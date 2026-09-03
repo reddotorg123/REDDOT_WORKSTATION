@@ -1089,7 +1089,10 @@
 
     if (!member.id) member.id = member.uid ? `RD-${member.uid.slice(0, 6).toUpperCase()}` : 'RD-EMP-001';
 
-    const photo = member.idCardPhoto || member.photoUrl || member.photoURL || WorkspaceDB.data.customMountedBadgePhoto || 'assets/id-card.png';
+    let photo = member.idCardPhoto || member.photoUrl || member.photoURL || WorkspaceDB.data.customMountedBadgePhoto || 'assets/id-card.png';
+    if (photo.includes('drive.google.com/thumbnail?id=') || photo.includes('/file/d/')) {
+      photo = convertGoogleDriveLink(photo);
+    }
     WorkspaceDB.data.customMountedBadgePhoto = photo;
     WorkspaceDB.save();
 
@@ -2822,7 +2825,7 @@
       if (!clean.startsWith('http://') && !clean.startsWith('https://') && !clean.startsWith('data:')) {
         // If it looks like a bare Google Drive file ID
         if (/^[a-zA-Z0-9_-]{25,50}$/.test(clean)) {
-          return `https://drive.google.com/thumbnail?id=${clean}&sz=w1000`;
+          return `https://lh3.googleusercontent.com/d/${clean}=w1000`;
         }
         clean = 'https://' + clean;
       }
@@ -2834,8 +2837,8 @@
       const fileId = matchFile ? matchFile[1] : (matchD ? matchD[1] : (matchId ? matchId[1] : null));
 
       if (fileId) {
-        // High-resolution public thumbnail endpoint (Google's official public image streamer)
-        return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+        // Direct high-resolution Google Usercontent CDN stream (HTTP 200 OK, Access-Control-Allow-Origin: *, no 302 redirect!)
+        return `https://lh3.googleusercontent.com/d/${fileId}=w1000`;
       }
       return clean;
     }
@@ -3218,8 +3221,16 @@
 
     // Check if a custom photo was mounted
     if (WorkspaceDB.data.customMountedBadgePhoto) {
+      let photoUrl = WorkspaceDB.data.customMountedBadgePhoto;
+      if (photoUrl.includes('drive.google.com/thumbnail?id=') || photoUrl.includes('/file/d/')) {
+        photoUrl = convertGoogleDriveLink(photoUrl);
+        WorkspaceDB.data.customMountedBadgePhoto = photoUrl;
+        WorkspaceDB.save();
+      }
       const badgeImg = document.getElementById('badgeImg');
-      if (badgeImg) badgeImg.src = WorkspaceDB.data.customMountedBadgePhoto;
+      if (badgeImg) {
+        badgeImg.src = photoUrl;
+      }
     }
 
     renderWallpaperGallery();

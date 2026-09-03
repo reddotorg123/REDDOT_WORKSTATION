@@ -93,7 +93,7 @@
           <div class="card-frame" id="cardBadgeTrigger" title="Click to view Official Employee Badge or Change Photo">
             <div class="card-glass-sheen"></div>
             <div class="card-image-box">
-              <img id="badgeImg" src="assets/id-card.png" alt="REDDOT Identification Badge" class="card-image" loading="eager" data-cache-key="badge_main_id_card">
+              <img id="badgeImg" src="assets/id-card.png" alt="REDDOT Identification Badge" class="card-image" loading="eager" data-cache-key="badge_main_id_card" onerror="if (!this.dataset.fallback) { this.dataset.fallback='1'; const m = (this.src||'').match(/([a-zA-Z0-9_-]{25,})/); if (m) { this.src = 'https://lh3.googleusercontent.com/d/' + m[1] + '=w1000'; return; } } this.src='assets/id-card.png';">
             </div>
           </div>
         </div>
