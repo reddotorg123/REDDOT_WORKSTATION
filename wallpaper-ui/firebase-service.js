@@ -289,8 +289,7 @@
     async updateMemberPhoto(uid, photoDataUrl) {
       if (!this.db || !photoDataUrl) return;
 
-      const userUid = this.currentUser ? this.currentUser.uid : uid;
-      const userEmail = this.currentUser?.email ? this.currentUser.email.toLowerCase().trim() : null;
+      const targetUid = uid || (this.currentUser ? this.currentUser.uid : 'RD-FOUNDER-001');
 
       const photoPayload = {
         idCardPhoto: photoDataUrl,
@@ -304,37 +303,28 @@
       // 1. Immediately persist in local storage
       try {
         const storedPhotos = JSON.parse(localStorage.getItem('rd_member_custom_photos') || '{}');
-        if (userEmail) storedPhotos[userEmail] = photoDataUrl;
-        if (uid) storedPhotos[uid] = photoDataUrl;
-        if (userUid) storedPhotos[userUid] = photoDataUrl;
+        if (targetUid) storedPhotos[targetUid] = photoDataUrl;
+        if (this.currentUser?.email) storedPhotos[this.currentUser.email.toLowerCase()] = photoDataUrl;
         localStorage.setItem('rd_member_custom_photos', JSON.stringify(storedPhotos));
         localStorage.setItem('rd_custom_badge_photo', photoDataUrl);
       } catch (_) {}
 
-      // 2. Update Firestore member docs across all possible lookup keys
-      const uidsToUpdate = Array.from(new Set([uid, userUid, 'RD-FOUNDER-001', 'pavithratech1206', userEmail ? userEmail.split('@')[0] : null].filter(Boolean)));
-      for (const idToUpdate of uidsToUpdate) {
-        try {
-          await this.db.collection(`organizations/${ORG_ID}/members`).doc(idToUpdate).set(photoPayload, { merge: true });
-        } catch (_) {}
+      // 2. Update ONLY the target member doc in Firestore
+      try {
+        await this.db.collection(`organizations/${ORG_ID}/members`).doc(targetUid).set(photoPayload, { merge: true });
+      } catch (e) {
+        console.warn('[FIREBASE] Member photo cloud sync notice:', e.message);
       }
 
-      if (userEmail) {
-        try {
-          const emailDoc = userEmail.replace(/[^a-z0-9]/gi, '_');
-          await this.db.collection(`organizations/${ORG_ID}/members`).doc(emailDoc).set(photoPayload, { merge: true });
-        } catch (_) {}
-      }
-
-      if (this.currentMember) {
+      if (this.currentMember && (this.currentMember.id === targetUid || this.currentMember.uid === targetUid)) {
         this.currentMember.idCardPhoto = photoDataUrl;
         this.currentMember.customPhoto = photoDataUrl;
         this.currentMember.isCustomPhoto = true;
-        this.currentMember.photoURL = photoDataUrl;
         this.currentMember.photoUrl = photoDataUrl;
+        this.currentMember.photoURL = photoDataUrl;
       }
-
-      await this.logAudit('MEMBER_PHOTO_UPDATED', `ID card photo updated in Cloud Vault for ${uid}`, uid);
+      await this.logAudit('MEMBER_PHOTO_UPDATED', `ID card photo updated in Cloud Vault for ${targetUid}`, targetUid).catch(() => {});
+      return photoPayload;
     },
 
     async getMemberDoc(uid) {

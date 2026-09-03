@@ -730,7 +730,7 @@
     if (!url || typeof url !== 'string') return '';
     const clean = url.trim();
     if (clean.startsWith('data:image/') || clean.startsWith('assets/') || clean.startsWith('http://') || clean.startsWith('https://')) {
-      return escapeHtml(clean);
+      return clean.replace(/"/g, '%22').replace(/'/g, '%27').replace(/</g, '%3C').replace(/>/g, '%3E');
     }
     return '';
   }
@@ -1370,11 +1370,25 @@
         const isActive = state.activeChannelId === ch.id;
         btn.className = `channel-item ${isActive ? 'active' : ''}`;
         btn.setAttribute('data-channel', ch.id);
+        btn.style.display = 'flex';
+        btn.style.alignItems = 'center';
+        btn.style.justifyContent = 'space-between';
+        btn.style.width = '100%';
         btn.innerHTML = `
-          <span class="ch-hash">#</span>
-          <span>${escapeHtml(ch.name || ch.id)}</span>
+          <div style="display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <span class="ch-hash">#</span>
+            <span style="overflow: hidden; text-overflow: ellipsis;">${escapeHtml(ch.name || ch.id)}</span>
+          </div>
+          ${ch.id !== 'general' ? `
+            <span class="btn-channel-quick-edit" title="Edit channel #${escapeHtml(ch.name || ch.id)}" style="opacity: 0.7; font-size: 11px; padding: 2px 5px; border-radius: 3px; cursor: pointer; color: var(--accent-cyan);">✏️</span>
+          ` : ''}
         `;
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
+          if (e.target.closest('.btn-channel-quick-edit')) {
+            e.stopPropagation();
+            openEditChannelModal(ch.id);
+            return;
+          }
           selectChatTarget(ch.id, ch.name, ch.topic);
         });
         channelList.appendChild(btn);
@@ -2595,8 +2609,8 @@
       playNotificationChirp(true);
     });
 
-    function openEditChannelModal() {
-      const curChId = state.activeChannelId;
+    function openEditChannelModal(targetChId = null) {
+      const curChId = targetChId || state.activeChannelId || 'general';
       if (!curChId || curChId.startsWith('dm_')) return;
 
       const chObj = (WorkspaceDB.data.channels || []).find(c => c.id === curChId) || { id: curChId, name: curChId, topic: '' };
@@ -2610,7 +2624,7 @@
       if (targetIdInput) targetIdInput.value = curChId;
       if (nameInput) nameInput.value = chObj.name || curChId;
       if (topicInput) topicInput.value = chObj.topic || '';
-      if (titleEl) titleEl.textContent = `EDIT GROUP CHANNEL #${curChId}`;
+      if (titleEl) titleEl.textContent = `EDIT GROUP CHANNEL #${chObj.name || curChId}`;
 
       // Default channel #general cannot be deleted
       if (btnDelete) {
@@ -2802,22 +2816,32 @@
 
     function convertGoogleDriveLink(url) {
       if (!url || typeof url !== 'string') return '';
-      const clean = url.trim();
+      let clean = url.trim();
+
+      // If user pasted without protocol
+      if (!clean.startsWith('http://') && !clean.startsWith('https://') && !clean.startsWith('data:')) {
+        // If it looks like a bare Google Drive file ID
+        if (/^[a-zA-Z0-9_-]{25,50}$/.test(clean)) {
+          return `https://drive.google.com/thumbnail?id=${clean}&sz=w1000`;
+        }
+        clean = 'https://' + clean;
+      }
 
       // Match Google Drive file id patterns:
-      const matchFile = clean.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-      const matchId = clean.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-      const fileId = matchFile ? matchFile[1] : (matchId ? matchId[1] : null);
+      const matchFile = clean.match(/\/file\/d\/([a-zA-Z0-9_-]{20,})/i);
+      const matchD = clean.match(/\/d\/([a-zA-Z0-9_-]{20,})/i);
+      const matchId = clean.match(/[?&]id=([a-zA-Z0-9_-]{20,})/i);
+      const fileId = matchFile ? matchFile[1] : (matchD ? matchD[1] : (matchId ? matchId[1] : null));
 
       if (fileId) {
-        // High-speed CDN stream bypassing Google Drive cookie blocks & preview warnings
-        return `https://lh3.googleusercontent.com/d/${fileId}=s800`;
+        // High-resolution public thumbnail endpoint (Google's official public image streamer)
+        return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
       }
       return clean;
     }
 
     function openLinkPhotoModal(targetMemberId = null) {
-      state.linkingPhotoMemberId = targetMemberId || state.selectedViewingMemberId || state.currentMemberId;
+      state.linkingPhotoMemberId = targetMemberId || state.selectedViewingMemberId || state.currentMemberId || 'RD-FOUNDER-001';
       const input = document.getElementById('inputDrivePhotoUrl');
       const previewBox = document.getElementById('drivePhotoPreviewBox');
       const statusText = document.getElementById('drivePhotoStatusText');
@@ -2852,14 +2876,21 @@
 
     document.getElementById('btnPreviewDrivePhoto')?.addEventListener('click', () => {
       const rawUrl = document.getElementById('inputDrivePhotoUrl')?.value;
-      if (!rawUrl || !rawUrl.trim()) return;
-
-      const directUrl = convertGoogleDriveLink(rawUrl);
       const previewBox = document.getElementById('drivePhotoPreviewBox');
       const statusText = document.getElementById('drivePhotoStatusText');
 
+      if (!rawUrl || !rawUrl.trim()) {
+        if (statusText) {
+          statusText.textContent = '⚠️ Please paste a link first.';
+          statusText.style.color = '#ffb300';
+        }
+        return;
+      }
+
+      let directUrl = convertGoogleDriveLink(rawUrl);
+
       if (statusText) {
-        statusText.textContent = 'Verifying image stream...';
+        statusText.textContent = 'Connecting to image stream...';
         statusText.style.color = 'var(--accent-cyan)';
       }
 
@@ -2869,16 +2900,44 @@
           previewBox.innerHTML = `<img src="${directUrl}" style="width:100%;height:100%;object-fit:cover;">`;
         }
         if (statusText) {
-          statusText.textContent = '✅ Image verified and ready to apply!';
+          statusText.textContent = '✅ Image verified! Click "Apply" below to save.';
           statusText.style.color = '#00e676';
         }
       };
       img.onerror = () => {
+        // Fallback: try direct lh3 CDN if thumbnail fails
+        const fileMatch = directUrl.match(/id=([a-zA-Z0-9_-]{20,})/);
+        if (fileMatch) {
+          const fallbackUrl = `https://lh3.googleusercontent.com/d/${fileMatch[1]}=s1000`;
+          const img2 = new Image();
+          img2.onload = () => {
+            directUrl = fallbackUrl;
+            if (previewBox) {
+              previewBox.innerHTML = `<img src="${fallbackUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+            }
+            if (statusText) {
+              statusText.textContent = '✅ Image verified via Google CDN! Click "Apply" to save.';
+              statusText.style.color = '#00e676';
+            }
+          };
+          img2.onerror = () => {
+            if (previewBox) {
+              previewBox.innerHTML = `<img src="${directUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+            }
+            if (statusText) {
+              statusText.innerHTML = '⚠️ Make sure Drive link permission is set to <strong>"Anyone with link can view"</strong>.';
+              statusText.style.color = '#ffb300';
+            }
+          };
+          img2.src = fallbackUrl;
+          return;
+        }
+
         if (previewBox) {
           previewBox.innerHTML = `<img src="${directUrl}" style="width:100%;height:100%;object-fit:cover;">`;
         }
         if (statusText) {
-          statusText.textContent = '⚠️ Preview notice: Ensure Drive permissions are "Anyone with link can view".';
+          statusText.innerHTML = '⚠️ Could not load preview. Ensure Drive access is <strong>"Anyone with the link"</strong>.';
           statusText.style.color = '#ffb300';
         }
       };
@@ -2891,16 +2950,25 @@
       if (!rawUrl || !rawUrl.trim()) return;
 
       const directUrl = convertGoogleDriveLink(rawUrl);
-      const targetId = state.linkingPhotoMemberId || state.selectedViewingMemberId || state.currentMemberId;
-      const member = WorkspaceDB.data.members[targetId] || getUniqueMembersList().find(m => m.id === targetId || m.uid === targetId) || state.currentMember;
+      const targetId = state.linkingPhotoMemberId || state.selectedViewingMemberId || state.currentMemberId || 'RD-FOUNDER-001';
+      let member = WorkspaceDB.data.members[targetId] || getUniqueMembersList().find(m => m.id === targetId || m.uid === targetId) || state.currentMember;
 
-      if (member) {
-        member.idCardPhoto = directUrl;
-        member.customPhoto = directUrl;
-        member.isCustomPhoto = true;
-        member.photoURL = directUrl;
-        member.photoUrl = directUrl;
+      if (!member) {
+        member = {
+          id: targetId,
+          name: state.currentUser?.displayName || 'JAGADISH K',
+          email: state.currentUser?.email || 'jagadish2k2006@gmail.com',
+          role: 'Founder / System Architect',
+          dept: 'Hardware Architecture'
+        };
+        WorkspaceDB.data.members[targetId] = member;
       }
+
+      member.idCardPhoto = directUrl;
+      member.customPhoto = directUrl;
+      member.isCustomPhoto = true;
+      member.photoURL = directUrl;
+      member.photoUrl = directUrl;
 
       WorkspaceDB.data.customMountedBadgePhoto = directUrl;
 
@@ -2910,6 +2978,7 @@
         const storedPhotos = JSON.parse(localStorage.getItem('rd_member_custom_photos') || '{}');
         if (emailKey) storedPhotos[emailKey.toLowerCase()] = directUrl;
         if (targetId) storedPhotos[targetId] = directUrl;
+        if (member.uid) storedPhotos[member.uid] = directUrl;
         localStorage.setItem('rd_member_custom_photos', JSON.stringify(storedPhotos));
         localStorage.setItem('rd_custom_badge_photo', directUrl);
       } catch (_) {}
@@ -2919,7 +2988,7 @@
       // Sync to Cloud Firestore
       if (window.FirebaseService?.updateMemberPhoto) {
         try {
-          const targetUid = member?.uid || member?.id || state.currentUser?.uid || 'RD-FOUNDER-001';
+          const targetUid = member.uid || member.id || state.currentUser?.uid || 'RD-FOUNDER-001';
           await FirebaseService.updateMemberPhoto(targetUid, directUrl);
         } catch (err) {
           console.warn('[PHOTO] Cloud sync note:', err);
@@ -3238,7 +3307,7 @@
       // 3. Dynamic Channels & Direct Messages (DMs) Subscription
       FirebaseService.subscribeChannels((channels) => {
         if (channels && channels.length > 0) {
-          const map = new Map((WorkspaceDB.data.channels || DEFAULT_CHANNELS).map(c => [c.id, c]));
+          const map = new Map(DEFAULT_CHANNELS.map(c => [c.id, c]));
           channels.forEach(ch => {
             if (!ch.isDirectMessage && !ch.id.startsWith('dm_')) {
               map.set(ch.id, { ...map.get(ch.id), ...ch });
