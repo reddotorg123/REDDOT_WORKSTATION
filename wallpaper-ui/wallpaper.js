@@ -735,6 +735,31 @@
     return '';
   }
 
+  function convertGoogleDriveLink(url) {
+    if (!url || typeof url !== 'string') return '';
+    let clean = url.trim();
+
+    // If user pasted without protocol
+    if (!clean.startsWith('http://') && !clean.startsWith('https://') && !clean.startsWith('data:')) {
+      if (/^[a-zA-Z0-9_-]{25,50}$/.test(clean)) {
+        return `https://lh3.googleusercontent.com/d/${clean}=s1000`;
+      }
+      clean = 'https://' + clean;
+    }
+
+    // Match Google Drive file id patterns:
+    const matchFile = clean.match(/\/file\/d\/([a-zA-Z0-9_-]{20,})/i);
+    const matchD = clean.match(/\/d\/([a-zA-Z0-9_-]{20,})/i);
+    const matchId = clean.match(/[?&]id=([a-zA-Z0-9_-]{20,})/i);
+    const fileId = matchFile ? matchFile[1] : (matchD ? matchD[1] : (matchId ? matchId[1] : null));
+
+    if (fileId) {
+      // Direct high-speed CDN stream (200 OK, image/png or image/jpeg, no 302 redirect, no CORB block)
+      return `https://lh3.googleusercontent.com/d/${fileId}=s1000`;
+    }
+    return clean;
+  }
+
   // --- WALLPAPERS GALLERY ---
   function renderWallpaperGallery() {
     const grid = document.getElementById('wallpaperPresetsGrid');
@@ -1090,14 +1115,18 @@
     if (!member.id) member.id = member.uid ? `RD-${member.uid.slice(0, 6).toUpperCase()}` : 'RD-EMP-001';
 
     let photo = member.idCardPhoto || member.photoUrl || member.photoURL || WorkspaceDB.data.customMountedBadgePhoto || 'assets/id-card.png';
-    if (photo.includes('drive.google.com/thumbnail?id=') || photo.includes('/file/d/')) {
+    if (photo && (photo.includes('drive.google.com/thumbnail?id=') || photo.includes('/file/d/') || photo.includes('drive.google.com/open?id='))) {
       photo = convertGoogleDriveLink(photo);
     }
     WorkspaceDB.data.customMountedBadgePhoto = photo;
-    WorkspaceDB.save();
+    WorkspaceDB.save().catch(() => {});
 
     const badgeImg = document.getElementById('badgeImg');
     if (badgeImg) {
+      badgeImg.onerror = () => {
+        console.warn('[BADGE] Photo failed to load, falling back to assets/id-card.png');
+        badgeImg.src = 'assets/id-card.png';
+      };
       badgeImg.src = photo;
       badgeImg.classList.add('pulse-glow');
       setTimeout(() => badgeImg.classList.remove('pulse-glow'), 1000);
@@ -2817,32 +2846,6 @@
     // --- GOOGLE DRIVE & WEB PHOTO LINKING ENGINE ---
     const linkPhotoModal = document.getElementById('linkPhotoModal');
 
-    function convertGoogleDriveLink(url) {
-      if (!url || typeof url !== 'string') return '';
-      let clean = url.trim();
-
-      // If user pasted without protocol
-      if (!clean.startsWith('http://') && !clean.startsWith('https://') && !clean.startsWith('data:')) {
-        // If it looks like a bare Google Drive file ID
-        if (/^[a-zA-Z0-9_-]{25,50}$/.test(clean)) {
-          return `https://lh3.googleusercontent.com/d/${clean}=w1000`;
-        }
-        clean = 'https://' + clean;
-      }
-
-      // Match Google Drive file id patterns:
-      const matchFile = clean.match(/\/file\/d\/([a-zA-Z0-9_-]{20,})/i);
-      const matchD = clean.match(/\/d\/([a-zA-Z0-9_-]{20,})/i);
-      const matchId = clean.match(/[?&]id=([a-zA-Z0-9_-]{20,})/i);
-      const fileId = matchFile ? matchFile[1] : (matchD ? matchD[1] : (matchId ? matchId[1] : null));
-
-      if (fileId) {
-        // Direct high-resolution Google Usercontent CDN stream (HTTP 200 OK, Access-Control-Allow-Origin: *, no 302 redirect!)
-        return `https://lh3.googleusercontent.com/d/${fileId}=w1000`;
-      }
-      return clean;
-    }
-
     function openLinkPhotoModal(targetMemberId = null) {
       state.linkingPhotoMemberId = targetMemberId || state.selectedViewingMemberId || state.currentMemberId || 'RD-FOUNDER-001';
       const input = document.getElementById('inputDrivePhotoUrl');
@@ -3222,13 +3225,17 @@
     // Check if a custom photo was mounted
     if (WorkspaceDB.data.customMountedBadgePhoto) {
       let photoUrl = WorkspaceDB.data.customMountedBadgePhoto;
-      if (photoUrl.includes('drive.google.com/thumbnail?id=') || photoUrl.includes('/file/d/')) {
+      if (photoUrl && (photoUrl.includes('drive.google.com/thumbnail?id=') || photoUrl.includes('/file/d/') || photoUrl.includes('drive.google.com/open?id='))) {
         photoUrl = convertGoogleDriveLink(photoUrl);
         WorkspaceDB.data.customMountedBadgePhoto = photoUrl;
-        WorkspaceDB.save();
+        WorkspaceDB.save().catch(() => {});
       }
       const badgeImg = document.getElementById('badgeImg');
       if (badgeImg) {
+        badgeImg.onerror = () => {
+          console.warn('[BADGE] Photo failed to load, falling back to assets/id-card.png');
+          badgeImg.src = 'assets/id-card.png';
+        };
         badgeImg.src = photoUrl;
       }
     }
