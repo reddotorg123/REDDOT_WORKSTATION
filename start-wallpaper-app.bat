@@ -1,7 +1,7 @@
 @echo off
-title Jagadish K - Native Windows Desktop Wallpaper App
+title REDDOT Workstation OS - Development Runner
 echo ==============================================================
-echo  JAGADISH K - NATIVE WINDOWS LIVE WALLPAPER APP
+echo  REDDOT WORKSTATION OS - DESKTOP & LIVE WALLPAPER
 echo  Runs behind all apps on Windows Desktop with System Tray
 echo ==============================================================
 cd /d "%~dp0"
