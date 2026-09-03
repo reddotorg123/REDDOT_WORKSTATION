@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Universal Allow for REDDOT Workstation OS Realtime Multi-Device Sync
+    match /{document=**} {
+      allow read, write: if true;
+    }
+
+    match /organizations/{orgId} {
+      allow read, write: if true;
+
+      // Members Collection
+      match /members/{memberDocId} {
+        allow read, write: if true;
+      }
+
+      // Invites Collection
+      match /invites/{inviteId} {
+        allow read, write: if true;
+      }
+
+      // Tasks Collection
+      match /tasks/{taskId} {
+        allow read, write: if true;
+
+        match /activity/{eventId} {
+          allow read, write: if true;
+        }
+      }
+
+      // Channels Collection & Direct Messages
+      match /channels/{channelId} {
+        allow read, write: if true;
+
+        match /messages/{messageId} {
+          allow read, write: if true;
+        }
+      }
+
+      // Audit Logs Collection
+      match /auditLogs/{eventId} {
+        allow read, write: if true;
+      }
+
+      // Realtime Calls Signaling Collection
+      match /calls/{callId} {
+        allow read, write: if true;
+      }
+    }
+  }
+}

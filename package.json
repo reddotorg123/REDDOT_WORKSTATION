@@ -1,0 +1,59 @@
+{
+  "name": "jagadish-desktop-wallpaper-app",
+  "version": "2.5.1",
+  "description": "REDDOT Architecture & Executive Workstation OS with Native Windows Desktop Wallpaper & System Tray for Jagadish K",
+  "main": "main.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/reddotorg123/REDDOT_WORKSTATION.git"
+  },
+  "homepage": "https://github.com/reddotorg123/REDDOT_WORKSTATION#readme",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win portable",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "build": {
+    "appId": "com.reddot.workstation",
+    "productName": "REDDOT Workstation OS",
+    "copyright": "Copyright © 2026 REDDOT Technologies",
+    "directories": {
+      "output": "app/v${version}"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "wallpaper-ui/**/*"
+    ],
+    "artifactName": "${productName}-${version}-${target}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "wallpaper-ui/assets/id-card.png"
+    },
+    "portable": {
+      "artifactName": "REDDOT-Workstation-OS-Portable.${ext}"
+    }
+  },
+  "keywords": [
+    "desktop-wallpaper",
+    "windows-wallpaper",
+    "system-tray",
+    "admin-panel",
+    "timesheets",
+    "jagadish-k"
+  ],
+  "author": "Jagadish K",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "electron-builder": "^25.1.8"
+  }
+}

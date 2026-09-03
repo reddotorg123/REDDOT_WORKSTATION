@@ -1,0 +1,15 @@
+{
+  "version": "2.5.1",
+  "releaseDate": "2026-09-03",
+  "minRequiredVersion": "2.0.0",
+  "changelog": [
+    "In-app Group Channel Management: Create, edit, and delete team channels with Firestore sync",
+    "Hardware Architecture Wallpaper Matrix: Real-time procedural rendering with glowing neon accents",
+    "Google Drive Direct CDN Photo Linking: Permanent ID badge photo sync with zero Gmail overwrites",
+    "Team Role & Department Authorization Modal: Instant member permissions and title editing",
+    "Global GitHub Releases OTA Mirror: Zero-latency Fastly CDN distribution for team updates worldwide",
+    "100% Standalone Portable Windows distribution with zero setup requirement"
+  ],
+  "downloadUrl": "https://github.com/reddotorg123/REDDOT_WORKSTATION/releases/download/v2.5.1/REDDOT-Workstation-OS-Portable.zip",
+  "mandatory": false
+}

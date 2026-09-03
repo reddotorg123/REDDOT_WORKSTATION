@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://127.0.0.1:* http://localhost:*; script-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://fonts.googleapis.com; font-src 'self' http://127.0.0.1:* http://localhost:* https://fonts.gstatic.com data:; img-src 'self' http://127.0.0.1:* http://localhost:* data: blob: https:; connect-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com https://*.google.com; object-src 'none'; base-uri 'none'; frame-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseapp.com https://accounts.google.com https://*.google.com;">
+  <title>REDDOT Workstation OS &bull; Enterprise Workspace</title>
+  <meta name="description" content="REDDOT Architecture Enterprise Employee Workspace with Native Persistent Database, ID Card Creator, Wallpaper Mount, Tasks, and Team Chat.">
+  <meta name="author" content="REDDOT Technologies">
+
+  <!-- Google Fonts: Space Grotesk, Outfit, Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700;800;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Firebase SDK v10 (Compat Build) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="firebase-service.js"></script>
+</head>
+<body class="theme-obsidian mode-wallpaper">
+  <!-- Dynamic Procedural Wallpaper Matrix Background -->
+  <div id="wallpaperBgLayer" class="wallpaper-bg-layer"></div>
+  <!-- Subtle Architectural Grid Background -->
+  <div class="grid-backdrop"></div>
+  <div class="vignette-overlay"></div>
+
+  <!-- =========================================================================
+       MAIN WORKSTATION VIEWPORT (PIXEL-PERFECT LIVE WALLPAPER)
+       ========================================================================= -->
+  <div id="wallpaperRoot" class="wp-root">
+
+    <!-- Top Minimalist Bar: Clean Branding & Window Controls -->
+    <header class="top-bar">
+      <div class="brand-block" id="btnBrandHome" title="Open Command Center (Key: Space)">
+        <div class="brand-icon-box">
+          <span class="brand-hex">&#x2B22;</span>
+        </div>
+        <div class="brand-meta">
+          <span class="brand-name" id="topBrandName">REDDOT.OS</span>
+          <span class="brand-sub">WORKSPACE</span>
+        </div>
+      </div>
+
+      <!-- Top Window Actions & Mode Controls -->
+      <div class="top-window-controls">
+        <button id="btnTopPinToggle" class="win-ctrl-btn" title="Toggle Desktop Background Pin Mode">
+          <span class="ctrl-icon" id="topPinIcon">📌</span>
+          <span class="ctrl-text" id="topPinText">Pin Mode</span>
+        </button>
+        <button id="btnTopMinimize" class="win-ctrl-btn" title="Minimize Window">
+          <span class="ctrl-icon">&minus;</span>
+        </button>
+        <button id="btnTopMaximize" class="win-ctrl-btn" title="Maximize / Restore Window">
+          <span class="ctrl-icon">&#x25A2;</span>
+        </button>
+        <button id="btnTopClose" class="win-ctrl-btn win-ctrl-close" title="Minimize to System Tray">
+          <span class="ctrl-icon">&times;</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Center Stage: Symmetrical Alignment of Left Tag, Giant Centerpiece & Right Tag -->
+    <main class="center-stage" id="centerStage">
+      <!-- Left Side Tag -->
+      <div class="side-tag left-tag">
+        <span class="tag-bold" id="leftTagRole">(TECHNICAL WORKSPACE)</span>
+        <span class="tag-muted" id="leftTagSub">ORGANIZATION // REDDOT</span>
+      </div>
+
+      <!-- Giant Bold Centerpiece Typography -->
+      <div class="giant-name-backdrop pointer-events-none">
+        <h1 class="giant-name" id="giantNameText">REDDOT</h1>
+      </div>
+
+      <!-- 3D Interactive Floating Lanyard Card Overlapping Centerpiece -->
+      <div id="lanyardContainer" class="lanyard-wrapper">
+        <div id="lanyardCard" class="lanyard-card">
+          <!-- Hanging Lanyard Neck Ribbon reaching top of screen -->
+          <div class="lanyard-ribbon">
+            <div class="ribbon-line"></div>
+            <div class="metallic-clip">
+              <div class="clip-slot"></div>
+            </div>
+          </div>
+
+          <!-- Physical Badge Case Holder with ID Card Artwork -->
+          <div class="card-frame" id="cardBadgeTrigger" title="Click to view Official Employee Badge or Change Photo">
+            <div class="card-glass-sheen"></div>
+            <div class="card-image-box">
+              <img id="badgeImg" src="assets/id-card.png" alt="REDDOT Identification Badge" class="card-image" loading="eager" data-cache-key="badge_main_id_card">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Side Tag -->
+      <div class="side-tag right-tag">
+        <span class="tag-bold" id="rightTagRole">PERSISTENT WORKSPACE &bull;</span>
+        <span class="tag-muted" id="rightTagSub">LOCAL DISK &amp; CLOUD DATABASE</span>
+      </div>
+    </main>
+
+    <!-- Bottom Bar: Watermark & Reveal Dock -->
+    <footer class="bottom-bar">
+      <div class="bottom-left">
+        <button id="btnOpenCommandCenter" class="stealth-dock-btn" title="Open Enterprise Command Center (Key: Space)">
+          <span class="btn-icon">&#x29E2;</span>
+          <span class="btn-text">COMMAND CENTER</span>
+          <span class="hotkey-pill">SPACE</span>
+        </button>
+      </div>
+
+      <div class="bottom-right">
+        <div class="watermark-tag">
+          <span class="watermark-sub" id="bottomUserEmail">PERSISTENT DISK VAULT ACTIVE</span>
+          <span class="watermark-bold" id="bottomBrandTag">REDDOT &bull; 2026</span>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- =========================================================================
+       ENTERPRISE ADMIN & WORKSTATION COMMAND CENTER
+       ========================================================================= -->
+  <div id="commandCenterDrawer" class="command-center-overlay collapsed">
+    <div class="command-center-shell">
+      
+      <!-- Drawer Header Bar -->
+      <header class="command-header">
+        <div class="header-left">
+          <div class="cmd-brand-icon">&#x25C6;</div>
+          <div class="cmd-title-meta">
+            <h2 class="cmd-title" id="cmdTitle">REDDOT WORKSPACE</h2>
+            <p class="cmd-subtitle" id="cmdSubtitle">Enterprise Workforce Command &bull; Org: reddot</p>
+          </div>
+          <div class="session-status-badge" id="btnAuthTrigger" title="Switch User / View Profile">
+            <span class="role-indicator-dot" id="roleDot" style="background: #00e676;"></span>
+            <span class="role-label" id="roleLabel">JAGADISH K // OWNER</span>
+            <span class="session-emp-id" id="sessionEmpId">OWNER</span>
+          </div>
+          <span class="db-secure-badge" id="cmdDbBadge" title="Disk Vault & Cloud Sync Active">PERSISTENT DB ACTIVE</span>
+        </div>
+
+        <!-- Segmented Tab Navigation Controller -->
+        <nav class="cmd-tab-nav" id="cmdTabNav">
+          <button class="cmd-tab-btn active" data-target="tabWallpapersView" id="tabBtnWallpapers">
+            <span class="tab-icon">&#x1F3A8;</span>
+            <span>Wallpapers</span>
+          </button>
+          <button class="cmd-tab-btn" data-target="tabWorkersView" id="tabBtnWorkers">
+            <span class="tab-icon">&#x1F465;</span>
+            <span>Directory &amp; IDs</span>
+          </button>
+          <button class="cmd-tab-btn" data-target="tabTimesheetsView" id="tabBtnTimesheets">
+            <span class="tab-icon">&#x23F1;</span>
+            <span>Shifts</span>
+          </button>
+          <button class="cmd-tab-btn" data-target="tabTasksView" id="tabBtnTasks">
+            <span class="tab-icon">&#x1F4CB;</span>
+            <span>Tasks</span>
+          </button>
+          <button class="cmd-tab-btn" data-target="tabChatView" id="tabBtnChat">
+            <span class="tab-icon">&#x1F4AC;</span>
+            <span>Team Chat</span>
+          </button>
+          <button class="cmd-tab-btn" data-target="tabTelemetryView" id="tabBtnTelemetry">
+            <span class="tab-icon">&#x1F310;</span>
+            <span>Presence</span>
+          </button>
+          <button class="cmd-tab-btn" data-target="tabDatabaseView" id="tabBtnDatabase">
+            <span class="tab-icon">&#x1F6E1;</span>
+            <span>Database &amp; Storage</span>
+          </button>
+        </nav>
+
+        <!-- Window Controls & Dismiss -->
+        <div class="header-right">
+          <button id="btnCmdPinToggle" class="btn-outline-action" title="Toggle Desktop Background Pin Mode">
+            <span id="cmdPinIcon">📌</span> <span id="cmdPinText">Pin Mode</span>
+          </button>
+          <button id="btnToggleWallpaperMode" class="btn-outline-action" title="Return to Clean Live Wallpaper (Esc)">
+            <span>&#x29E2; Wallpaper Mode [Esc]</span>
+          </button>
+          <div class="cmd-win-ctrl-group">
+            <button id="btnCmdMinimize" class="cmd-win-btn" title="Minimize Window">&minus;</button>
+            <button id="btnCmdMaximize" class="cmd-win-btn" title="Maximize Window">&#x25A2;</button>
+            <button id="btnCloseCommandCenter" class="drawer-close-btn" title="Close (Esc)">&times;</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Tab Content Area -->
+      <main class="command-body">
+
+        <!-- TAB 1: WALLPAPER PRESETS GALLERY -->
+        <section id="tabWallpapersView" class="cmd-tab-pane active">
+          <div class="tab-hero">
+            <div class="tab-hero-text">
+              <h3>HARDWARE ARCHITECTURE WALLPAPER MATRIX</h3>
+              <p>Select your workstation aesthetic preset or customize hardware telemetry overlays.</p>
+            </div>
+          </div>
+          <div class="wallpapers-grid" id="wallpaperPresetsGrid"></div>
+        </section>
+
+        <!-- TAB 2: EMPLOYEE DIRECTORY & ID BADGES -->
+        <section id="tabWorkersView" class="cmd-tab-pane">
+          <div class="workers-toolbar">
+            <div class="toolbar-left">
+              <input type="text" id="searchWorkerInput" class="custom-input search-input" placeholder="Search team members by name, role, ID, department...">
+            </div>
+            <div class="toolbar-right" style="display: flex; gap: 8px;">
+              <button id="btnOpenCreateWorkerModal" class="btn-primary-action" title="Create a new Member Profile and generate Official ID Card">
+                <span>&#x2795; Create Member &amp; ID Card</span>
+              </button>
+            </div>
+          </div>
+          <div class="workers-grid" id="workersCardsGrid">
+            <!-- Dynamically populated with member ID cards -->
+          </div>
+        </section>
+
+        <!-- TAB 3: WORK HOURS & SHIFTS -->
+        <section id="tabTimesheetsView" class="cmd-tab-pane">
+          <div class="timesheet-layout">
+            <div class="timesheet-hero-card">
+              <div class="hero-shift-meta">
+                <span class="shift-indicator-badge" id="personalShiftBadge">DUTY OFF</span>
+                <h3 class="shift-timer-display" id="personalShiftTimer">00:00:00</h3>
+                <p class="shift-timer-sub">Current active shift duration for authenticated user</p>
+              </div>
+              <div class="hero-shift-controls">
+                <button id="btnPersonalClockIn" class="btn-clock in">
+                  <span>&#x25B6; Clock In</span>
+                </button>
+                <button id="btnPersonalBreak" class="btn-clock break" disabled>
+                  <span>&#x23F8; Take Break</span>
+                </button>
+                <button id="btnPersonalClockOut" class="btn-clock out" disabled>
+                  <span>&#x23F9; Clock Out</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="punch-log-section">
+              <h4 class="section-title">SHIFT PUNCH AUDIT TRAIL</h4>
+              <div class="punch-table-wrap">
+                <table class="punch-table">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Action</th>
+                      <th>Timestamp</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody id="punchLogTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 4: TASKS & GOALS -->
+        <section id="tabTasksView" class="cmd-tab-pane">
+          <div class="tasks-layout">
+            <div class="tasks-sidebar">
+              <div class="task-create-card" id="taskCreateContainer">
+                <h4>&#x2795; CREATE &amp; ASSIGN TASK</h4>
+                <p class="task-hint">Assign goals and deadlines with immediate disk persistence.</p>
+                <form id="formCreateTask" class="task-form">
+                  <div class="form-group">
+                    <label>Task Title</label>
+                    <input type="text" id="taskTitleInput" class="custom-input" placeholder="e.g. Calibrate Ultrasonic Transducer" required>
+                  </div>
+                  <div class="form-group">
+                    <label>Assignee</label>
+                    <select id="taskAssigneeSelect" class="custom-select"></select>
+                  </div>
+                  <div class="form-group">
+                    <label>Priority</label>
+                    <select id="taskPrioritySelect" class="custom-select">
+                      <option value="NORMAL">Normal</option>
+                      <option value="MEDIUM">Medium</option>
+                      <option value="HIGH">High</option>
+                      <option value="URGENT">Urgent Priority</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Due Date / Target</label>
+                    <input type="text" id="taskDeadlineInput" class="custom-input" placeholder="Today 5:00 PM">
+                  </div>
+                  <div class="form-group">
+                    <label>Task Description &amp; Requirements</label>
+                    <textarea id="taskDescInput" class="custom-textarea" rows="3" placeholder="Provide requirements or verification notes..."></textarea>
+                  </div>
+                  <button type="submit" class="btn-primary-action w-100">
+                    <span>&#x1F4CB; Save &amp; Assign Task</span>
+                  </button>
+                </form>
+              </div>
+
+              <!-- Filter options -->
+              <div class="task-filter-box mt-12">
+                <label style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Task Filter</label>
+                <div class="filter-chips" id="taskFilterGroup">
+                  <button class="filter-chip active" data-filter="ALL">All Tasks</button>
+                  <button class="filter-chip" data-filter="MY_TASKS">Assigned to Me</button>
+                  <button class="filter-chip" data-filter="ASSIGNED">Assigned</button>
+                  <button class="filter-chip" data-filter="REACHED">In Progress</button>
+                  <button class="filter-chip" data-filter="ACCOMPLISHED">Completed</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="tasks-main-column">
+              <div class="tasks-column-head">
+                <h4>WORKSPACE TASKS &bull; PERSISTENT STORE</h4>
+                <span class="tasks-counter-badge" id="tasksTotalBadge">0 Tasks</span>
+              </div>
+              <div class="task-cards-list" id="taskCardsList">
+                <!-- Dynamically populated from Database -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 5: TEAM CHANNELS & DIRECT MESSAGES -->
+        <section id="tabChatView" class="cmd-tab-pane">
+          <div class="chat-layout">
+            <div class="chat-sidebar">
+              <div class="channel-group-block">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                  <span class="group-label" style="margin-bottom: 0;">TEAM CHANNELS</span>
+                  <button id="btnCreateChannel" title="Create New Group Channel" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: var(--accent-cyan); font-size: 13px; font-weight: 800; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;">+</button>
+                </div>
+                <div class="channel-items-list" id="channelList">
+                  <!-- Dynamically rendered team channels -->
+                </div>
+              </div>
+
+              <div class="channel-group-block mt-16">
+                <span class="group-label">DIRECT MESSAGES</span>
+                <div class="dm-items-list" id="dmMembersList">
+                  <!-- Dynamically populated team DM list -->
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-conversation-pane">
+              <div class="chat-conv-header">
+                <div class="conv-title-wrap">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <h4 id="activeChatTitle">#general</h4>
+                    <button id="btnEditChannel" class="btn-icon" title="Edit Group Channel Name &amp; Topic" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); cursor: pointer; color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                      <span>✏️ Edit</span>
+                    </button>
+                  </div>
+                  <p id="activeChatTopic">Company-wide updates and collaboration</p>
+                </div>
+                <div class="conv-actions">
+                  <button id="btnStartMeeting" class="btn-secondary-action" title="Start Secure Team Meeting">
+                    <span>&#x1F4F9; Start Meeting</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="chat-messages-scroll" id="chatMessagesContainer">
+                <!-- Dynamically populated from Database -->
+              </div>
+
+              <form id="formSendMessage" class="chat-input-bar">
+                <input type="text" id="chatMessageInput" class="chat-text-input" placeholder="Type a message or @mention a colleague..." autocomplete="off" required>
+                <button type="submit" class="btn-chat-send" title="Send Message">
+                  <span>Send &rarr;</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 6: TEAM PRESENCE & AVAILABILITY -->
+        <section id="tabTelemetryView" class="cmd-tab-pane">
+          <div class="telemetry-dashboard-container">
+            <div class="telemetry-hero-banner">
+              <div class="telemetry-hero-meta">
+                <h3>&#x1F310; TEAM PRESENCE &amp; AVAILABILITY DASHBOARD</h3>
+                <p>Transparent, minimal status indicators: App online/away/offline, active focus task, and system uptime. (Zero-surveillance guarantee).</p>
+              </div>
+              <div class="telemetry-hero-stats">
+                <div class="telemetry-stat-badge">
+                  <span class="pulse-green"></span>
+                  <span id="statFleetOnlineCount">0 Online</span>
+                </div>
+                <button id="btnViewPrivacyPolicy" class="btn-secondary-action">
+                  <span>&#x1F6E1; Privacy &amp; Disclosure</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Team Presence Cards Grid -->
+            <div class="fleet-overview-cards" id="fleetTelemetryGrid"></div>
+
+            <!-- Audit Trail -->
+            <div class="audit-log-section mt-24">
+              <h4 class="section-title">&#x1F4DC; WORKSPACE AUDIT LOG</h4>
+              <div class="punch-table-wrap">
+                <table class="punch-table">
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>Performed By</th>
+                      <th>Details</th>
+                      <th>Time</th>
+                    </tr>
+                  </thead>
+                  <tbody id="auditLogTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 7: DATABASE & STORAGE HUB (LIVE DIAGNOSTICS & BENCHMARK) -->
+        <section id="tabDatabaseView" class="cmd-tab-pane">
+          <div class="db-management-panel">
+            <div class="db-overview-card">
+              <div class="db-status-banner">
+                <div class="db-shield-icon">&#x1F6E1;</div>
+                <div class="db-banner-text">
+                  <h3>NATIVE PERSISTENT DATABASE &amp; STORAGE HUB</h3>
+                  <p>Reliable local file storage on Windows disk with automated persistence, backup exports, and real-time CRUD benchmarks.</p>
+                </div>
+                <div class="db-health-badge" id="dbHealthBadgeWrap" style="display: flex; gap: 8px; align-items: center;">
+                  <span class="pulse-green" id="dbStatusDot"></span>
+                  <span id="serverConnectionStatus">PERSISTENT DISK DB ONLINE (~0.5ms)</span>
+                  <button id="btnSyncCloudVaultNow" class="btn-primary" style="padding: 4px 10px; font-size: 10.5px; height: 26px;">
+                    <span>⚡ Sync Cloud Vault</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="db-metrics-row">
+                <div class="db-stat-box">
+                  <span class="db-stat-val" id="dbStatMembersCount">4</span>
+                  <span class="db-stat-lbl">Active Members</span>
+                </div>
+                <div class="db-stat-box">
+                  <span class="db-stat-val" id="dbStatTasksCount">4</span>
+                  <span class="db-stat-lbl">Stored Tasks</span>
+                </div>
+                <div class="db-stat-box">
+                  <span class="db-stat-val" id="dbStatMsgsCount">6</span>
+                  <span class="db-stat-lbl">Chat Messages</span>
+                </div>
+                <div class="db-stat-box">
+                  <span class="db-stat-val" id="dbStatPunchesCount">3</span>
+                  <span class="db-stat-lbl">Shift Punches</span>
+                </div>
+                <div class="db-stat-box">
+                  <span class="db-stat-val" id="dbStatLatency">0.4ms</span>
+                  <span class="db-stat-lbl">Disk Latency</span>
+                </div>
+                <div class="db-stat-box">
+                  <span class="db-stat-val" id="dbStatDbSize">14 KB</span>
+                  <span class="db-stat-lbl">Database Size</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="db-config-grid">
+              <!-- Live Database Diagnostics Benchmark Card -->
+              <div class="db-card">
+                <div class="db-card-head">
+                  <span>⚡ DATABASE DIAGNOSTICS &amp; BENCHMARK</span>
+                </div>
+                <div class="db-card-body">
+                  <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">
+                    Execute live INSERT, READ, UPDATE, and DELETE benchmark operations directly on the Windows disk store to verify integrity.
+                  </p>
+                  
+                  <div id="dbDiagnosticResults" style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.06); padding: 12px; border-radius: 6px; font-family: var(--font-mono); font-size: 11px; margin-bottom: 12px;">
+                    <div style="color: var(--accent-green);">● DATABASE STORAGE: READY</div>
+                    <div style="color: var(--text-muted); margin-top: 4px;" id="diagFilePath">Location: appData/reddot_storage/reddot_database.json</div>
+                    <div style="color: var(--text-secondary); margin-top: 4px;" id="diagLastTest">Last Test: Idle &bull; Click "Run Database Diagnostic"</div>
+                  </div>
+
+                  <div style="display: flex; gap: 8px;">
+                    <button id="btnRunDbDiagnostics" class="btn-primary-action" style="flex: 1;">
+                      <span>⚡ Run Live Database Diagnostic</span>
+                    </button>
+                    <button id="btnExportDbBackup" class="btn-secondary-action" style="flex: 1;">
+                      <span>💾 Export Backup (.json)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- System Preferences & Account -->
+              <div class="db-card">
+                <div class="db-card-head">
+                  <span>⚙️ SYSTEM &amp; WALLPAPER CONFIGURATION</span>
+                </div>
+                <div class="db-card-body">
+                  <div class="setting-toggle-row">
+                    <div class="setting-text-wrap">
+                      <strong>⚡ Auto-Start on Windows Boot</strong>
+                      <p>Launch Workstation OS and set Live Wallpaper on Windows startup.</p>
+                    </div>
+                    <label class="switch-control">
+                      <input type="checkbox" id="toggleAutoStart">
+                      <span class="switch-slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="db-actions-vertical mt-16">
+                    <button id="btnSelectCustomWallpaperBadge" class="btn-secondary-action w-100">
+                      <span>📷 Select Custom ID Photo from PC &amp; Mount</span>
+                    </button>
+                    <button id="btnResetDatabaseToDefaults" class="btn-secondary-action w-100 mt-8" style="color: #ffb300;">
+                      <span>🔄 Reset Database to Clean Initial Fixtures</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Over-The-Air (OTA) Cloud Software Update Engine -->
+              <div class="db-card" style="grid-column: 1 / -1;">
+                <div class="db-card-head" style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>🚀 OVER-THE-AIR (OTA) CLOUD SOFTWARE UPDATER</span>
+                  <span id="otaVersionBadge" style="font-family: var(--font-mono); font-size: 10px; background: rgba(0, 210, 255, 0.15); color: var(--accent-cyan); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(0, 210, 255, 0.3);">VERSION 2.5.1 (PORTABLE)</span>
+                </div>
+                <div class="db-card-body">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                      <h4 style="font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 4px;">Automated Cloud Release Pipeline</h4>
+                      <p style="font-size: 11px; color: var(--text-secondary);">Direct over-the-air updates for REDDOT Workstation OS with zero-downtime installation.</p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                      <button id="btnCheckForOtaUpdates" class="btn-primary-action">
+                        <span>🔄 Check for Updates</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Live Update Status Banner -->
+                  <div id="otaStatusBox" style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.06); padding: 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 11px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="pulse-green" id="otaStatusDot"></span>
+                        <span id="otaStatusText" style="color: #00e676; font-weight: 700;">SYSTEM UP TO DATE &bull; YOU ARE ON THE LATEST BUILD</span>
+                      </div>
+                      <span id="otaLastCheckedText" style="color: var(--text-muted); font-size: 10px;">Last checked: Just now</span>
+                    </div>
+
+                    <!-- Changelog box (hidden by default) -->
+                    <div id="otaChangelogWrap" class="hidden" style="margin-top: 12px; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px; border-left: 3px solid var(--accent-cyan);">
+                      <div style="color: #fff; font-weight: 700; margin-bottom: 4px;" id="otaChangelogTitle">What's New in This Version:</div>
+                      <ul id="otaChangelogList" style="margin: 0; padding-left: 18px; color: var(--text-secondary); line-height: 1.5;"></ul>
+                    </div>
+
+                    <!-- Progress bar (hidden by default) -->
+                    <div id="otaProgressWrap" class="hidden" style="margin-top: 12px;">
+                      <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--accent-cyan); margin-bottom: 4px;">
+                        <span id="otaProgressLabel">Downloading update package...</span>
+                        <span id="otaProgressPercent">0%</span>
+                      </div>
+                      <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                        <div id="otaProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #00d2ff, #00e676); transition: width 0.2s ease;"></div>
+                      </div>
+                    </div>
+
+                    <!-- Action buttons (hidden by default) -->
+                    <div id="otaActionsWrap" class="hidden" style="margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;">
+                      <button id="btnFastOtaUpdate" class="btn-primary-action" style="background: linear-gradient(135deg, #00d2ff, #00e676); color: #000; font-weight: 800; border: none;">
+                        <span>⚡ 1-Click Fast Cloud Update</span>
+                      </button>
+                      <button id="btnDownloadOtaUpdate" class="btn-primary-action" style="display: none;">
+                        <span>⬇️ Download Portable Package (.zip)</span>
+                      </button>
+                      <button id="btnInstallOtaUpdate" class="btn-primary-action hidden" style="background: #00e676; color: #000; font-weight: 800;">
+                        <span>⚡ Restart &amp; Install Update Now</span>
+                      </button>
+                    </div>
+
+                    <!-- Global GitHub OTA Mirror Settings -->
+                    <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                      <div>
+                        <span style="font-size: 11px; font-weight: 700; color: #fff;">🌐 Global GitHub Releases OTA Mirror:</span>
+                        <p style="font-size: 10px; color: var(--text-muted); margin: 2px 0 0 0;">Worldwide Fastly CDN distribution for zero-latency team updates.</p>
+                      </div>
+                      <div style="display: flex; gap: 6px; align-items: center;">
+                        <input type="text" id="inputGithubRepo" value="reddotorg123/REDDOT_WORKSTATION" placeholder="reddotorg123/REDDOT_WORKSTATION" style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-family: var(--font-mono); font-size: 11px; padding: 5px 10px; border-radius: 4px; width: 230px;">
+                        <button type="button" id="btnSaveGithubRepo" class="btn-secondary-action" style="padding: 5px 10px; font-size: 11px;">
+                          <span>Save Repo</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODALS & OVERLAYS
+       ========================================================================= -->
+
+  <!-- CREATE MEMBER & ID CARD MODAL -->
+  <div id="createWorkerModal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="createWorkerBackdrop"></div>
+    <div class="modal-card modal-lg">
+      <div class="modal-head">
+        <div class="head-title-wrap">
+          <span class="modal-icon">&#x1F465;</span>
+          <span class="modal-title">CREATE NEW MEMBER PROFILE &amp; ID BADGE</span>
+        </div>
+        <button id="btnCloseCreateWorker" class="modal-close-btn">&times;</button>
+      </div>
+
+      <form id="formCreateWorker" class="modal-body">
+        <p class="modal-hint">Add a new team member to the persistent database and generate their official identification badge.</p>
+        
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label>Worker ID Code</label>
+            <input type="text" id="newWorkerId" class="custom-input mono" placeholder="e.g. RD-EMP-105" required>
+          </div>
+          <div class="form-group">
+            <label>Full Legal Name</label>
+            <input type="text" id="newWorkerName" class="custom-input" placeholder="e.g. Maya Sundaram" required>
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label>Designation / Role</label>
+            <input type="text" id="newWorkerRole" class="custom-input" placeholder="e.g. Senior Embedded &amp; IoT Architect" required>
+          </div>
+          <div class="form-group">
+            <label>Department</label>
+            <select id="newWorkerDept" class="custom-select">
+              <option value="Hardware Architecture">Hardware Architecture</option>
+              <option value="AI / ML Systems">AI / ML Systems</option>
+              <option value="Firmware &amp; Embedded">Firmware &amp; Embedded</option>
+              <option value="Software &amp; Web">Software &amp; Web</option>
+              <option value="Operations &amp; Research">Operations &amp; Research</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label>Work Email</label>
+            <input type="email" id="newWorkerEmail" class="custom-input" placeholder="colleague@reddot.com">
+          </div>
+          <div class="form-group">
+            <label>Custom Profile Photo</label>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" id="btnPickPhotoForNewWorker" class="btn-secondary-action" style="flex: 1; font-size: 11px;">
+                <span>📷 Select Photo from PC...</span>
+              </button>
+              <span id="newWorkerPhotoStatus" style="font-size: 10px; color: var(--accent-green); align-self: center;">Default Avatar</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-foot">
+          <button type="button" id="btnCancelCreateWorker" class="btn-secondary-action">Cancel</button>
+          <button type="submit" class="btn-primary-action">
+            <span>&#x1F4B3; Create Member &amp; Save to Database</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- DIGITAL BADGE VIEWER & PHOTO MOUNT MODAL -->
+  <div id="badgeViewerModal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="badgeViewerBackdrop"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="modal-title">OFFICIAL REDDOT IDENTIFICATION BADGE</span>
+        <button id="btnCloseBadgeViewer" class="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body text-center">
+        <div class="digital-badge-render" id="digitalBadgeCard">
+          <div class="badge-slot"></div>
+          <div class="badge-head">
+            <div class="badge-logo-mark">&#x25C6;</div>
+            <div class="badge-company-text">REDDOT ARCHITECTURE</div>
+          </div>
+          <div class="badge-avatar-wrap">
+            <div class="badge-avatar-img" id="badgeViewAvatar">
+              <img id="badgeViewCustomPhoto" src="assets/profile-photo.jpeg" alt="Badge Photo" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+            </div>
+          </div>
+          <div class="badge-identity">
+            <h2 class="badge-person-name" id="badgeViewName">JAGADISH K</h2>
+            <p class="badge-person-role" id="badgeViewRole">FOUNDER &amp; TECHNICAL HEAD</p>
+            <span class="badge-person-dept" id="badgeViewDept">HARDWARE ARCHITECTURE</span>
+          </div>
+          <div class="badge-security-block">
+            <div class="badge-id-num" id="badgeViewIdNum">ID: RD-FOUNDER-001</div>
+            <div class="badge-barcode">|||| | ||||| || |||| ||| |||||</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot justify-between" style="flex-wrap: wrap; gap: 6px;">
+        <div style="display: flex; gap: 6px;">
+          <button id="btnUploadPhotoForBadge" class="btn-secondary-action" title="Upload a photo from your PC to replace this ID photo">
+            <span>📷 Local Photo</span>
+          </button>
+          <button id="btnLinkGoogleDriveBadgePhoto" class="btn-secondary-action" title="Link a Google Drive photo or web image URL">
+            <span>🔗 Google Drive Link</span>
+          </button>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button id="btnMountBadgeWallpaper" class="btn-primary-action" title="Mount this badge onto the 3D Live Wallpaper">
+            <span>🖼️ Mount on Wallpaper</span>
+          </button>
+          <button id="btnCloseBadgeModal" class="btn-secondary-action">
+            <span>Done</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASK ACTIVITY & COMMENTS MODAL -->
+  <div id="taskActivityModal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="taskActivityBackdrop"></div>
+    <div class="modal-card modal-lg">
+      <div class="modal-head">
+        <div class="head-title-wrap">
+          <span class="modal-icon">&#x1F4CB;</span>
+          <span class="modal-title" id="taskModalTitle">TASK DETAILS &amp; ACTIVITY</span>
+        </div>
+        <button id="btnCloseTaskActivity" class="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="task-detail-overview" id="taskDetailMeta"></div>
+
+        <div class="task-activity-timeline mt-16">
+          <h5 style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 8px;">Activity Timeline &amp; Comments</h5>
+          <div class="activity-feed-scroll" id="taskActivityFeed"></div>
+        </div>
+
+        <form id="formAddTaskComment" class="comment-input-row mt-12">
+          <input type="text" id="inputTaskComment" class="custom-input" placeholder="Add a progress update or comment..." required>
+          <button type="submit" class="btn-secondary-action" style="white-space: nowrap;">Post Comment</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- START MEETING MODAL -->
+  <div id="meetingModal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="meetingModalBackdrop"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="head-title-wrap">
+          <span class="modal-icon">&#x1F4F9;</span>
+          <span class="modal-title">START SECURE TEAM MEETING</span>
+        </div>
+        <button id="btnCloseMeetingModal" class="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body text-center">
+        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">
+          Generate an encrypted meeting room link for team voice, video, and screen sharing.
+        </p>
+        <div class="meeting-provider-grid">
+          <button class="btn-provider-choice" id="btnLaunchMeetJitsi">
+            <strong>📹 Jitsi Meet (Realtime Encrypted)</strong>
+            <span>https://meet.jit.si/reddot-team-room</span>
+          </button>
+          <button class="btn-provider-choice" id="btnLaunchGoogleMeet">
+            <strong>🌐 Google Meet Workspace</strong>
+            <span>https://meet.google.com/new</span>
+          </button>
+        </div>
+        <div style="margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px;">
+          <button id="btnBroadcastCallInvite" class="btn-primary" style="width: 100%; justify-content: center;">
+            <span>📡 Ring & Broadcast Call Invite to All Members</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INCOMING REALTIME CALL SIGNALING MODAL -->
+  <div id="incomingCallModal" class="modal-overlay hidden" style="z-index: 10000;">
+    <div class="modal-backdrop" id="incomingCallBackdrop"></div>
+    <div class="modal-card modal-call-card text-center" style="max-width: 400px; padding: 32px 24px; background: rgba(12, 12, 20, 0.96); border: 1px solid var(--accent-cyan); box-shadow: 0 0 40px rgba(0, 229, 255, 0.25);">
+      <div class="call-avatar-wrapper" style="width: 80px; height: 80px; margin: 0 auto 16px auto; border-radius: 50%; border: 2px solid var(--accent-cyan); padding: 4px; box-shadow: 0 0 20px var(--accent-cyan);">
+        <div id="incomingCallAvatar" style="width: 100%; height: 100%; border-radius: 50%; background: var(--surface-card); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: #fff; overflow: hidden;">RD</div>
+      </div>
+      <h3 id="incomingCallCallerName" style="font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 4px;">Teammate Calling...</h3>
+      <p id="incomingCallSubtitle" style="font-size: 11px; color: var(--accent-cyan); margin-bottom: 24px; font-family: var(--font-mono); letter-spacing: 0.5px;">⚡ INCOMING REALTIME TEAM CALL</p>
+      
+      <div style="display: flex; gap: 12px; justify-content: center;">
+        <button id="btnDeclineIncomingCall" class="btn-secondary" style="flex: 1; justify-content: center; background: rgba(255, 59, 48, 0.15); border-color: rgba(255, 59, 48, 0.4); color: #ff453a;">
+          <span>❌ Decline</span>
+        </button>
+        <button id="btnAcceptIncomingCall" class="btn-primary" style="flex: 1; justify-content: center; background: var(--accent-green); border-color: var(--accent-green); color: #000;">
+          <span>📞 Accept Call</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRIVACY POLICY MODAL -->
+  <div id="privacyModal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="privacyModalBackdrop"></div>
+    <div class="modal-card modal-lg">
+      <div class="modal-head">
+        <div class="head-title-wrap">
+          <span class="modal-icon">&#x1F6E1;</span>
+          <span class="modal-title">PRIVACY POLICY &amp; ZERO-SURVEILLANCE DISCLOSURE</span>
+        </div>
+        <button id="btnClosePrivacyModal" class="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body" style="max-height: 400px; overflow-y: auto; font-size: 12px; line-height: 1.6; color: var(--text-secondary);">
+        <h4 style="color: #fff; margin-bottom: 6px;">1. Absolute Privacy Commitment</h4>
+        <p>REDDOT is built for work coordination, goal alignment, and team communication. We uphold an absolute zero-surveillance guarantee:</p>
+        <ul style="margin: 8px 0 16px 20px; list-style-type: disc;">
+          <li><strong>NO keystroke logging</strong> or keyboard monitoring.</li>
+          <li><strong>NO screen capture</strong>, desktop screenshots, or window monitoring.</li>
+          <li><strong>NO clipboard capture</strong> or file scanning.</li>
+          <li><strong>NO webcam or microphone surveillance</strong>.</li>
+          <li><strong>NO hidden monitoring</strong> or secret productivity scoring algorithms.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUTHENTICATION & PROFILE CREATION MODAL -->
+  <div id="authModal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="authModalBackdrop"></div>
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-head">
+        <div class="head-title-wrap">
+          <span class="modal-icon">&#x1F510;</span>
+          <span class="modal-title" id="authModalTitle">REDDOT WORKSTATION ACCESS</span>
+        </div>
+        <button id="btnCloseAuthModal" class="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- 1-Click Fast Google ID Authentication -->
+        <button type="button" id="btnGoogleSignIn" class="btn-google-auth">
+          <svg class="google-icon" viewBox="0 0 48 48" width="18" height="18">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.79l7.97-6.2z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          </svg>
+          <span>Sign In with Google Account</span>
+        </button>
+
+        <div class="auth-divider">OR USE WORK EMAIL</div>
+
+        <!-- Auth Mode Switcher Tabs -->
+        <div class="filter-chips" style="justify-content: center; margin-bottom: 8px;">
+          <button type="button" class="filter-chip active" id="tabAuthSignIn" style="padding: 6px 18px;">Email Sign In</button>
+          <button type="button" class="filter-chip" id="tabAuthSignUp" style="padding: 6px 18px;">Create New Profile</button>
+        </div>
+
+        <!-- Alert Notification Box -->
+        <div id="authAlertBox" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 11px; margin-bottom: 6px;"></div>
+
+        <!-- SIGN IN FORM -->
+        <form id="formSignIn" class="task-form">
+          <div class="form-group">
+            <label for="inputSignInEmail">Work Email Address</label>
+            <input type="email" id="inputSignInEmail" class="custom-input" placeholder="e.g. jagadish@reddot.com" required>
+          </div>
+          <div class="form-group">
+            <label for="inputSignInPassword">Account Password</label>
+            <input type="password" id="inputSignInPassword" class="custom-input" placeholder="Enter your password" required>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+            <button type="button" id="btnForgotPass" style="background: none; border: none; color: var(--accent-cyan); font-size: 11px; cursor: pointer; text-decoration: underline;">Forgot Password?</button>
+            <button type="submit" id="btnSubmitSignIn" class="btn-primary-action" style="padding: 9px 22px;">⚡ Sign In to Workstation</button>
+          </div>
+        </form>
+
+        <!-- CREATE PROFILE / SIGN UP FORM -->
+        <form id="formSignUp" class="task-form" style="display: none;">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="inputSignUpName">Full Name</label>
+              <input type="text" id="inputSignUpName" class="custom-input" placeholder="e.g. Jagadish K" required>
+            </div>
+            <div class="form-group">
+              <label for="inputSignUpEmpId">Badge / Employee ID</label>
+              <input type="text" id="inputSignUpEmpId" class="custom-input" placeholder="e.g. RD-FOUNDER-001" required>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="selectSignUpDept">Department</label>
+              <select id="selectSignUpDept" class="custom-select">
+                <option value="Hardware Architecture">Hardware Architecture</option>
+                <option value="Firmware & Embedded">Firmware & Embedded</option>
+                <option value="AI / ML Systems">AI / ML Systems</option>
+                <option value="Executive & Operations">Executive & Operations</option>
+                <option value="Robotics & Controls">Robotics & Controls</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="inputSignUpRole">Role / Title</label>
+              <input type="text" id="inputSignUpRole" class="custom-input" placeholder="e.g. Founder & Technical Head" required>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="inputSignUpEmail">Work Email</label>
+              <input type="email" id="inputSignUpEmail" class="custom-input" placeholder="e.g. jagadish@reddot.com" required>
+            </div>
+            <div class="form-group">
+              <label for="inputSignUpPassword">Password (6+ chars)</label>
+              <input type="password" id="inputSignUpPassword" class="custom-input" placeholder="Create secure password" minlength="6" required>
+            </div>
+          </div>
+
+          <!-- Photo Picker for ID Card -->
+          <div class="form-group">
+            <label>Badge Photo (Optional)</label>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button type="button" id="btnPickSignUpPhoto" class="btn-secondary-action" style="font-size: 11px; padding: 6px 12px;">🖼️ Choose Photo</button>
+              <span id="signUpPhotoStatus" style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Default Avatar</span>
+            </div>
+          </div>
+
+          <div class="modal-foot" style="padding: 10px 0 0 0; margin-top: 6px; border-top: none; background: none;">
+            <button type="submit" id="btnSubmitSignUp" class="btn-primary-action" style="width: 100%; padding: 10px;">🚀 Create Official Profile &amp; Connect</button>
+          </div>
+        </form>
+
+        <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); text-align: center;">
+          <button type="button" id="btnContinueOffline" class="btn-secondary-action" style="width: 100%; font-size: 11px; padding: 8px;">
+            <span>⚡ Continue in Local Founder Mode (Offline / Disk Vault)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- USER PROFILE & SESSION MANAGEMENT MODAL -->
+  <div id="userProfileModal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="userProfileModalBackdrop"></div>
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-head">
+        <div class="head-title-wrap">
+          <span class="modal-icon">&#x1F464;</span>
+          <span class="modal-title">AUTHENTICATED WORKSTATION PROFILE</span>
+        </div>
+        <button id="btnCloseUserProfileModal" class="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body text-center">
+        <!-- Render Official Badge Mini Preview -->
+        <div class="digital-badge-render" style="margin-bottom: 12px; width: 240px; padding: 12px;">
+          <div class="badge-slot"></div>
+          <div class="badge-head">
+            <span class="badge-logo-mark">&#x25C6;</span>
+            <span class="badge-company-text">REDDOT &bull; ID</span>
+          </div>
+          <div class="badge-avatar-wrap" id="userProfileAvatarBox" style="width: 76px; height: 76px;">
+            <div style="font-weight: 800; font-size: 20px; color: #fff;" id="userProfileAvatarText">JK</div>
+          </div>
+          <div class="badge-identity">
+            <span class="badge-person-name" id="userProfileName" style="font-size: 13px;">JAGADISH K</span>
+            <span class="badge-person-role" id="userProfileRole" style="font-size: 9px;">FOUNDER // OWNER</span>
+            <span class="badge-person-dept" id="userProfileDept" style="font-size: 8px;">HARDWARE ARCHITECTURE</span>
+          </div>
+          <div class="badge-security-block">
+            <span class="badge-id-num" id="userProfileBadgeId">ID: RD-FOUNDER-001</span>
+            <span style="font-size: 9.5px; color: var(--text-muted);" id="userProfileEmail">jagadish@reddot.com</span>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <button id="btnUserProfileChangePhoto" class="btn-secondary-action" style="width: 100%;">
+            <span>📷 Local Photo Upload</span>
+          </button>
+          <button id="btnUserProfileLinkDrivePhoto" class="btn-secondary-action" style="width: 100%;">
+            <span>🔗 Link Google Drive Photo</span>
+          </button>
+          <button id="btnUserProfileMountWallpaper" class="btn-secondary-action" style="width: 100%;">
+            <span>🖼️ Mount on 3D Live Wallpaper</span>
+          </button>
+          <button id="btnUserProfileSignOut" class="btn-secondary-action" style="width: 100%; color: #ff5252; border-color: rgba(255,82,82,0.3);">
+            <span>🚪 Sign Out of Workstation</span>
+          </button>
+        </div>
+      </div>
+  <!-- CREATE GROUP CHANNEL MODAL -->
+  <div id="createChannelModal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="createChannelBackdrop"></div>
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-head">
+        <div class="head-title-wrap">
+          <span class="modal-icon">💬</span>
+          <span class="modal-title">CREATE NEW GROUP CHANNEL</span>
+        </div>
+        <button id="btnCloseCreateChannel" class="modal-close-btn">&times;</button>
+      </div>
+      <form id="formCreateChannelModal" class="modal-body" style="padding: 16px 20px;">
+        <p class="modal-hint">Create a dedicated real-time chat channel for your team with instant Cloud Firestore synchronization.</p>
+        
+        <div class="form-group mb-16">
+          <label for="inputNewChannelName">CHANNEL NAME</label>
+          <div style="position: relative; display: flex; align-items: center;">
+            <span style="position: absolute; left: 10px; color: var(--accent-cyan); font-weight: 800; font-family: var(--font-mono);">#</span>
+            <input type="text" id="inputNewChannelName" placeholder="e.g. hardware-schematics, marketing, firmware" style="padding-left: 26px; width: 100%;" required>
+          </div>
+          <span style="font-size: 10px; color: var(--text-muted); margin-top: 4px; display: block;">Letters, numbers, and dashes only. Automatically normalized.</span>
+        </div>
+
+        <div class="form-group mb-16">
+          <label for="inputNewChannelTopic">CHANNEL TOPIC / DESCRIPTION</label>
+          <input type="text" id="inputNewChannelTopic" placeholder="e.g. Hardware architecture reviews and design notes" style="width: 100%;">
+        </div>
+
+        <div class="modal-foot" style="padding: 10px 0 0 0; display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" id="btnCancelCreateChannel" class="btn-secondary-action">Cancel</button>
+          <button type="submit" id="btnSubmitCreateChannel" class="btn-primary-action">
+            <span>➕ Create Channel</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- EDIT & DELETE GROUP CHANNEL MODAL -->
+  <div id="editChannelModal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="editChannelBackdrop"></div>
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-head">
+        <div class="head-title-wrap">
+          <span class="modal-icon">✏️</span>
+          <span class="modal-title" id="editChannelModalTitle">EDIT GROUP CHANNEL</span>
+        </div>
+        <button id="btnCloseEditChannel" class="modal-close-btn">&times;</button>
+      </div>
+      <form id="formEditChannelModal" class="modal-body" style="padding: 16px 20px;">
+        <input type="hidden" id="editChannelTargetId" value="">
+        
+        <div class="form-group mb-16">
+          <label for="inputEditChannelName">CHANNEL DISPLAY NAME</label>
+          <input type="text" id="inputEditChannelName" placeholder="Channel display name" style="width: 100%;" required>
+        </div>
+
+        <div class="form-group mb-16">
+          <label for="inputEditChannelTopic">CHANNEL TOPIC / DESCRIPTION</label>
+          <textarea id="inputEditChannelTopic" rows="3" placeholder="Channel purpose and focus..." style="width: 100%; resize: none;"></textarea>
+        </div>
+
+        <div class="modal-foot justify-between" style="padding: 12px 0 0 0;">
+          <button type="button" id="btnDeleteChannelConfirm" class="btn-secondary-action" style="color: #ff5252; border-color: rgba(255,82,82,0.3);">
+            <span>🗑️ Delete Channel</span>
+          </button>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" id="btnCancelEditChannel" class="btn-secondary-action">Cancel</button>
+            <button type="submit" id="btnSubmitEditChannel" class="btn-primary-action">
+              <span>💾 Save Changes</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- EDIT & AUTHORIZE MEMBER ROLE MODAL -->
+  <div id="editRoleModal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="editRoleBackdrop"></div>
+    <div class="modal-card" style="max-width: 460px;">
+      <div class="modal-head">
+        <div class="head-title-wrap">
+          <span class="modal-icon">⚡</span>
+          <span class="modal-title">AUTHORIZE &amp; UPDATE ROLE</span>
+        </div>
+        <button id="btnCloseEditRole" class="modal-close-btn">&times;</button>
+      </div>
+      <form id="formEditRoleModal" class="modal-body" style="padding: 16px 20px;">
+        <input type="hidden" id="editRoleTargetMemberId" value="">
+        
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px solid rgba(255,255,255,0.08);">
+          <div id="editRoleAvatarPreview" style="width: 44px; height: 44px; border-radius: 50%; overflow: hidden; background: var(--surface-card); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; color: #fff;"></div>
+          <div>
+            <div id="editRoleMemberName" style="font-weight: 700; font-size: 13px; color: #fff;">Member Name</div>
+            <div id="editRoleMemberSub" style="font-size: 11px; font-family: var(--font-mono); color: var(--accent-cyan);">RD-EMP-001 &bull; member@reddot.com</div>
+          </div>
+        </div>
+
+        <div class="form-group mb-16">
+          <label for="selectPresetRole">OFFICIAL ROLE PRESET</label>
+          <select id="selectPresetRole" style="width: 100%;">
+            <option value="Lead Hardware Architect">Lead Hardware Architect</option>
+            <option value="Senior Hardware Engineer">Senior Hardware Engineer</option>
+            <option value="Firmware & Embedded Engineer">Firmware & Embedded Engineer</option>
+            <option value="AI / ML Systems Engineer">AI / ML Systems Engineer</option>
+            <option value="Team Lead & Project Manager">Team Lead & Project Manager</option>
+            <option value="Executive / Admin">Executive / Admin</option>
+            <option value="Employee / Associate">Employee / Associate</option>
+            <option value="__custom__">-- Custom Title --</option>
+          </select>
+        </div>
+
+        <div class="form-group mb-16" id="wrapCustomRoleInput" style="display: none;">
+          <label for="inputCustomRole">CUSTOM TITLE / ROLE</label>
+          <input type="text" id="inputCustomRole" placeholder="e.g. Principal Systems Architect" style="width: 100%;">
+        </div>
+
+        <div class="form-group mb-16">
+          <label for="selectEditRoleDept">DEPARTMENT ASSIGNMENT</label>
+          <select id="selectEditRoleDept" style="width: 100%;">
+            <option value="Hardware Architecture">Hardware Architecture</option>
+            <option value="Firmware & Embedded">Firmware & Embedded</option>
+            <option value="AI / ML Systems">AI / ML Systems</option>
+            <option value="Robotics & Controls">Robotics & Controls</option>
+            <option value="Engineering & Development">Engineering & Development</option>
+            <option value="Operations & Executive">Operations & Executive</option>
+          </select>
+        </div>
+
+        <div class="modal-foot" style="padding: 12px 0 0 0; display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" id="btnCancelEditRole" class="btn-secondary-action">Cancel</button>
+          <button type="submit" id="btnSubmitEditRole" class="btn-primary-action">
+            <span>⚡ Save Role &amp; Permissions</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- LINK GOOGLE DRIVE / WEB IMAGE MODAL -->
+  <div id="linkPhotoModal" class="modal-overlay hidden">
+    <div class="modal-backdrop" id="linkPhotoBackdrop"></div>
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-head">
+        <div class="head-title-wrap">
+          <span class="modal-icon">🔗</span>
+          <span class="modal-title">LINK GOOGLE DRIVE OR WEB PHOTO</span>
+        </div>
+        <button id="btnCloseLinkPhoto" class="modal-close-btn">&times;</button>
+      </div>
+      <form id="formLinkPhotoModal" class="modal-body" style="padding: 16px 20px;">
+        <p class="modal-hint">Paste any <strong>Google Drive share link</strong> or direct image URL. Drive links are automatically converted to high-speed CDN streams and permanently saved.</p>
+        
+        <div class="form-group mb-12">
+          <label for="inputDrivePhotoUrl">GOOGLE DRIVE LINK OR IMAGE URL</label>
+          <input type="url" id="inputDrivePhotoUrl" placeholder="https://drive.google.com/file/d/.../view?usp=sharing" style="width: 100%;" required>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+          <button type="button" id="btnPreviewDrivePhoto" class="btn-secondary-action" style="flex: 1; font-size: 11px;">
+            <span>🔍 Preview Image</span>
+          </button>
+        </div>
+
+        <!-- Live Preview Container -->
+        <div id="drivePhotoPreviewWrap" style="display: flex; align-items: center; gap: 14px; padding: 12px; background: rgba(0,0,0,0.4); border-radius: 8px; border: 1px dashed rgba(255,255,255,0.15); margin-bottom: 14px;">
+          <div id="drivePhotoPreviewBox" style="width: 64px; height: 64px; border-radius: 50%; overflow: hidden; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 2px solid var(--accent-cyan);">
+            <span style="font-size: 10px; color: var(--text-muted);">No Preview</span>
+          </div>
+          <div style="flex: 1; font-size: 11px;">
+            <div id="drivePhotoStatusText" style="color: var(--text-secondary); margin-bottom: 4px;">Paste link and click Preview</div>
+            <div style="font-size: 9.5px; color: var(--text-muted); font-family: var(--font-mono);">Works with Google Drive share links, Imgur, GitHub raw, etc.</div>
+          </div>
+        </div>
+
+        <div class="modal-foot" style="padding: 10px 0 0 0; display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" id="btnCancelLinkPhoto" class="btn-secondary-action">Cancel</button>
+          <button type="submit" id="btnSubmitLinkPhoto" class="btn-primary-action">
+            <span>✅ Apply to ID Card &amp; Profile</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main JavaScript Engine -->
+  <script src="wallpaper.js"></script>
+</body>
+</html>
