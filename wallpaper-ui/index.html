@@ -950,7 +950,12 @@
               <div class="db-card" style="grid-column: 1 / -1;">
                 <div class="db-card-head" style="display: flex; justify-content: space-between; align-items: center;">
                   <span>🚀 OVER-THE-AIR (OTA) CLOUD SOFTWARE UPDATER</span>
-                  <span id="otaVersionBadge" style="font-family: var(--font-mono); font-size: 10px; background: rgba(0, 210, 255, 0.15); color: var(--accent-cyan); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(0, 210, 255, 0.3);">VERSION 2.5.1 (PORTABLE)</span>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <button id="btnRevertOtaHotpatchTop" class="btn-secondary-action hidden" style="font-size: 9px; padding: 2px 7px; color: #ffb300; border-color: rgba(255, 179, 0, 0.4);" title="Restore original factory bundled build">
+                      <span>↺ Revert Hotpatch</span>
+                    </button>
+                    <span id="otaVersionBadge" style="font-family: var(--font-mono); font-size: 10px; background: rgba(0, 210, 255, 0.15); color: var(--accent-cyan); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(0, 210, 255, 0.3);">VERSION 2.5.3 (INSTALLED)</span>
+                  </div>
                 </div>
                 <div class="db-card-body">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
@@ -1002,6 +1007,9 @@
                       </button>
                       <button id="btnInstallOtaUpdate" class="btn-primary-action hidden" style="background: #00e676; color: #000; font-weight: 800;">
                         <span>⚡ Restart &amp; Install Update Now</span>
+                      </button>
+                      <button id="btnRevertOtaHotpatch" class="btn-secondary-action hidden" style="font-size: 11px;" title="Revert to factory bundled build and remove downloaded hotpatches">
+                        <span>↺ Revert to Factory Build</span>
                       </button>
                     </div>
 

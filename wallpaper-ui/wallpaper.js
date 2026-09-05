@@ -6963,12 +6963,40 @@
         const info = await window.electronAPI.otaGetInfo();
         const badge = document.getElementById('otaVersionBadge');
         if (badge && info.version) {
-          badge.textContent = `VERSION ${info.version} (${info.channel.toUpperCase()})`;
+          const channelStr = info.isHotpatched ? 'HOTPATCHED' : (info.channel || 'INSTALLED').toUpperCase();
+          badge.textContent = `VERSION ${info.version} (${channelStr})`;
+        }
+        const btnRevert = document.getElementById('btnRevertOtaHotpatch');
+        const btnRevertTop = document.getElementById('btnRevertOtaHotpatchTop');
+        if (info.isHotpatched) {
+          if (btnRevert) btnRevert.classList.remove('hidden');
+          if (btnRevertTop) btnRevertTop.classList.remove('hidden');
+        } else {
+          if (btnRevert) btnRevert.classList.add('hidden');
+          if (btnRevertTop) btnRevertTop.classList.add('hidden');
         }
       } catch (e) {
         console.warn('[OTA] Could not fetch system info:', e);
       }
     }
+
+    const handleRevertHotpatch = async () => {
+      if (confirm('Revert REDDOT Workstation OS to factory bundled build? This will remove all downloaded hotpatches and reload the verified installation.')) {
+        if (window.electronAPI && window.electronAPI.otaRevertHotpatch) {
+          try {
+            const res = await window.electronAPI.otaRevertHotpatch();
+            if (res && res.success) {
+              playNotificationChirp(true);
+              window.location.reload();
+            }
+          } catch (e) {
+            alert(`Could not revert hotpatch: ${e.message}`);
+          }
+        }
+      }
+    };
+    document.getElementById('btnRevertOtaHotpatch')?.addEventListener('click', handleRevertHotpatch);
+    document.getElementById('btnRevertOtaHotpatchTop')?.addEventListener('click', handleRevertHotpatch);
 
     // Global GitHub OTA Mirror configuration
     const githubRepoInput = document.getElementById('inputGithubRepo');
@@ -7206,12 +7234,26 @@
     const bannerDesc = document.getElementById('otaBannerDesc');
     if (bannerDesc) bannerDesc.textContent = 'Syncing cloud release files & applying zero-downtime hotpatch...';
 
+    const otaStatusText = document.getElementById('otaStatusText');
+    const otaStatusDot = document.getElementById('otaStatusDot');
+    if (otaStatusText) {
+      otaStatusText.style.color = 'var(--accent-cyan)';
+      otaStatusText.textContent = 'DOWNLOADING & APPLYING OVER-THE-AIR CLOUD HOTPATCH...';
+    }
+    if (otaStatusDot) otaStatusDot.className = 'pulse-amber';
+
     try {
       if (window.electronAPI && window.electronAPI.otaApplyHotpatch) {
         const res = await window.electronAPI.otaApplyHotpatch();
         if (res && res.success) {
           playNotificationChirp(true);
           if (btn) btn.innerHTML = '<span>✅ Updated to v' + (res.version || '2.5.3') + '! Reloading...</span>';
+          if (bannerDesc) bannerDesc.textContent = `Successfully updated to v${res.version || '2.5.3'}! Reloading workspace...`;
+          if (otaStatusText) {
+            otaStatusText.style.color = '#00e676';
+            otaStatusText.textContent = `SUCCESSFULLY HOTPATCHED TO v${res.version || '2.5.3'}! REFRESHING WORKSPACE...`;
+          }
+          if (otaStatusDot) otaStatusDot.className = 'pulse-green';
           setTimeout(() => { window.location.reload(); }, 600);
           return;
         }
@@ -7222,9 +7264,14 @@
       console.error('[OTA] Error applying global hotpatch:', err);
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<span>⚡ 1-Click Fast Update</span>';
+        btn.innerHTML = '<span>⚡ 1-Click Fast Cloud Update</span>';
       }
       if (bannerDesc) bannerDesc.textContent = `Update notice: ${err.message}`;
+      if (otaStatusText) {
+        otaStatusText.style.color = '#ffb300';
+        otaStatusText.textContent = `OTA NOTICE: ${err.message}`;
+      }
+      if (otaStatusDot) otaStatusDot.className = 'pulse-amber';
     }
   }
 

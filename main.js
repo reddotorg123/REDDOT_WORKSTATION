@@ -19,17 +19,91 @@ let metricsInterval = null;
 let localServer = null;
 let localServerPort = 0;
 
+// Semantic version comparator: returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
+function compareSemver(v1, v2) {
+  const p1 = String(v1 || '0.0.0').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+  const p2 = String(v2 || '0.0.0').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const a = p1[i] || 0;
+    const b = p2[i] || 0;
+    if (a > b) return 1;
+    if (a < b) return -1;
+  }
+  return 0;
+}
+
+// User-writable hotpatch paths (lives in %APPDATA%\reddot-workstation-os\hotpatch - 100% writable, no UAC, outside read-only app.asar)
+function getHotpatchDir() {
+  return path.join(app.getPath('userData'), 'hotpatch');
+}
+
+function getHotpatchUiDir() {
+  return path.join(getHotpatchDir(), 'wallpaper-ui');
+}
+
+function getInstalledVersion() {
+  try {
+    const vJsonPath = path.join(__dirname, 'version.json');
+    if (fs.existsSync(vJsonPath)) {
+      const vData = JSON.parse(fs.readFileSync(vJsonPath, 'utf8'));
+      if (vData && vData.version) return vData.version;
+    }
+  } catch (_) {}
+  return app.getVersion() || '2.5.1';
+}
+
+function getActiveVersionInfo() {
+  const baseVersion = getInstalledVersion();
+  const hotpatchVJson = path.join(getHotpatchDir(), 'version.json');
+  if (fs.existsSync(hotpatchVJson)) {
+    try {
+      const vData = JSON.parse(fs.readFileSync(hotpatchVJson, 'utf8'));
+      if (vData && vData.version) {
+        if (compareSemver(vData.version, baseVersion) >= 0) {
+          return {
+            version: vData.version,
+            isHotpatched: true,
+            baseVersion: baseVersion,
+            releaseDate: vData.releaseDate || '2026-09-05',
+            appliedAt: vData.appliedAt || null
+          };
+        }
+      }
+    } catch (_) {}
+  }
+  return {
+    version: baseVersion,
+    isHotpatched: false,
+    baseVersion: baseVersion,
+    releaseDate: '2026-09-05',
+    appliedAt: null
+  };
+}
+
 // Local loopback server to serve UI with http:// protocol for full Firebase Web Auth compliance
+// Automatically checks user-writable hotpatch directory first, falling back to bundled assets in app.asar
 function startLocalServer() {
   return new Promise((resolve, reject) => {
     localServer = http.createServer((req, res) => {
       let reqPath = req.url.split('?')[0];
       if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
       const safePath = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, '');
-      let filePath = path.join(__dirname, 'wallpaper-ui', safePath);
 
-      if (!fs.existsSync(filePath) && (safePath === '\\version.json' || safePath === '/version.json' || safePath === 'version.json')) {
-        filePath = path.join(__dirname, 'version.json');
+      let filePath = null;
+
+      // Special case: version manifest
+      if (safePath === '\\version.json' || safePath === '/version.json' || safePath === 'version.json') {
+        const hotpatchVJson = path.join(getHotpatchDir(), 'version.json');
+        filePath = fs.existsSync(hotpatchVJson) ? hotpatchVJson : path.join(__dirname, 'version.json');
+      } else {
+        // Priority 1: Check hotpatch folder in user data
+        const hotpatchFilePath = path.join(getHotpatchUiDir(), safePath);
+        if (fs.existsSync(hotpatchFilePath) && !fs.statSync(hotpatchFilePath).isDirectory()) {
+          filePath = hotpatchFilePath;
+        } else {
+          // Priority 2: Bundled UI folder in app package
+          filePath = path.join(__dirname, 'wallpaper-ui', safePath);
+        }
       }
 
       if (!fs.existsSync(filePath) && (safePath.toLowerCase().endsWith('favicon.ico') || safePath === '/favicon.ico' || safePath === 'favicon.ico')) {
@@ -56,7 +130,9 @@ function startLocalServer() {
         '.ico': 'image/x-icon',
         '.woff2': 'font/woff2',
         '.woff': 'font/woff',
-        '.ttf': 'font/ttf'
+        '.ttf': 'font/ttf',
+        '.mp3': 'audio/mpeg',
+        '.wav': 'audio/wav'
       };
 
       const contentType = mimeTypes[ext] || 'application/octet-stream';
@@ -343,7 +419,12 @@ function createWallpaperWindow() {
   if (localServerPort > 0) {
     mainWindow.loadURL(`http://localhost:${localServerPort}/index.html?t=${Date.now()}`);
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'wallpaper-ui', 'index.html'));
+    const hotpatchIndex = path.join(getHotpatchUiDir(), 'index.html');
+    if (fs.existsSync(hotpatchIndex)) {
+      mainWindow.loadFile(hotpatchIndex);
+    } else {
+      mainWindow.loadFile(path.join(__dirname, 'wallpaper-ui', 'index.html'));
+    }
   }
 
   const showAndActivate = () => {
@@ -710,18 +791,6 @@ const DEFAULT_OTA_MANIFEST_URL = 'https://firestore.googleapis.com/v1/projects/r
 const CLOUD_BUNDLE_URL = 'https://firestore.googleapis.com/v1/projects/reddot-workspace/databases/(default)/documents/organizations/reddot/ota/bundle?key=AIzaSyBpjenDcXDREseIDv5NfgpDo2fAk_gUhdk';
 let downloadedUpdatePath = null;
 
-function compareSemver(v1, v2) {
-  const p1 = String(v1 || '0.0.0').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
-  const p2 = String(v2 || '0.0.0').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
-    const a = p1[i] || 0;
-    const b = p2[i] || 0;
-    if (a > b) return 1;
-    if (a < b) return -1;
-  }
-  return 0;
-}
-
 function fetchJson(url) {
   return new Promise((resolve, reject) => {
     const client = url.startsWith('https:') ? https : http;
@@ -750,44 +819,100 @@ function fetchJson(url) {
   });
 }
 
+// Robust binary file downloader with HTTP redirect (301/302) support for GitHub / S3 CDN releases
+function downloadBinaryFile(fileUrl, targetPath, onProgress, maxRedirects = 5) {
+  return new Promise((resolve, reject) => {
+    if (maxRedirects <= 0) {
+      return reject(new Error('Too many redirects while downloading update package'));
+    }
+
+    const client = fileUrl.startsWith('https:') ? https : http;
+    const req = client.get(fileUrl, {
+      headers: {
+        'User-Agent': 'REDDOT-Workstation-OS',
+        'Accept': 'application/octet-stream, application/vnd.microsoft.portable-executable, application/zip, */*'
+      }
+    }, (res) => {
+      // Handle HTTP redirects cleanly without attempting to parse binary as JSON
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        const redirectUrl = new URL(res.headers.location, fileUrl).href;
+        return downloadBinaryFile(redirectUrl, targetPath, onProgress, maxRedirects - 1)
+          .then(resolve)
+          .catch(reject);
+      }
+
+      if (res.statusCode !== 200) {
+        res.resume();
+        return reject(new Error(`Server returned HTTP status ${res.statusCode} while downloading update`));
+      }
+
+      const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
+      let receivedBytes = 0;
+      let lastProgressTime = 0;
+
+      const fileStream = fs.createWriteStream(targetPath);
+
+      res.on('data', (chunk) => {
+        receivedBytes += chunk.length;
+        fileStream.write(chunk);
+
+        const now = Date.now();
+        if (now - lastProgressTime > 150 || receivedBytes === totalBytes) {
+          lastProgressTime = now;
+          const percent = totalBytes > 0 ? Math.round((receivedBytes / totalBytes) * 100) : 0;
+          if (onProgress) {
+            onProgress({ percent, receivedBytes, totalBytes });
+          }
+        }
+      });
+
+      res.on('end', () => {
+        fileStream.end(() => {
+          resolve({ targetPath, totalBytes: receivedBytes });
+        });
+      });
+
+      res.on('error', (err) => {
+        fileStream.close();
+        if (fs.existsSync(targetPath)) try { fs.unlinkSync(targetPath); } catch (_) {}
+        reject(err);
+      });
+    });
+
+    req.on('error', (err) => {
+      if (fs.existsSync(targetPath)) try { fs.unlinkSync(targetPath); } catch (_) {}
+      reject(err);
+    });
+
+    req.setTimeout(90000, () => {
+      req.destroy();
+      if (fs.existsSync(targetPath)) try { fs.unlinkSync(targetPath); } catch (_) {}
+      reject(new Error('Update download connection timed out'));
+    });
+  });
+}
+
 ipcMain.handle('ota-get-info', async (event) => {
   if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
-  let ver = '2.5.3';
-  try {
-    const vJsonPath = path.join(__dirname, 'version.json');
-    if (fs.existsSync(vJsonPath)) {
-      const vData = JSON.parse(fs.readFileSync(vJsonPath, 'utf8'));
-      if (vData.version) ver = vData.version;
-    } else {
-      ver = app.getVersion() || '2.5.3';
-    }
-  } catch (_) {
-    ver = app.getVersion() || '2.5.3';
-  }
+  const activeInfo = getActiveVersionInfo();
   return {
-    version: ver,
+    version: activeInfo.version,
+    baseVersion: activeInfo.baseVersion,
+    isHotpatched: activeInfo.isHotpatched,
+    appliedAt: activeInfo.appliedAt,
     platform: process.platform,
     arch: process.arch,
     isPackaged: app.isPackaged,
-    channel: 'portable',
-    buildDate: '2026-09-05'
+    channel: activeInfo.isHotpatched ? 'hotpatched' : (app.isPackaged ? 'installed' : 'development'),
+    buildDate: activeInfo.releaseDate || '2026-09-05'
   };
 });
 
 ipcMain.handle('ota-check-update', async (event, customParam) => {
   if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
-  let currentVersion = '2.5.3';
-  try {
-    const vJsonPath = path.join(__dirname, 'version.json');
-    if (fs.existsSync(vJsonPath)) {
-      const vData = JSON.parse(fs.readFileSync(vJsonPath, 'utf8'));
-      if (vData.version) currentVersion = vData.version;
-    } else {
-      currentVersion = app.getVersion() || '2.5.3';
-    }
-  } catch (_) {
-    currentVersion = app.getVersion() || '2.5.3';
-  }
+  const activeInfo = getActiveVersionInfo();
+  const currentVersion = activeInfo.version;
 
   let candidates = [];
 
@@ -900,7 +1025,7 @@ ipcMain.handle('ota-apply-hotpatch', async (event) => {
   try {
     const bundleDoc = await fetchJson(CLOUD_BUNDLE_URL);
     if (!bundleDoc || !bundleDoc.fields) {
-      throw new Error('Cloud OTA bundle is not available');
+      throw new Error('Cloud OTA bundle is not available or could not be fetched');
     }
 
     const fields = bundleDoc.fields;
@@ -910,54 +1035,101 @@ ipcMain.handle('ota-apply-hotpatch', async (event) => {
     const styleCss = fields.styleCss?.stringValue;
     const indexHtml = fields.indexHtml?.stringValue;
 
-    const uiDir = path.join(__dirname, 'wallpaper-ui');
-    if (!fs.existsSync(uiDir)) fs.mkdirSync(uiDir, { recursive: true });
+    // Use safe, user-writable userData directory (works inside Program Files, asar, portable, dev)
+    const hotpatchDir = getHotpatchDir();
+    const hotpatchUiDir = getHotpatchUiDir();
+
+    if (!fs.existsSync(hotpatchUiDir)) {
+      fs.mkdirSync(hotpatchUiDir, { recursive: true });
+    }
 
     const filesUpdated = [];
     if (wallpaperJs) {
-      fs.writeFileSync(path.join(uiDir, 'wallpaper.js'), wallpaperJs, 'utf8');
+      fs.writeFileSync(path.join(hotpatchUiDir, 'wallpaper.js'), wallpaperJs, 'utf8');
       filesUpdated.push('wallpaper.js');
     }
     if (firebaseServiceJs) {
-      fs.writeFileSync(path.join(uiDir, 'firebase-service.js'), firebaseServiceJs, 'utf8');
+      fs.writeFileSync(path.join(hotpatchUiDir, 'firebase-service.js'), firebaseServiceJs, 'utf8');
       filesUpdated.push('firebase-service.js');
     }
     if (styleCss) {
-      fs.writeFileSync(path.join(uiDir, 'style.css'), styleCss, 'utf8');
+      fs.writeFileSync(path.join(hotpatchUiDir, 'style.css'), styleCss, 'utf8');
       filesUpdated.push('style.css');
     }
     if (indexHtml) {
-      fs.writeFileSync(path.join(uiDir, 'index.html'), indexHtml, 'utf8');
+      fs.writeFileSync(path.join(hotpatchUiDir, 'index.html'), indexHtml, 'utf8');
       filesUpdated.push('index.html');
     }
 
-    // Update local version manifest
-    const vJsonPath = path.join(__dirname, 'version.json');
-    if (fs.existsSync(vJsonPath)) {
+    // Update hotpatch version manifest in userData
+    const hotpatchVJsonPath = path.join(hotpatchDir, 'version.json');
+    const vData = {
+      version: remoteVersion,
+      releaseDate: fields.releaseDate?.stringValue || new Date().toISOString().slice(0, 10),
+      appliedAt: new Date().toISOString(),
+      changelog: fields.changelog?.arrayValue?.values ? fields.changelog.arrayValue.values.map(v => v.stringValue) : []
+    };
+    fs.writeFileSync(hotpatchVJsonPath, JSON.stringify(vData, null, 2), 'utf8');
+    filesUpdated.push('version.json');
+
+    // Also update dev workspace if not packaged (for easy dev sync)
+    if (!app.isPackaged) {
       try {
-        const vData = JSON.parse(fs.readFileSync(vJsonPath, 'utf8'));
-        vData.version = remoteVersion;
-        if (fields.releaseDate?.stringValue) {
-          vData.releaseDate = fields.releaseDate.stringValue;
+        const localUiDir = path.join(__dirname, 'wallpaper-ui');
+        if (wallpaperJs) fs.writeFileSync(path.join(localUiDir, 'wallpaper.js'), wallpaperJs, 'utf8');
+        if (firebaseServiceJs) fs.writeFileSync(path.join(localUiDir, 'firebase-service.js'), firebaseServiceJs, 'utf8');
+        if (styleCss) fs.writeFileSync(path.join(localUiDir, 'style.css'), styleCss, 'utf8');
+        if (indexHtml) fs.writeFileSync(path.join(localUiDir, 'index.html'), indexHtml, 'utf8');
+        const vJsonPath = path.join(__dirname, 'version.json');
+        if (fs.existsSync(vJsonPath)) {
+          const devVData = JSON.parse(fs.readFileSync(vJsonPath, 'utf8'));
+          devVData.version = remoteVersion;
+          fs.writeFileSync(vJsonPath, JSON.stringify(devVData, null, 2), 'utf8');
         }
-        if (fields.changelog?.arrayValue?.values) {
-          vData.changelog = fields.changelog.arrayValue.values.map(v => v.stringValue);
-        }
-        fs.writeFileSync(vJsonPath, JSON.stringify(vData, null, 2), 'utf8');
-        filesUpdated.push('version.json');
       } catch (_) {}
     }
 
-    // Automatically reload the renderer window to mount updated code
-    setTimeout(() => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.reload();
-      }
-    }, 600);
+    // Clear session cache so Chromium picks up hotpatch instantly
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        await mainWindow.webContents.session.clearCache();
+      } catch (_) {}
+
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.reloadIgnoringCache();
+        }
+      }, 500);
+    }
 
     return { success: true, version: remoteVersion, filesUpdated };
   } catch (err) {
     console.error('[OTA] Hotpatch installation error:', err);
+    throw err;
+  }
+});
+
+// Revert to factory bundled build (clears hotpatches from userData and restores pristine app.asar code)
+ipcMain.handle('ota-revert-hotpatch', async (event) => {
+  if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
+  try {
+    const hotpatchDir = getHotpatchDir();
+    if (fs.existsSync(hotpatchDir)) {
+      fs.rmSync(hotpatchDir, { recursive: true, force: true });
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        await mainWindow.webContents.session.clearCache();
+      } catch (_) {}
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.reloadIgnoringCache();
+        }
+      }, 300);
+    }
+    return { success: true, restoredVersion: getInstalledVersion() };
+  } catch (err) {
+    console.error('[OTA] Revert hotpatch error:', err);
     throw err;
   }
 });
@@ -968,61 +1140,37 @@ ipcMain.handle('ota-download-update', async (event, downloadUrl) => {
     throw new Error('Invalid download URL');
   }
 
+  // If download URL is a GitHub web release page rather than a direct binary asset, open in browser
+  if (downloadUrl.includes('/releases/tag/') || downloadUrl.endsWith('/releases/latest') || downloadUrl.endsWith('/releases')) {
+    shell.openExternal(downloadUrl);
+    return { success: true, openedBrowser: true };
+  }
+
   const updatesDir = path.join(app.getPath('temp'), 'reddot_updates');
   if (!fs.existsSync(updatesDir)) fs.mkdirSync(updatesDir, { recursive: true });
 
-  const targetFile = path.join(updatesDir, `REDDOT-Workstation-OS-Update-${Date.now()}.exe`);
-  const fileStream = fs.createWriteStream(targetFile);
+  let fileExt = '.exe';
+  try {
+    const parsedUrl = new URL(downloadUrl);
+    const pathname = parsedUrl.pathname.toLowerCase();
+    if (pathname.endsWith('.zip')) fileExt = '.zip';
+    else if (pathname.endsWith('.exe')) fileExt = '.exe';
+  } catch (_) {}
 
-  return new Promise((resolve, reject) => {
-    const client = downloadUrl.startsWith('https:') ? https : http;
-    const req = client.get(downloadUrl, { headers: { 'User-Agent': 'REDDOT-Workstation-OS' } }, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return fetchJson(res.headers.location).then(resolve).catch(reject);
-      }
-      if (res.statusCode !== 200) {
-        fileStream.close();
-        fs.unlinkSync(targetFile);
-        return reject(new Error(`Download failed with HTTP status ${res.statusCode}`));
-      }
+  const targetFile = path.join(updatesDir, `REDDOT-Workstation-OS-Update-${Date.now()}${fileExt}`);
 
-      const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
-      let receivedBytes = 0;
-      let lastProgressEmit = 0;
-
-      res.on('data', (chunk) => {
-        receivedBytes += chunk.length;
-        fileStream.write(chunk);
-
-        const now = Date.now();
-        if (now - lastProgressEmit > 200 || receivedBytes === totalBytes) {
-          lastProgressEmit = now;
-          const percent = totalBytes > 0 ? Math.round((receivedBytes / totalBytes) * 100) : 0;
-          mainWindow?.webContents.send('ota-download-progress', {
-            percent,
-            receivedBytes,
-            totalBytes
-          });
-        }
-      });
-
-      res.on('end', () => {
-        fileStream.end(() => {
-          downloadedUpdatePath = targetFile;
-          mainWindow?.webContents.send('ota-download-complete', {
-            filePath: targetFile
-          });
-          resolve({ success: true, filePath: targetFile });
-        });
-      });
+  try {
+    await downloadBinaryFile(downloadUrl, targetFile, (progress) => {
+      mainWindow?.webContents.send('ota-download-progress', progress);
     });
 
-    req.on('error', (err) => {
-      fileStream.close();
-      if (fs.existsSync(targetFile)) fs.unlinkSync(targetFile);
-      reject(err);
-    });
-  });
+    downloadedUpdatePath = targetFile;
+    mainWindow?.webContents.send('ota-download-complete', { filePath: targetFile });
+    return { success: true, filePath: targetFile };
+  } catch (err) {
+    console.error('[OTA] Update package download error:', err);
+    throw err;
+  }
 });
 
 ipcMain.handle('ota-install-update', async (event) => {
@@ -1032,17 +1180,25 @@ ipcMain.handle('ota-install-update', async (event) => {
   }
 
   try {
-    const child = spawn(downloadedUpdatePath, ['/S'], {
-      detached: true,
-      stdio: 'ignore'
-    });
-    child.unref();
+    if (downloadedUpdatePath.toLowerCase().endsWith('.exe')) {
+      const child = spawn(downloadedUpdatePath, ['/S'], {
+        detached: true,
+        stdio: 'ignore'
+      });
+      child.on('error', () => {
+        shell.openPath(downloadedUpdatePath);
+      });
+      child.unref();
 
-    setTimeout(() => {
-      app.quit();
-    }, 1000);
+      setTimeout(() => {
+        app.quit();
+      }, 1000);
 
-    return { success: true };
+      return { success: true };
+    } else {
+      shell.showItemInFolder(downloadedUpdatePath);
+      return { success: true, openedFolder: true };
+    }
   } catch (err) {
     shell.openPath(downloadedUpdatePath);
     setTimeout(() => {

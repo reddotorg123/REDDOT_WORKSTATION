@@ -134,6 +134,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   otaApplyHotpatch: () => {
     return ipcRenderer.invoke('ota-apply-hotpatch');
   },
+  otaRevertHotpatch: () => {
+    return ipcRenderer.invoke('ota-revert-hotpatch');
+  },
   onOtaProgress: (callback) => {
     if (typeof callback === 'function') {
       const listener = (_event, progress) => callback(progress);
