@@ -26,6 +26,31 @@
   <script src="firebase-service.js?v=2.5.2-teams"></script>
 </head>
 <body class="theme-obsidian mode-command">
+  <!-- Global Over-The-Air (OTA) Cloud Update Notification Banner -->
+  <aside id="otaGlobalBanner" class="ota-global-banner hidden" role="alert" aria-live="assertive">
+    <div class="ota-banner-inner">
+      <div class="ota-banner-left">
+        <div class="ota-banner-icon">🚀</div>
+        <div class="ota-banner-text">
+          <div class="ota-banner-head">
+            <span class="ota-banner-title">NEW WORKSTATION UPDATE AVAILABLE</span>
+            <span class="ota-banner-badge" id="otaBannerBadge">v2.5.3</span>
+          </div>
+          <p class="ota-banner-desc" id="otaBannerDesc">New release is available with instant hotpatching.</p>
+        </div>
+      </div>
+      <div class="ota-banner-actions">
+        <button type="button" id="btnBannerFastUpdate" class="btn-ota-banner-primary" title="Install update instantly with zero downtime">
+          <span>⚡ 1-Click Fast Update</span>
+        </button>
+        <button type="button" id="btnBannerViewChanges" class="btn-ota-banner-secondary" title="View changelog in Database tab">
+          <span>What's New</span>
+        </button>
+        <button type="button" id="btnBannerDismiss" class="btn-ota-banner-close" title="Dismiss notification">✕</button>
+      </div>
+    </div>
+  </aside>
+
   <!-- Dynamic Procedural Wallpaper Matrix Background -->
   <div id="wallpaperBgLayer" class="wallpaper-bg-layer"></div>
   <!-- Subtle Architectural Grid Background -->
@@ -51,6 +76,10 @@
 
       <!-- Top Window Actions & Mode Controls -->
       <div class="top-window-controls">
+        <button type="button" id="topOtaPill" class="ota-header-pill hidden" title="New update available! Click to update now">
+          <span class="ota-pill-dot"></span>
+          <span id="topOtaPillText">⚡ UPDATE v2.5.3</span>
+        </button>
         <button id="btnTopPinToggle" class="win-ctrl-btn" title="Toggle Desktop Background Pin Mode">
           <span class="ctrl-icon" id="topPinIcon">📌</span>
           <span class="ctrl-text" id="topPinText">Pin Mode</span>
@@ -184,6 +213,10 @@
 
         <!-- Window Controls & Dismiss -->
         <div class="header-right">
+          <button type="button" id="headerOtaPill" class="ota-header-pill hidden" title="New update available! Click to update now">
+            <span class="ota-pill-dot"></span>
+            <span id="headerOtaPillText">⚡ UPDATE v2.5.3</span>
+          </button>
           <button id="btnCmdPinToggle" class="btn-outline-action" title="Toggle Desktop Background Pin Mode">
             <span id="cmdPinIcon">📌</span> <span id="cmdPinText">Pin Mode</span>
           </button>

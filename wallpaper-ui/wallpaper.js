@@ -6991,36 +6991,24 @@
       checkOtaUpdates(true);
     });
 
-    document.getElementById('btnFastOtaUpdate')?.addEventListener('click', async () => {
-      const btn = document.getElementById('btnFastOtaUpdate');
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span>⏳ Syncing Cloud Release...</span>';
-      }
-      try {
-        if (window.electronAPI && window.electronAPI.otaApplyHotpatch) {
-          const res = await window.electronAPI.otaApplyHotpatch();
-          if (res && res.success) {
-            playNotificationChirp(true);
-            if (btn) btn.innerHTML = '<span>✅ Updated to v' + (res.version || '2.5.1') + '! Reloading...</span>';
-            setTimeout(() => { window.location.reload(); }, 700);
-            return;
-          }
-        } else {
-          // Direct Web / browser fallback
-          window.location.reload();
-        }
-      } catch (err) {
-        console.error('[OTA] Error applying hotpatch:', err);
-        const statusText = document.getElementById('otaStatusText');
-        if (statusText) {
-          statusText.style.color = '#ffb300';
-          statusText.textContent = `OTA NOTICE: ${err.message}`;
-        }
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = '<span>⚡ 1-Click Fast Cloud Update</span>';
-        }
+    // Global OTA fast update execution
+    document.getElementById('btnFastOtaUpdate')?.addEventListener('click', (e) => triggerGlobalFastUpdate(e.currentTarget));
+    document.getElementById('btnBannerFastUpdate')?.addEventListener('click', (e) => triggerGlobalFastUpdate(e.currentTarget));
+    document.getElementById('headerOtaPill')?.addEventListener('click', (e) => triggerGlobalFastUpdate(e.currentTarget));
+    document.getElementById('topOtaPill')?.addEventListener('click', (e) => triggerGlobalFastUpdate(e.currentTarget));
+
+    document.getElementById('btnBannerViewChanges')?.addEventListener('click', () => {
+      const tabBtn = document.querySelector('[data-target="tabDatabaseView"]');
+      if (tabBtn) tabBtn.click();
+      const otaSection = document.getElementById('otaVersionBadge');
+      if (otaSection) otaSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    document.getElementById('btnBannerDismiss')?.addEventListener('click', () => {
+      const banner = document.getElementById('otaGlobalBanner');
+      if (banner) banner.classList.add('hidden');
+      if (otaUpdateInfo && otaUpdateInfo.latestVersion) {
+        sessionStorage.setItem('dismissed_ota_v' + otaUpdateInfo.latestVersion, 'true');
       }
     });
 
@@ -7082,10 +7070,162 @@
       });
     }
 
+    // Real-Time Cloud Firestore OTA Release Listener
+    if (window.FirebaseService && typeof window.FirebaseService.listenToOtaRelease === 'function') {
+      window.FirebaseService.listenToOtaRelease((releaseData) => {
+        if (!releaseData) return;
+        const remoteVer = releaseData.version;
+        const currentVer = (otaUpdateInfo && otaUpdateInfo.currentVersion) || '2.5.1';
+        if (compareSemver(remoteVer, currentVer) > 0) {
+          otaUpdateInfo = {
+            hasUpdate: true,
+            currentVersion: currentVer,
+            latestVersion: remoteVer,
+            releaseDate: releaseData.releaseDate || '2026-09-05',
+            changelog: releaseData.changelog || [],
+            downloadUrl: releaseData.downloadUrl || ''
+          };
+          showGlobalOtaNotification(otaUpdateInfo);
+          playNotificationChirp(true);
+        }
+      });
+    }
+
     // Auto-check on launch
     setTimeout(() => {
       checkOtaUpdates(false);
     }, 2500);
+
+    // Background periodic check every 15 minutes
+    setInterval(() => {
+      checkOtaUpdates(false);
+    }, 15 * 60 * 1000);
+
+    // Check when window regains focus
+    window.addEventListener('focus', () => {
+      checkOtaUpdates(false);
+    });
+  }
+
+  function ensureOtaBannerInDom() {
+    let banner = document.getElementById('otaGlobalBanner');
+    if (banner) return banner;
+
+    banner = document.createElement('aside');
+    banner.id = 'otaGlobalBanner';
+    banner.className = 'ota-global-banner hidden';
+    banner.role = 'alert';
+    banner.setAttribute('aria-live', 'assertive');
+    banner.innerHTML = `
+      <div class="ota-banner-inner">
+        <div class="ota-banner-left">
+          <div class="ota-banner-icon">🚀</div>
+          <div class="ota-banner-text">
+            <div class="ota-banner-head">
+              <span class="ota-banner-title">NEW WORKSTATION UPDATE AVAILABLE</span>
+              <span class="ota-banner-badge" id="otaBannerBadge">v2.5.3</span>
+            </div>
+            <p class="ota-banner-desc" id="otaBannerDesc">New release is available with instant hotpatching.</p>
+          </div>
+        </div>
+        <div class="ota-banner-actions">
+          <button type="button" id="btnBannerFastUpdate" class="btn-ota-banner-primary" title="Install update instantly with zero downtime">
+            <span>⚡ 1-Click Fast Update</span>
+          </button>
+          <button type="button" id="btnBannerViewChanges" class="btn-ota-banner-secondary" title="View changelog in Database tab">
+            <span>What's New</span>
+          </button>
+          <button type="button" id="btnBannerDismiss" class="btn-ota-banner-close" title="Dismiss notification">✕</button>
+        </div>
+      </div>
+    `;
+    document.body.prepend(banner);
+
+    document.getElementById('btnBannerFastUpdate')?.addEventListener('click', (e) => triggerGlobalFastUpdate(e.currentTarget));
+    document.getElementById('btnBannerViewChanges')?.addEventListener('click', () => {
+      const tabBtn = document.querySelector('[data-target="tabDatabaseView"]');
+      if (tabBtn) tabBtn.click();
+      const otaSection = document.getElementById('otaVersionBadge');
+      if (otaSection) otaSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    document.getElementById('btnBannerDismiss')?.addEventListener('click', () => {
+      banner.classList.add('hidden');
+      if (otaUpdateInfo && otaUpdateInfo.latestVersion) {
+        sessionStorage.setItem('dismissed_ota_v' + otaUpdateInfo.latestVersion, 'true');
+      }
+    });
+
+    return banner;
+  }
+
+  function showGlobalOtaNotification(info) {
+    if (!info || !info.latestVersion) return;
+
+    // Header pills in Command Center and Desktop Wallpaper mode
+    const headerPill = document.getElementById('headerOtaPill');
+    const headerPillText = document.getElementById('headerOtaPillText');
+    const topPill = document.getElementById('topOtaPill');
+    const topPillText = document.getElementById('topOtaPillText');
+
+    if (headerPill) {
+      headerPill.classList.remove('hidden');
+      if (headerPillText) headerPillText.textContent = `⚡ UPDATE v${info.latestVersion}`;
+    }
+    if (topPill) {
+      topPill.classList.remove('hidden');
+      if (topPillText) topPillText.textContent = `⚡ UPDATE v${info.latestVersion}`;
+    }
+
+    // Check if user dismissed banner for this session
+    if (sessionStorage.getItem('dismissed_ota_v' + info.latestVersion) === 'true') {
+      return;
+    }
+
+    const banner = ensureOtaBannerInDom();
+    if (banner) {
+      const badge = document.getElementById('otaBannerBadge');
+      const desc = document.getElementById('otaBannerDesc');
+      if (badge) badge.textContent = `v${info.latestVersion}`;
+      if (desc) {
+        if (info.changelog && Array.isArray(info.changelog) && info.changelog.length > 0) {
+          desc.textContent = info.changelog.slice(0, 2).join(' • ');
+        } else {
+          desc.textContent = `Workstation OS v${info.latestVersion} is ready with performance improvements.`;
+        }
+      }
+      banner.classList.remove('hidden');
+    }
+  }
+
+  async function triggerGlobalFastUpdate(triggerBtn) {
+    const btn = triggerBtn || document.getElementById('btnBannerFastUpdate') || document.getElementById('btnFastOtaUpdate');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳ Applying Cloud Update...</span>';
+    }
+    const bannerDesc = document.getElementById('otaBannerDesc');
+    if (bannerDesc) bannerDesc.textContent = 'Syncing cloud release files & applying zero-downtime hotpatch...';
+
+    try {
+      if (window.electronAPI && window.electronAPI.otaApplyHotpatch) {
+        const res = await window.electronAPI.otaApplyHotpatch();
+        if (res && res.success) {
+          playNotificationChirp(true);
+          if (btn) btn.innerHTML = '<span>✅ Updated to v' + (res.version || '2.5.3') + '! Reloading...</span>';
+          setTimeout(() => { window.location.reload(); }, 600);
+          return;
+        }
+      } else {
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error('[OTA] Error applying global hotpatch:', err);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚡ 1-Click Fast Update</span>';
+      }
+      if (bannerDesc) bannerDesc.textContent = `Update notice: ${err.message}`;
+    }
   }
 
   async function checkOtaUpdates(manualClick = false) {
@@ -7114,6 +7254,8 @@
         }
 
         if (res.hasUpdate) {
+          showGlobalOtaNotification(res);
+
           if (dot) dot.className = 'pulse-cyan';
           if (text) {
             text.style.color = 'var(--accent-cyan)';
@@ -7141,6 +7283,13 @@
             playNotificationChirp(true);
           }
         } else {
+          const headerPill = document.getElementById('headerOtaPill');
+          const topPill = document.getElementById('topOtaPill');
+          const banner = document.getElementById('otaGlobalBanner');
+          if (headerPill) headerPill.classList.add('hidden');
+          if (topPill) topPill.classList.add('hidden');
+          if (banner) banner.classList.add('hidden');
+
           if (dot) dot.className = 'pulse-green';
           if (text) {
             text.style.color = '#00e676';

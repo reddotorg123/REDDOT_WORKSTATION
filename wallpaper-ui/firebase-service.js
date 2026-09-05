@@ -1674,6 +1674,36 @@
         }, (err) => {
           console.warn('[FIREBASE] subscribeBookmarks note:', err.message);
         });
+    },
+
+    // =========================================================================
+    // OVER-THE-AIR (OTA) REAL-TIME RELEASE LISTENER & BROADCAST
+    // =========================================================================
+    listenToOtaRelease(callback) {
+      if (!this.db) return () => {};
+      try {
+        const unsub = this.db.collection('organizations').doc(ORG_ID).collection('system').doc('otaRelease')
+          .onSnapshot((docSnap) => {
+            if (docSnap && docSnap.exists) {
+              callback(docSnap.data());
+            }
+          }, (err) => {
+            console.warn('[FIREBASE] OTA release real-time listener notice:', err.message);
+          });
+        this.listeners.push(unsub);
+        return unsub;
+      } catch (e) {
+        console.warn('[FIREBASE] OTA release listener error:', e);
+        return () => {};
+      }
+    },
+
+    async broadcastOtaAnnouncement(version, changelog = []) {
+      const summary = Array.isArray(changelog) && changelog.length > 0 
+        ? changelog.slice(0, 3).map(c => `• ${c}`).join('\n') 
+        : '• Performance enhancements and stability upgrades';
+      const text = `📢 **REDDOT Workstation OS v${version} is now available!**\n\n${summary}\n\n👉 Click **⚡ UPDATE** in the top header or go to **Database > OTA Updater** to hotpatch now!`;
+      return this.sendMessage('general', text);
     }
   };
 
