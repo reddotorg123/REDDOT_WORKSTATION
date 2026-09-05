@@ -71,7 +71,7 @@
   "author": "Jagadish K",
   "license": "MIT",
   "devDependencies": {
-    "electron": "34.5.8",
+    "electron": "44.1.1",
     "electron-builder": "^25.1.8"
   }
 }
