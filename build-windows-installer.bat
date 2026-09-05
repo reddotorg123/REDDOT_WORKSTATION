@@ -10,7 +10,11 @@ echo Features: Desktop Shortcut, Start Menu Entry, Uninstaller, Custom Directory
 echo Target output folder: app/v2.5.3/
 echo.
 cd /d "%~dp0"
-call npx -y electron-builder --win nsis
+if exist "node_modules\.bin\electron-builder.cmd" (
+  call node_modules\.bin\electron-builder.cmd --win nsis
+) else (
+  call npx -y electron-builder --win nsis
+)
 if %ERRORLEVEL% EQU 0 (
   echo.
   echo [SUCCESS] Windows Setup Installer (.exe) built successfully!
