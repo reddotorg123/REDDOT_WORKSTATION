@@ -4,16 +4,23 @@ Welcome to the **REDDOT Workstation OS & Enterprise Cloud Collaboration Platform
 
 ---
 
-## ?? How to Share with Your Team (1-Click Portable App)
+## 🚀 How to Share with Your Team
 
-The complete application is packaged in a standalone portable zip file:
-📦 **app\v2.5.1\REDDOT-Workstation-OS-Portable.zip**
+The complete application is packaged and ready to share:
 
-### Steps for Teammates:
-1. **Send the File**: Share REDDOT-Workstation-OS-Portable.zip with your 4 teammates via Google Drive, OneDrive, Dropbox, USB drive, or internal file share.
-2. **Extract**: Have each teammate right-click the zip file and select **Extract All...** to any folder (e.g. C:\REDDOT-Workstation-OS or Desktop).
-3. **Launch**: Double-click **REDDOT-Workstation-OS.exe** (or Run-REDDOT-Workstation-OS.bat).
-   - *No installation, Node.js, or complex setup required! It runs out of the box on Windows 10 & 11.*
+### Option A: Standard Setup Installer (.exe)
+📦 `app\v2.5.3\REDDOT-Workstation-OS-Setup.exe`
+- Installs desktop shortcut and Start Menu item.
+- Automatically connects to Cloud Over-The-Air pipeline.
+
+### Option B: Standalone Portable App (.exe)
+📦 `app\v2.5.3\REDDOT-Workstation-OS-Portable.exe`
+- No installation required; double-click and run directly from anywhere (USB, desktop, downloads).
+
+### Steps for Teammates (e.g., Pavithra):
+1. **Send the File**: Share `REDDOT-Workstation-OS-Setup.exe` (or `REDDOT-Workstation-OS-Portable.exe`) via Google Drive, OneDrive, USB pendrive, or chat.
+2. **Launch & Sign In**: Double-click the file to open.
+   - *No Node.js or complex setup required! It runs out of the box on Windows 10 & 11.*
 
 ---
 
