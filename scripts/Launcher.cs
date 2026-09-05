@@ -17,6 +17,7 @@ namespace ReddotWorkstation
                 // Search for the standalone binary in known relative paths
                 string[] candidates = new string[]
                 {
+                    Path.Combine(baseDir, "app", "v2.5.1", "REDDOT-Workstation-OS-Portable", "REDDOT-Workstation-OS.exe"),
                     Path.Combine(baseDir, "v2.5.1", "REDDOT-Workstation-OS-Portable", "REDDOT-Workstation-OS.exe"),
                     Path.Combine(baseDir, "REDDOT-Workstation-OS-Portable", "REDDOT-Workstation-OS.exe"),
                     Path.Combine(baseDir, "v2.5.1", "REDDOT-Workstation-OS-win32-x64", "REDDOT-Workstation-OS.exe"),
@@ -38,6 +39,7 @@ namespace ReddotWorkstation
                     MessageBox.Show("Could not locate REDDOT Workstation OS binary in this folder.", "REDDOT Workstation OS", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
+
 
                 ProcessStartInfo psi = new ProcessStartInfo();
                 psi.FileName = target;

@@ -1,6 +1,6 @@
 {
   "name": "reddot-workstation-os",
-  "version": "2.5.1",
+  "version": "2.5.3",
   "description": "REDDOT Architecture & Executive Workstation OS with Native Windows Desktop Wallpaper & System Tray for Jagadish K",
   "main": "main.js",
   "repository": {
@@ -11,10 +11,13 @@
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder --win portable",
-    "dist:portable": "electron-builder --win portable"
+    "dist": "electron-builder --win nsis portable",
+    "dist:installer": "electron-builder --win nsis",
+    "dist:portable": "electron-builder --win portable",
+    "ota:publish": "node scripts/publish-ota.js"
   },
   "build": {
+    "electronVersion": "34.5.8",
     "appId": "com.reddot.workstation",
     "productName": "REDDOT Workstation OS",
     "copyright": "Copyright © 2026 REDDOT Technologies",
@@ -28,7 +31,14 @@
     ],
     "artifactName": "${productName}-${version}-${target}.${ext}",
     "win": {
+      "signAndEditExecutable": false,
       "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
         {
           "target": "portable",
           "arch": [
@@ -37,6 +47,14 @@
         }
       ],
       "icon": "wallpaper-ui/assets/id-card.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "REDDOT Workstation OS",
+      "artifactName": "REDDOT-Workstation-OS-Setup.${ext}"
     },
     "portable": {
       "artifactName": "REDDOT-Workstation-OS-Portable.${ext}"
@@ -53,7 +71,7 @@
   "author": "Jagadish K",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^34.0.0",
+    "electron": "34.5.8",
     "electron-builder": "^25.1.8"
   }
 }

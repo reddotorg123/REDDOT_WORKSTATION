@@ -28,8 +28,12 @@ function startLocalServer() {
       const safePath = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, '');
       let filePath = path.join(__dirname, 'wallpaper-ui', safePath);
 
-      if (!fs.existsSync(filePath) && safePath === '\\version.json' || safePath === '/version.json' || safePath === 'version.json') {
+      if (!fs.existsSync(filePath) && (safePath === '\\version.json' || safePath === '/version.json' || safePath === 'version.json')) {
         filePath = path.join(__dirname, 'version.json');
+      }
+
+      if (!fs.existsSync(filePath) && (safePath.toLowerCase().endsWith('favicon.ico') || safePath === '/favicon.ico' || safePath === 'favicon.ico')) {
+        filePath = path.join(__dirname, 'wallpaper-ui', 'assets', 'id-card.png');
       }
 
       if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
@@ -56,7 +60,13 @@ function startLocalServer() {
       };
 
       const contentType = mimeTypes[ext] || 'application/octet-stream';
-      res.writeHead(200, { 'Content-Type': contentType });
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Cross-Origin-Opener-Policy': 'same-origin-allow-popups'
+      });
       fs.createReadStream(filePath).pipe(res);
     });
 
@@ -207,7 +217,9 @@ function sampleSystemMetrics() {
   };
 
   if (tray) {
-    tray.setToolTip(`REDDOT Workstation OS\nCPU: ${cpuLoad}% | RAM: ${usedMemGB}GB/${totalMemGB}GB (${memUsagePercent}%)\nApp RAM: ${appMemMB}MB | Health: ${healthScore}%\nAuto-Start: ${metrics.autoStart ? 'ENABLED' : 'DISABLED'}`);
+    try {
+      tray.setToolTip(`REDDOT OS • CPU: ${cpuLoad}% RAM: ${usedMemGB}GB`);
+    } catch (_) {}
   }
 
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -240,12 +252,13 @@ function createWallpaperWindow() {
   const { width, height } = primaryDisplay.workAreaSize || primaryDisplay.bounds;
 
   mainWindow = new BrowserWindow({
-    width: Math.min(width, 1920),
-    height: Math.min(height, 1080),
+    title: 'REDDOT Workstation OS',
+    width: Math.min(width, 1536),
+    height: Math.min(height, 864),
     x: 0,
     y: 0,
-    frame: false,
-    show: false,
+    frame: true,
+    show: true,
     resizable: true,
     movable: true,
     minimizable: true,
@@ -254,6 +267,7 @@ function createWallpaperWindow() {
     skipTaskbar: false,
     focusable: true,
     backgroundColor: '#060609',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -265,20 +279,24 @@ function createWallpaperWindow() {
     }
   });
 
-  // Allow Google OAuth / Firebase Auth popups safely
+  // Completely eliminate the default window menu bar (File, Edit, View, Window, Help)
+  mainWindow.setMenu(null);
+  mainWindow.setMenuBarVisibility(false);
+
+  // Allow Google OAuth / Firebase Auth popups safely & give meetings optimal widescreen bounds
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (
-      url.startsWith('https://accounts.google.com') ||
-      url.includes('.firebaseapp.com/__/auth/handler') ||
-      url.includes('firebaseapp.com') ||
-      url.startsWith('https://meet.jit.si') ||
-      url.startsWith('https://meet.google.com')
-    ) {
+    const isMeeting = url.startsWith('https://meet.jit.si') || url.startsWith('https://meet.google.com') || url.includes('jit.si');
+    const isAuth = url.startsWith('https://accounts.google.com') ||
+                   url.includes('.firebaseapp.com/__/auth/handler') ||
+                   url.includes('firebaseapp.com');
+
+    if (isMeeting || isAuth) {
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
-          width: 540,
-          height: 700,
+          width: isMeeting ? 1024 : 540,
+          height: isMeeting ? 720 : 700,
+          resizable: true,
           autoHideMenuBar: true,
           alwaysOnTop: true,
           center: true,
@@ -308,20 +326,55 @@ function createWallpaperWindow() {
     console.log(`[RENDERER ${level}] ${message} (${sourceId}:${line})`);
   });
 
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if ((input.control && input.key.toLowerCase() === 'r') || input.key === 'F5') {
+      mainWindow.webContents.session.clearCache().then(() => {
+        mainWindow.webContents.reloadIgnoringCache();
+      });
+      event.preventDefault();
+    }
+  });
+
+  // Ensure no stale scripts or styles remain cached
+  try {
+    mainWindow.webContents.session.clearCache();
+  } catch (_) {}
+
   if (localServerPort > 0) {
-    mainWindow.loadURL(`http://localhost:${localServerPort}/index.html`);
+    mainWindow.loadURL(`http://localhost:${localServerPort}/index.html?t=${Date.now()}`);
   } else {
     mainWindow.loadFile(path.join(__dirname, 'wallpaper-ui', 'index.html'));
   }
 
+  const showAndActivate = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (!mainWindow.isVisible()) mainWindow.show();
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.maximize();
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.moveTop();
+      mainWindow.setAlwaysOnTop(true);
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.setAlwaysOnTop(false);
+        }
+      }, 1000);
+    }
+  };
+
   mainWindow.once('ready-to-show', () => {
-    mainWindow.maximize();
-    mainWindow.show();
-    mainWindow.focus();
+    showAndActivate();
     config.autoStart = getAutoStartStatus();
     sampleSystemMetrics();
-    metricsInterval = setInterval(sampleSystemMetrics, 1500);
+    if (!metricsInterval) metricsInterval = setInterval(sampleSystemMetrics, 1500);
   });
+
+  mainWindow.webContents.once('did-finish-load', () => {
+    showAndActivate();
+  });
+
+  setTimeout(showAndActivate, 800);
 
   mainWindow.on('closed', () => {
     if (metricsInterval) clearInterval(metricsInterval);
@@ -330,33 +383,37 @@ function createWallpaperWindow() {
 }
 
 function createTrayIcon() {
-  const iconPath = path.join(__dirname, 'wallpaper-ui', 'assets', 'id-card.png');
-  let icon = nativeImage.createFromPath(iconPath);
-  if (icon.isEmpty()) {
-    icon = nativeImage.createEmpty();
+  try {
+    const iconPath = path.join(__dirname, 'wallpaper-ui', 'assets', 'id-card.png');
+    let icon = nativeImage.createFromPath(iconPath);
+    if (icon.isEmpty()) {
+      icon = nativeImage.createEmpty();
+    }
+    icon = icon.resize({ width: 16, height: 16 });
+
+    tray = new Tray(icon);
+    tray.setToolTip('REDDOT Workstation OS');
+
+    tray.on('double-click', () => {
+      if (mainWindow) {
+        if (!mainWindow.isVisible()) mainWindow.show();
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+      }
+    });
+
+    tray.on('click', () => {
+      if (mainWindow) {
+        if (!mainWindow.isVisible()) mainWindow.show();
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+      }
+    });
+
+    updateTrayMenu();
+  } catch (err) {
+    console.warn('[TRAY] Tray icon creation skipped:', err.message);
   }
-  icon = icon.resize({ width: 16, height: 16 });
-
-  tray = new Tray(icon);
-  tray.setToolTip('REDDOT Enterprise Workstation OS');
-
-  tray.on('double-click', () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
-    }
-  });
-
-  tray.on('click', () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
-    }
-  });
-
-  updateTrayMenu();
 }
 
 function updateTrayMenu() {
@@ -462,6 +519,12 @@ function updateTrayMenu() {
         mainWindow?.webContents.send('toggle-clean');
       }
     },
+    {
+      label: '🔄 Reload Workstation Window',
+      click: () => {
+        mainWindow?.webContents.reload();
+      }
+    },
     { type: 'separator' },
     {
       label: '🚪 Exit Workstation',
@@ -504,7 +567,7 @@ ipcMain.on('window-maximize', (event) => {
 ipcMain.on('window-close', (event) => {
   if (!isTrustedSender(event)) return;
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.hide();
+    mainWindow.close();
   }
 });
 
@@ -689,20 +752,44 @@ function fetchJson(url) {
 
 ipcMain.handle('ota-get-info', async (event) => {
   if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
+  let ver = '2.5.3';
+  try {
+    const vJsonPath = path.join(__dirname, 'version.json');
+    if (fs.existsSync(vJsonPath)) {
+      const vData = JSON.parse(fs.readFileSync(vJsonPath, 'utf8'));
+      if (vData.version) ver = vData.version;
+    } else {
+      ver = app.getVersion() || '2.5.3';
+    }
+  } catch (_) {
+    ver = app.getVersion() || '2.5.3';
+  }
   return {
-    version: app.getVersion() || '2.5.1',
+    version: ver,
     platform: process.platform,
     arch: process.arch,
     isPackaged: app.isPackaged,
     channel: 'portable',
-    buildDate: '2026-09-02'
+    buildDate: '2026-09-05'
   };
 });
 
 ipcMain.handle('ota-check-update', async (event, customParam) => {
   if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
-  const currentVersion = app.getVersion() || '2.5.1';
-  let manifest = null;
+  let currentVersion = '2.5.3';
+  try {
+    const vJsonPath = path.join(__dirname, 'version.json');
+    if (fs.existsSync(vJsonPath)) {
+      const vData = JSON.parse(fs.readFileSync(vJsonPath, 'utf8'));
+      if (vData.version) currentVersion = vData.version;
+    } else {
+      currentVersion = app.getVersion() || '2.5.3';
+    }
+  } catch (_) {
+    currentVersion = app.getVersion() || '2.5.3';
+  }
+
+  let candidates = [];
 
   // Check if customParam is a GitHub repository slug (e.g. "owner/repo")
   let githubRepo = 'reddotorg123/REDDOT_WORKSTATION';
@@ -710,59 +797,67 @@ ipcMain.handle('ota-check-update', async (event, customParam) => {
     githubRepo = customParam.trim();
   }
 
-  // 1. Primary Global Mirror: GitHub Raw and GitHub Releases CDN
+  // 1. Query Cloud Firestore REST API for latest release manifest
+  const primaryUrl = (typeof customParam === 'string' && customParam.startsWith('http')) ? customParam : DEFAULT_OTA_MANIFEST_URL;
+  try {
+    const raw = await fetchJson(primaryUrl);
+    if (raw && raw.fields) {
+      candidates.push({
+        version: raw.fields.version?.stringValue || '0.0.0',
+        releaseDate: raw.fields.releaseDate?.stringValue || '2026-09-05',
+        minRequiredVersion: raw.fields.minRequiredVersion?.stringValue || '2.0.0',
+        mandatory: !!raw.fields.mandatory?.booleanValue,
+        downloadUrl: raw.fields.downloadUrl?.stringValue || '',
+        changelog: raw.fields.changelog?.arrayValue?.values?.map(v => v.stringValue) || []
+      });
+    } else if (raw && raw.version) {
+      candidates.push(raw);
+    }
+  } catch (err) {
+    console.warn('[OTA] Cloud manifest fetch notice:', err.message);
+  }
+
+  // 2. Query GitHub Raw and GitHub Releases CDN
   if (githubRepo) {
     try {
-      const ghRawUrl = `https://raw.githubusercontent.com/${githubRepo}/main/version.json`;
+      const ghRawUrl = `https://raw.githubusercontent.com/${githubRepo}/main/version.json?_t=${Date.now()}`;
       const raw = await fetchJson(ghRawUrl);
       if (raw && raw.version) {
-        manifest = raw;
+        candidates.push(raw);
       }
     } catch (ghRawErr) {
-      // Fallback to GitHub Releases API
       try {
         const ghApiUrl = `https://api.github.com/repos/${githubRepo}/releases/latest`;
         const ghRelease = await fetchJson(ghApiUrl);
         if (ghRelease && ghRelease.tag_name) {
           const zipAsset = (ghRelease.assets || []).find(a => a.name.endsWith('.zip') || a.name.endsWith('.exe')) || ghRelease.assets?.[0];
-          manifest = {
+          candidates.push({
             version: ghRelease.tag_name.replace(/^v/, ''),
-            releaseDate: ghRelease.published_at ? ghRelease.published_at.slice(0, 10) : '2026-09-03',
+            releaseDate: ghRelease.published_at ? ghRelease.published_at.slice(0, 10) : '2026-09-05',
             downloadUrl: zipAsset ? zipAsset.browser_download_url : ghRelease.html_url,
             changelog: ghRelease.body ? ghRelease.body.split('\n').map(l => l.trim()).filter(Boolean) : ['Global GitHub Release update']
-          };
+          });
         }
       } catch (_) {}
     }
   }
 
-  // 2. Secondary: Cloud Firestore REST API
-  if (!manifest) {
-    const primaryUrl = (typeof customParam === 'string' && customParam.startsWith('http')) ? customParam : DEFAULT_OTA_MANIFEST_URL;
+  // 3. Fallback to Local Workstation
+  if (candidates.length === 0 && localServerPort > 0) {
     try {
-      const raw = await fetchJson(primaryUrl);
-      if (raw && raw.fields) {
-        manifest = {
-          version: raw.fields.version?.stringValue || currentVersion,
-          releaseDate: raw.fields.releaseDate?.stringValue || '2026-09-03',
-          minRequiredVersion: raw.fields.minRequiredVersion?.stringValue || '2.0.0',
-          mandatory: !!raw.fields.mandatory?.booleanValue,
-          downloadUrl: raw.fields.downloadUrl?.stringValue || '',
-          changelog: raw.fields.changelog?.arrayValue?.values?.map(v => v.stringValue) || []
-        };
-      } else if (raw && raw.version) {
-        manifest = raw;
+      const localManifest = await fetchJson(`http://127.0.0.1:${localServerPort}/version.json`);
+      if (localManifest && localManifest.version) {
+        candidates.push(localManifest);
       }
-    } catch (err) {
-      console.warn('[OTA] Cloud manifest fetch notice:', err.message);
-    }
+    } catch (_) {}
   }
 
-  // 3. Tertiary: Local Workstation Fallback
-  if (!manifest && localServerPort > 0) {
-    try {
-      manifest = await fetchJson(`http://127.0.0.1:${localServerPort}/version.json`);
-    } catch (_) {}
+  // Pick candidate with highest semantic version
+  let manifest = null;
+  for (const c of candidates) {
+    if (!manifest || compareSemver(c.version, manifest.version) > 0) {
+      manifest = c;
+    }
   }
 
   if (manifest) {
@@ -774,13 +869,13 @@ ipcMain.handle('ota-check-update', async (event, customParam) => {
       hasUpdate: hasUpdate,
       currentVersion: currentVersion,
       latestVersion: remoteVersion,
-      releaseDate: manifest.releaseDate || '2026-09-02',
+      releaseDate: manifest.releaseDate || '2026-09-05',
       minRequiredVersion: manifest.minRequiredVersion || '2.0.0',
       changelog: manifest.changelog || [
-        'Bi-directional real-time chat with direct Cloud REST fallback',
-        'Individual teammate task assignment (Pavithra R) without duplicates',
-        'Full keyboard responsiveness and input text focus enhancements',
-        'Instant Over-The-Air (OTA) continuous cloud update sync'
+        'Borderless Workspace: Removed top menu bar for distraction-free immersion',
+        'Interactive Task Editor: Edit tasks with assignee, priority, status, and cloud sync',
+        'Real-Time Fleet Hours Today: Live aggregate punch log calculations and presence ticker',
+        'Over-The-Air (OTA) Cloud Pipeline: Instant hotpatching with zero downtime'
       ],
       downloadUrl: manifest.downloadUrl || '',
       canHotpatch: true,
@@ -793,7 +888,7 @@ ipcMain.handle('ota-check-update', async (event, customParam) => {
     hasUpdate: false,
     currentVersion: currentVersion,
     latestVersion: currentVersion,
-    releaseDate: '2026-09-02',
+    releaseDate: '2026-09-05',
     changelog: ['You are running the verified production build of REDDOT Workstation OS.'],
     offlineNotice: 'Cloud release server currently standby'
   };
@@ -809,22 +904,31 @@ ipcMain.handle('ota-apply-hotpatch', async (event) => {
     }
 
     const fields = bundleDoc.fields;
-    const remoteVersion = fields.version?.stringValue || '2.5.1';
+    const remoteVersion = fields.version?.stringValue || '2.5.3';
     const wallpaperJs = fields.wallpaperJs?.stringValue;
     const firebaseServiceJs = fields.firebaseServiceJs?.stringValue;
     const styleCss = fields.styleCss?.stringValue;
+    const indexHtml = fields.indexHtml?.stringValue;
 
     const uiDir = path.join(__dirname, 'wallpaper-ui');
     if (!fs.existsSync(uiDir)) fs.mkdirSync(uiDir, { recursive: true });
 
+    const filesUpdated = [];
     if (wallpaperJs) {
       fs.writeFileSync(path.join(uiDir, 'wallpaper.js'), wallpaperJs, 'utf8');
+      filesUpdated.push('wallpaper.js');
     }
     if (firebaseServiceJs) {
       fs.writeFileSync(path.join(uiDir, 'firebase-service.js'), firebaseServiceJs, 'utf8');
+      filesUpdated.push('firebase-service.js');
     }
     if (styleCss) {
       fs.writeFileSync(path.join(uiDir, 'style.css'), styleCss, 'utf8');
+      filesUpdated.push('style.css');
+    }
+    if (indexHtml) {
+      fs.writeFileSync(path.join(uiDir, 'index.html'), indexHtml, 'utf8');
+      filesUpdated.push('index.html');
     }
 
     // Update local version manifest
@@ -833,7 +937,14 @@ ipcMain.handle('ota-apply-hotpatch', async (event) => {
       try {
         const vData = JSON.parse(fs.readFileSync(vJsonPath, 'utf8'));
         vData.version = remoteVersion;
+        if (fields.releaseDate?.stringValue) {
+          vData.releaseDate = fields.releaseDate.stringValue;
+        }
+        if (fields.changelog?.arrayValue?.values) {
+          vData.changelog = fields.changelog.arrayValue.values.map(v => v.stringValue);
+        }
         fs.writeFileSync(vJsonPath, JSON.stringify(vData, null, 2), 'utf8');
+        filesUpdated.push('version.json');
       } catch (_) {}
     }
 
@@ -844,7 +955,7 @@ ipcMain.handle('ota-apply-hotpatch', async (event) => {
       }
     }, 600);
 
-    return { success: true, version: remoteVersion };
+    return { success: true, version: remoteVersion, filesUpdated };
   } catch (err) {
     console.error('[OTA] Hotpatch installation error:', err);
     throw err;
@@ -975,12 +1086,27 @@ if (!gotTheLock) {
 } else {
   app.on('second-instance', () => {
     if (mainWindow) {
+      if (!mainWindow.isVisible()) mainWindow.show();
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.maximize();
       mainWindow.show();
       mainWindow.focus();
+      mainWindow.moveTop();
+      mainWindow.setAlwaysOnTop(true);
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.setAlwaysOnTop(false);
+        }
+      }, 1000);
     }
   });
 
   app.whenReady().then(async () => {
+    // Completely remove default application top menu bar (File, Edit, View, Window, Help)
+    try {
+      Menu.setApplicationMenu(null);
+    } catch (_) {}
+
     // Allow WebRTC audio/video call media permissions automatically
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
       if (['media', 'notifications', 'pointerLock', 'fullscreen', 'display-capture'].includes(permission)) {
@@ -990,13 +1116,23 @@ if (!gotTheLock) {
       }
     });
 
+    // Strip Referer and Origin on Google user content / Drive requests to bypass 429/403 anti-hotlink blocks
+    session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+      const url = details.url || '';
+      if (url.includes('googleusercontent.com') || url.includes('drive.google.com')) {
+        delete details.requestHeaders['Referer'];
+        delete details.requestHeaders['Origin'];
+      }
+      callback({ cancel: false, requestHeaders: details.requestHeaders });
+    });
+
     // Restrictive Content Security Policy for Firebase, Google Auth, & Local loopback
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
       callback({
         responseHeaders: {
           ...details.responseHeaders,
           'Content-Security-Policy': [
-            "default-src 'self' http://127.0.0.1:* http://localhost:*; script-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://fonts.googleapis.com; font-src 'self' http://127.0.0.1:* http://localhost:* https://fonts.gstatic.com data:; img-src 'self' http://127.0.0.1:* http://localhost:* data: blob: https:; connect-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com https://*.google.com; object-src 'none'; base-uri 'none'; frame-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseapp.com https://accounts.google.com https://*.google.com;"
+            "default-src 'self' http://127.0.0.1:* http://localhost:*; script-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://www.gstatic.com https://apis.google.com https://accounts.google.com https://meet.jit.si https://*.8x8.vc; style-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://fonts.googleapis.com; font-src 'self' http://127.0.0.1:* http://localhost:* https://fonts.gstatic.com data:; img-src 'self' http://127.0.0.1:* http://localhost:* data: blob: https:; connect-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com https://*.google.com https://meet.jit.si https://*.jit.si https://*.8x8.vc wss://*.jit.si; object-src 'none'; base-uri 'none'; frame-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseapp.com https://accounts.google.com https://*.google.com https://meet.jit.si https://*.jit.si https://*.8x8.vc;"
           ]
         }
       });

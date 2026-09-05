@@ -13,7 +13,7 @@
     apiKey: "AIzaSyBpjenDcXDREseIDv5NfgpDo2fAk_gUhdk",
     authDomain: "reddot-workspace.firebaseapp.com",
     projectId: "reddot-workspace",
-    databaseURL: "https://reddot-workspace-default-rtdb.firebaseio.com",
+    databaseURL: "",
     storageBucket: "reddot-workspace.firebasestorage.app",
     messagingSenderId: "346765054940",
     appId: "1:346765054940:web:f2feb5855e0131ac383519"

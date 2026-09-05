@@ -3,27 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://127.0.0.1:* http://localhost:*; script-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://www.gstatic.com https://apis.google.com https://accounts.google.com; style-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://fonts.googleapis.com; font-src 'self' http://127.0.0.1:* http://localhost:* https://fonts.gstatic.com data:; img-src 'self' http://127.0.0.1:* http://localhost:* data: blob: https:; connect-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com https://*.google.com; object-src 'none'; base-uri 'none'; frame-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseapp.com https://accounts.google.com https://*.google.com;">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://127.0.0.1:* http://localhost:*; script-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://www.gstatic.com https://apis.google.com https://accounts.google.com https://*.firebaseio.com https://*.firebaseapp.com https://meet.jit.si https://*.jit.si https://*.8x8.vc; style-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://fonts.googleapis.com; font-src 'self' http://127.0.0.1:* http://localhost:* https://fonts.gstatic.com data:; img-src 'self' http://127.0.0.1:* http://localhost:* data: blob: https:; connect-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com https://*.google.com https://meet.jit.si https://*.jit.si https://*.8x8.vc; object-src 'none'; base-uri 'none'; frame-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseapp.com https://accounts.google.com https://*.google.com https://meet.jit.si https://*.jit.si https://*.8x8.vc;">
   <title>REDDOT Workstation OS &bull; Enterprise Workspace</title>
   <meta name="description" content="REDDOT Architecture Enterprise Employee Workspace with Native Persistent Database, ID Card Creator, Wallpaper Mount, Tasks, and Team Chat.">
   <meta name="author" content="REDDOT Technologies">
+  <link rel="icon" type="image/png" href="assets/id-card.png">
 
   <!-- Google Fonts: Space Grotesk, Outfit, Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700;800;900&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2.5.3-teams">
 
   <!-- Firebase SDK v10 (Compat Build) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-  <script src="firebase-config.js"></script>
-  <script src="firebase-service.js"></script>
+  <script src="firebase-config.js?v=2.5.2-teams"></script>
+  <script src="firebase-service.js?v=2.5.2-teams"></script>
 </head>
-<body class="theme-obsidian mode-wallpaper">
+<body class="theme-obsidian mode-command">
   <!-- Dynamic Procedural Wallpaper Matrix Background -->
   <div id="wallpaperBgLayer" class="wallpaper-bg-layer"></div>
   <!-- Subtle Architectural Grid Background -->
@@ -59,7 +61,7 @@
         <button id="btnTopMaximize" class="win-ctrl-btn" title="Maximize / Restore Window">
           <span class="ctrl-icon">&#x25A2;</span>
         </button>
-        <button id="btnTopClose" class="win-ctrl-btn win-ctrl-close" title="Minimize to System Tray">
+        <button id="btnTopClose" class="win-ctrl-btn win-ctrl-close" title="Close REDDOT Workstation">
           <span class="ctrl-icon">&times;</span>
         </button>
       </div>
@@ -129,7 +131,7 @@
   <!-- =========================================================================
        ENTERPRISE ADMIN & WORKSTATION COMMAND CENTER
        ========================================================================= -->
-  <div id="commandCenterDrawer" class="command-center-overlay collapsed">
+  <div id="commandCenterDrawer" class="command-center-overlay">
     <div class="command-center-shell">
       
       <!-- Drawer Header Bar -->
@@ -156,7 +158,7 @@
           </button>
           <button class="cmd-tab-btn" data-target="tabWorkersView" id="tabBtnWorkers">
             <span class="tab-icon">&#x1F465;</span>
-            <span>Directory &amp; IDs</span>
+            <span>Directory</span>
           </button>
           <button class="cmd-tab-btn" data-target="tabTimesheetsView" id="tabBtnTimesheets">
             <span class="tab-icon">&#x23F1;</span>
@@ -176,7 +178,7 @@
           </button>
           <button class="cmd-tab-btn" data-target="tabDatabaseView" id="tabBtnDatabase">
             <span class="tab-icon">&#x1F6E1;</span>
-            <span>Database &amp; Storage</span>
+            <span>Database</span>
           </button>
         </nav>
 
@@ -332,56 +334,432 @@
           </div>
         </section>
 
-        <!-- TAB 5: TEAM CHANNELS & DIRECT MESSAGES -->
+        <!-- TAB 5: MICROSOFT TEAMS SUITE -->
         <section id="tabChatView" class="cmd-tab-pane">
-          <div class="chat-layout">
-            <div class="chat-sidebar">
-              <div class="channel-group-block">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                  <span class="group-label" style="margin-bottom: 0;">TEAM CHANNELS</span>
-                  <button id="btnCreateChannel" title="Create New Group Channel" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: var(--accent-cyan); font-size: 13px; font-weight: 800; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;">+</button>
-                </div>
-                <div class="channel-items-list" id="channelList">
-                  <!-- Dynamically rendered team channels -->
-                </div>
-              </div>
-
-              <div class="channel-group-block mt-16">
-                <span class="group-label">DIRECT MESSAGES</span>
-                <div class="dm-items-list" id="dmMembersList">
-                  <!-- Dynamically populated team DM list -->
-                </div>
-              </div>
-            </div>
-
-            <div class="chat-conversation-pane">
-              <div class="chat-conv-header">
-                <div class="conv-title-wrap">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <h4 id="activeChatTitle">#general</h4>
-                    <button id="btnEditChannel" class="btn-icon" title="Edit Group Channel Name &amp; Topic" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); cursor: pointer; color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
-                      <span>✏️ Edit</span>
-                    </button>
-                  </div>
-                  <p id="activeChatTopic">Company-wide updates and collaboration</p>
-                </div>
-                <div class="conv-actions">
-                  <button id="btnStartMeeting" class="btn-secondary-action" title="Start Secure Team Meeting">
-                    <span>&#x1F4F9; Start Meeting</span>
-                  </button>
-                </div>
-              </div>
-
-              <div class="chat-messages-scroll" id="chatMessagesContainer">
-                <!-- Dynamically populated from Database -->
-              </div>
-
-              <form id="formSendMessage" class="chat-input-bar">
-                <input type="text" id="chatMessageInput" class="chat-text-input" placeholder="Type a message or @mention a colleague..." autocomplete="off" required>
-                <button type="submit" class="btn-chat-send" title="Send Message">
-                  <span>Send &rarr;</span>
+          <div class="teams-app-shell">
+            <!-- 1. Iconic Microsoft Teams Left App Rail (64px) -->
+            <aside class="teams-app-rail" id="teamsLeftRail">
+              <div class="rail-nav-group">
+                <button type="button" class="rail-item" data-rail-tab="activity" id="railBtnActivity" title="Activity Feed">
+                  <span class="rail-icon">🔔</span>
+                  <span class="rail-label">Activity</span>
+                  <span class="rail-badge hidden" id="railActivityBadge">0</span>
                 </button>
-              </form>
+                <button type="button" class="rail-item active" data-rail-tab="chat" id="railBtnChat" title="Chat &amp; Channels">
+                  <span class="rail-icon">💬</span>
+                  <span class="rail-label">Chat</span>
+                </button>
+                <button type="button" class="rail-item" data-rail-tab="calendar" id="railBtnCalendar" title="Meetings &amp; Calendar">
+                  <span class="rail-icon">📅</span>
+                  <span class="rail-label">Calendar</span>
+                </button>
+                <button type="button" class="rail-item" data-rail-tab="calls" id="railBtnCalls" title="Calls &amp; Speed Dial">
+                  <span class="rail-icon">📞</span>
+                  <span class="rail-label">Calls</span>
+                </button>
+                <button type="button" class="rail-item" data-rail-tab="files" id="railBtnFiles" title="Shared Files">
+                  <span class="rail-icon">📁</span>
+                  <span class="rail-label">Files</span>
+                </button>
+                <button type="button" class="rail-item" data-rail-tab="saved" id="railBtnSaved" title="Saved Messages">
+                  <span class="rail-icon">🔖</span>
+                  <span class="rail-label">Saved</span>
+                </button>
+              </div>
+
+              <div class="rail-footer-group">
+                <button type="button" class="rail-item rail-action-item" id="railBtnMeetNow" title="Start Instant Team Meeting">
+                  <span class="rail-icon">📹</span>
+                  <span class="rail-label">Meet</span>
+                </button>
+              </div>
+            </aside>
+
+            <!-- 2. Main Teams Content Deck -->
+            <div class="teams-deck-area">
+
+              <!-- PANE 1: CHAT & CHANNELS (DEFAULT) -->
+              <div class="teams-deck-pane active" id="teamsPaneChat">
+                <div class="chat-layout">
+                  <div class="chat-sidebar">
+                    <!-- Chats & Channels Filter Input -->
+                    <div class="chat-sidebar-filter">
+                      <input type="text" id="searchChatsInput" class="custom-input chat-filter-input" placeholder="Filter channels &amp; DMs...">
+                    </div>
+
+                    <div class="channel-group-block">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span class="group-label" style="margin-bottom: 0;">TEAM CHANNELS</span>
+                        <button id="btnCreateChannel" title="Create New Group Channel" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: var(--accent-cyan); font-size: 13px; font-weight: 800; width: 22px; height: 22px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;">+</button>
+                      </div>
+                      <div class="channel-items-list" id="channelList">
+                        <!-- Dynamically rendered team channels -->
+                      </div>
+                    </div>
+
+                    <div class="channel-group-block mt-16">
+                      <span class="group-label">DIRECT MESSAGES</span>
+                      <div class="dm-items-list" id="dmMembersList">
+                        <!-- Dynamically populated team DM list -->
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="chat-conversation-pane" id="chatConversationPane">
+                    <!-- Drag & Drop Overlay Zone -->
+                    <div id="chatDropZone" class="chat-drop-zone hidden">
+                      <div class="drop-zone-content">
+                        <span class="drop-icon">📥</span>
+                        <h4>Drop files to upload</h4>
+                        <p>Share photos, documents, and code files to this channel</p>
+                      </div>
+                    </div>
+
+                    <!-- Channel Conversation Header -->
+                    <div class="chat-conv-header">
+                      <div class="conv-title-wrap">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <h4 id="activeChatTitle">#general</h4>
+                          <button id="btnEditChannel" class="btn-icon" title="Edit Group Channel Name &amp; Topic" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); cursor: pointer; color: #fff; font-size: 11px; padding: 2px 7px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                            <span>✏️ Edit</span>
+                          </button>
+                        </div>
+                        <p id="activeChatTopic">Company-wide updates and collaboration</p>
+                      </div>
+
+                      <div class="conv-actions" style="display: flex; align-items: center; gap: 8px;">
+                        <!-- Instant Channel Search Bar -->
+                        <div class="chat-search-wrap" id="chatSearchWrap" style="display: none;">
+                          <input type="text" id="inputChatSearch" class="chat-search-input" placeholder="Find in channel..." autocomplete="off">
+                          <span id="chatSearchCount" class="chat-search-count"></span>
+                          <button id="btnCloseChatSearch" class="chat-search-btn" title="Close Search">&times;</button>
+                        </div>
+                        <button id="btnToggleChatSearch" class="btn-icon-action" title="Search Messages in this Channel">
+                          <span>🔍</span>
+                        </button>
+                        <button id="btnScheduleMeetingInChat" class="btn-secondary-action" title="Schedule Meeting in this Channel">
+                          <span>📅 Schedule</span>
+                        </button>
+                        <button id="btnStartMeeting" class="btn-primary-action" title="Start Instant Team Meeting">
+                          <span>📹 Meet Now</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Microsoft Teams Channel Hub Tabs -->
+                    <div class="chat-hub-tabs" id="chatHubTabs">
+                      <button class="hub-tab-btn active" data-hub-tab="posts" id="hubTabBtnPosts">
+                        <span>💬 Posts</span>
+                      </button>
+                      <button class="hub-tab-btn" data-hub-tab="files" id="hubTabBtnFiles">
+                        <span>📁 Files (<span id="chatFilesCount">0</span>)</span>
+                      </button>
+                      <button class="hub-tab-btn" data-hub-tab="pinned" id="hubTabBtnPinned">
+                        <span>📌 Pinned (<span id="chatPinnedCount">0</span>)</span>
+                      </button>
+                      <button class="hub-tab-btn" data-hub-tab="about" id="hubTabBtnAbout">
+                        <span>ℹ️ About</span>
+                      </button>
+                    </div>
+
+                    <!-- Pinned Messages Banner (Collapsible) -->
+                    <div id="chatPinnedBanner" class="chat-pinned-banner hidden">
+                      <div class="pinned-banner-content">
+                        <span class="pinned-pin-icon">📌</span>
+                        <span class="pinned-label">PINNED:</span>
+                        <span id="pinnedBannerText" class="pinned-text"></span>
+                      </div>
+                      <div class="pinned-banner-actions">
+                        <button id="btnJumpPinned" class="btn-text-action" title="Jump to this message">Jump</button>
+                        <button id="btnDismissPinnedBanner" class="btn-icon-xs" title="Dismiss Banner">&times;</button>
+                      </div>
+                    </div>
+
+                    <!-- Middle Stage: Message Stream & Optional Thread Side Panel -->
+                    <div class="chat-middle-stage">
+                      <div class="chat-stream-column">
+                        <!-- 1. Posts Tab: Messages Stream -->
+                        <div class="chat-tab-pane active" id="chatTabPanePosts">
+                          <div class="chat-messages-scroll" id="chatMessagesContainer">
+                            <!-- Dynamically populated from Database -->
+                          </div>
+                        </div>
+
+                        <!-- 2. Files Tab: Channel Media & Document Vault -->
+                        <div class="chat-tab-pane hidden" id="chatTabPaneFiles">
+                          <div class="channel-files-vault" id="chatFilesContainer">
+                            <!-- Dynamically rendered files & images -->
+                          </div>
+                        </div>
+
+                        <!-- 3. Pinned Tab: Pinned Messages Collection -->
+                        <div class="chat-tab-pane hidden" id="chatTabPanePinned">
+                          <div class="channel-pinned-list" id="chatPinnedContainer">
+                            <!-- Dynamically rendered pinned messages -->
+                          </div>
+                        </div>
+
+                        <!-- 4. About Tab: Channel Specs & Member Roster -->
+                        <div class="chat-tab-pane hidden" id="chatTabPaneAbout">
+                          <div class="channel-about-view" id="chatAboutContainer">
+                            <!-- Channel details & member access list -->
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- 5. Thread Discussion Side Panel (Teams Hallmark) -->
+                      <aside class="teams-thread-panel hidden" id="teamsThreadSidePanel">
+                        <div class="thread-panel-head">
+                          <div class="thread-head-meta">
+                            <span class="thread-head-icon">💬</span>
+                            <h4>Thread Discussion</h4>
+                          </div>
+                          <button type="button" id="btnCloseThreadPanel" class="btn-thread-close" title="Close Thread">&times;</button>
+                        </div>
+                        <div class="thread-panel-body">
+                          <!-- Original Root Post -->
+                          <div id="threadRootPostCard" class="thread-root-card"></div>
+                          <div class="thread-replies-divider">
+                            <span id="threadRepliesCountText">Replies</span>
+                          </div>
+                          <!-- Thread Replies Scroll List -->
+                          <div id="threadRepliesContainer" class="thread-replies-scroll"></div>
+                        </div>
+                        <!-- Dedicated Thread Composer -->
+                        <form id="formSendThreadReply" class="thread-reply-composer">
+                          <textarea id="inputThreadReplyText" class="thread-input" placeholder="Reply in thread... (Enter to send)" rows="1" autocomplete="off"></textarea>
+                          <button type="submit" class="btn-thread-send" title="Send Reply">➤</button>
+                        </form>
+                      </aside>
+                    </div>
+
+                    <!-- Realtime Typing Indicator -->
+                    <div id="chatTypingIndicator" class="chat-typing-bar hidden">
+                      <div class="typing-dots">
+                        <span></span><span></span><span></span>
+                      </div>
+                      <span id="chatTypingText" class="typing-text"></span>
+                    </div>
+
+                    <!-- Quoted Reply Preview Bar -->
+                    <div id="chatReplyBar" class="chat-reply-bar hidden">
+                      <div class="reply-bar-meta">
+                        <span class="reply-bar-icon">↩️</span>
+                        <div class="reply-bar-info">
+                          <span class="reply-to-label">Replying to <strong id="replyBarSender">Teammate</strong></span>
+                          <span class="reply-bar-snippet" id="replyBarSnippet">...</span>
+                        </div>
+                      </div>
+                      <button type="button" id="btnCancelReply" class="reply-bar-close" title="Cancel Reply">&times;</button>
+                    </div>
+
+                    <!-- Pending Attachments Preview Strip -->
+                    <div id="chatAttachmentBar" class="chat-attachment-bar hidden">
+                      <div id="chatAttachmentList" class="attachment-preview-list"></div>
+                    </div>
+
+                    <!-- Rich Text Formatting Toolbar -->
+                    <div id="chatFormatToolbar" class="chat-format-toolbar hidden">
+                      <button type="button" class="format-btn" data-format="bold" title="Bold (**text**)"><strong>B</strong></button>
+                      <button type="button" class="format-btn" data-format="italic" title="Italic (*text*)"><em>I</em></button>
+                      <button type="button" class="format-btn" data-format="strike" title="Strikethrough (~~text~~)"><del>S</del></button>
+                      <button type="button" class="format-btn" data-format="code" title="Inline Code (`code`)"><code>&lt;/&gt;</code></button>
+                      <button type="button" class="format-btn" data-format="codeblock" title="Code Block (```)"><code>{ }</code></button>
+                      <button type="button" class="format-btn" data-format="quote" title="Quote (> text)">❝</button>
+                      <button type="button" class="format-btn" data-format="list" title="Bullet List (- item)">• List</button>
+                      <button type="button" class="format-btn" data-format="link" title="Hyperlink ([title](url))">🔗 Link</button>
+                      <span class="format-divider"></span>
+                      <button type="button" id="btnToggleSubject" class="format-btn format-text-btn" title="Add Subject Header">Subject</button>
+                      <button type="button" id="btnToggleImportance" class="format-btn format-text-btn" title="Mark as Important">❗ Important</button>
+                    </div>
+
+                    <!-- Voice Recording Live Bar -->
+                    <div id="chatVoiceBar" class="chat-voice-bar hidden">
+                      <span class="voice-recording-pulse"></span>
+                      <span class="voice-status-text">Recording Audio Memo...</span>
+                      <span id="voiceDuration" class="voice-duration">0:00</span>
+                      <div class="voice-actions">
+                        <button type="button" id="btnCancelVoice" class="btn-voice-cancel">Cancel</button>
+                        <button type="button" id="btnSendVoice" class="btn-voice-send">Send Audio 🎤</button>
+                      </div>
+                    </div>
+
+                    <!-- Teams Message Composer -->
+                    <form id="formSendMessage" class="chat-input-bar">
+                      <div class="chat-composer-wrap">
+                        <!-- Optional Subject Header Field -->
+                        <div id="composerSubjectWrap" class="composer-subject-wrap hidden">
+                          <input type="text" id="chatMessageSubject" class="composer-subject-input" placeholder="Add a subject header...">
+                        </div>
+
+                        <textarea id="chatMessageInput" class="chat-text-input" placeholder="Type a message... (Enter to send, Shift+Enter for newline)" rows="1" autocomplete="off"></textarea>
+                        
+                        <div class="composer-action-bar">
+                          <div class="composer-tools-left">
+                            <button type="button" id="btnToggleFormat" class="tool-btn" title="Format Options (Aa)">
+                              <span>Aa</span>
+                            </button>
+                            <button type="button" id="btnAttachFile" class="tool-btn" title="Attach Document / File">
+                              <span>📎</span>
+                            </button>
+                            <button type="button" id="btnAttachImage" class="tool-btn" title="Upload Image">
+                              <span>🖼️</span>
+                            </button>
+                            <button type="button" id="btnRecordVoice" class="tool-btn" title="Record Voice Note">
+                              <span id="recordVoiceIcon">🎙️</span>
+                            </button>
+                            <button type="button" id="btnEmojiPicker" class="tool-btn" title="Insert Emoji">
+                              <span>😀</span>
+                            </button>
+                          </div>
+
+                          <div class="composer-tools-right">
+                            <input type="file" id="hiddenFileInput" class="hidden" multiple>
+                            <input type="file" id="hiddenImageInput" class="hidden" accept="image/*" multiple>
+                            <button type="submit" class="btn-chat-send" title="Send Message (Enter)">
+                              <span>Send &rarr;</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Floating Mentions Autocomplete Popup -->
+                      <div id="mentionAutocompletePopup" class="mention-autocomplete-popup hidden"></div>
+                      <!-- Floating Emoji Picker Popup -->
+                      <div id="emojiPickerPopup" class="emoji-picker-popup hidden"></div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANE 2: ACTIVITY FEED -->
+              <div class="teams-deck-pane hidden" id="teamsPaneActivity">
+                <div class="teams-pane-inner">
+                  <div class="pane-header-row">
+                    <div class="pane-title-wrap">
+                      <h3>🔔 ACTIVITY FEED</h3>
+                      <p>Real-time notifications for mentions, thread replies, emoji reactions, and team calls.</p>
+                    </div>
+                    <div class="activity-filter-buttons">
+                      <button type="button" class="btn-filter-pill active" data-filter="all">All Activity</button>
+                      <button type="button" class="btn-filter-pill" data-filter="unread">Unread Only</button>
+                      <button type="button" class="btn-filter-pill" data-filter="mentions">@Mentions</button>
+                      <button type="button" id="btnClearActivity" class="btn-secondary-action" style="font-size: 11px; padding: 5px 10px;">Mark All as Read</button>
+                    </div>
+                  </div>
+                  <div class="activity-feed-scroll" id="activityFeedContainer">
+                    <!-- Dynamically populated notifications -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANE 3: CALENDAR & MEETINGS -->
+              <div class="teams-deck-pane hidden" id="teamsPaneCalendar">
+                <div class="teams-pane-inner">
+                  <div class="pane-header-row">
+                    <div class="pane-title-wrap">
+                      <h3>📅 MEETINGS &amp; EVENTS CALENDAR</h3>
+                      <p>Coordinate project syncs, schedule team milestones, and launch encrypted video conferences.</p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                      <button type="button" id="btnQuickMeetCalendar" class="btn-secondary-action">
+                        <span>📹 Meet Now</span>
+                      </button>
+                      <button type="button" id="btnOpenScheduleModal" class="btn-primary-action">
+                        <span>📅 + Schedule Meeting</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="calendar-timeline-container" id="calendarMeetingsContainer">
+                    <!-- Dynamically rendered meeting cards with live countdowns -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANE 4: CALLS & SPEED DIAL -->
+              <div class="teams-deck-pane hidden" id="teamsPaneCalls">
+                <div class="teams-pane-inner">
+                  <div class="pane-header-row">
+                    <div class="pane-title-wrap">
+                      <h3>📞 CALLS &amp; SPEED DIAL</h3>
+                      <p>Instant audio/video calls, teammate speed-dial directory, and comprehensive call logs.</p>
+                    </div>
+                  </div>
+                  <div class="calls-layout-split">
+                    <!-- Left Speed Dial Section -->
+                    <div class="calls-speed-dial-section">
+                      <h4 class="section-subhead">SPEED DIAL TEAM ROSTER</h4>
+                      <div class="speed-dial-grid" id="speedDialGrid">
+                        <!-- Dynamically populated colleague cards -->
+                      </div>
+                    </div>
+                    <!-- Right Call History Section -->
+                    <div class="calls-history-section">
+                      <h4 class="section-subhead">CALL HISTORY &amp; LOGS</h4>
+                      <div class="call-history-wrapper">
+                        <table class="teams-call-table">
+                          <thead>
+                            <tr>
+                              <th>Type</th>
+                              <th>Participant</th>
+                              <th>Date &amp; Time</th>
+                              <th>Duration</th>
+                              <th>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody id="callHistoryTableBody">
+                            <!-- Dynamically populated call rows -->
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANE 5: CENTRAL WORKSPACE FILES -->
+              <div class="teams-deck-pane hidden" id="teamsPaneFiles">
+                <div class="teams-pane-inner">
+                  <div class="pane-header-row">
+                    <div class="pane-title-wrap">
+                      <h3>📁 CENTRAL FILES REPOSITORY</h3>
+                      <p>Consolidated cloud documents, architecture blueprints, images, and attachments across all channels.</p>
+                    </div>
+                    <div class="files-toolbar-actions">
+                      <input type="text" id="searchFilesInput" class="custom-input search-input" style="max-width: 240px;" placeholder="Search all files...">
+                      <div class="files-filter-pills">
+                        <button type="button" class="btn-filter-pill active" data-file-cat="all">All</button>
+                        <button type="button" class="btn-filter-pill" data-file-cat="images">Images</button>
+                        <button type="button" class="btn-filter-pill" data-file-cat="documents">Documents</button>
+                        <button type="button" class="btn-filter-pill" data-file-cat="code">Code</button>
+                      </div>
+                      <button type="button" id="btnUploadCentralFile" class="btn-primary-action">
+                        <span>+ Upload File</span>
+                      </button>
+                      <input type="file" id="hiddenCentralFileInput" class="hidden" multiple>
+                    </div>
+                  </div>
+                  <div class="central-files-grid" id="centralFilesGrid">
+                    <!-- Dynamically populated files -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- PANE 6: BOOKMARKED / SAVED MESSAGES -->
+              <div class="teams-deck-pane hidden" id="teamsPaneSaved">
+                <div class="teams-pane-inner">
+                  <div class="pane-header-row">
+                    <div class="pane-title-wrap">
+                      <h3>🔖 SAVED MESSAGES &amp; BOOKMARKS</h3>
+                      <p>Quick access to critical project directives, pinned notes, and bookmarks saved across all channels.</p>
+                    </div>
+                  </div>
+                  <div class="saved-messages-list" id="savedMessagesContainer">
+                    <!-- Dynamically populated bookmarks -->
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </section>
@@ -441,7 +819,7 @@
                 <div class="db-health-badge" id="dbHealthBadgeWrap" style="display: flex; gap: 8px; align-items: center;">
                   <span class="pulse-green" id="dbStatusDot"></span>
                   <span id="serverConnectionStatus">PERSISTENT DISK DB ONLINE (~0.5ms)</span>
-                  <button id="btnSyncCloudVaultNow" class="btn-primary" style="padding: 4px 10px; font-size: 10.5px; height: 26px;">
+                  <button id="btnSyncCloudVaultNow" class="btn-primary" style="padding: 4px 10px; font-size: 10.5px; min-height: 26px; height: auto; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center;">
                     <span>⚡ Sync Cloud Vault</span>
                   </button>
                 </div>
@@ -449,8 +827,12 @@
 
               <div class="db-metrics-row">
                 <div class="db-stat-box">
+                  <span class="db-stat-val" id="dbStatOnlineCount" style="color: #00e676;">1</span>
+                  <span class="db-stat-lbl"><span class="presence-dot pulse-green" style="position: static; display: inline-block; width: 7px; height: 7px; vertical-align: middle; margin-right: 4px;"></span>Online Now</span>
+                </div>
+                <div class="db-stat-box">
                   <span class="db-stat-val" id="dbStatMembersCount">4</span>
-                  <span class="db-stat-lbl">Active Members</span>
+                  <span class="db-stat-lbl">Total Members</span>
                 </div>
                 <div class="db-stat-box">
                   <span class="db-stat-val" id="dbStatTasksCount">4</span>
@@ -710,8 +1092,8 @@
           </div>
           <div class="badge-identity">
             <h2 class="badge-person-name" id="badgeViewName">JAGADISH K</h2>
-            <p class="badge-person-role" id="badgeViewRole">FOUNDER &amp; TECHNICAL HEAD</p>
-            <span class="badge-person-dept" id="badgeViewDept">HARDWARE ARCHITECTURE</span>
+            <p class="badge-person-role" id="badgeViewRole" style="cursor: pointer;" title="Click to edit designation / role">FOUNDER &amp; TECHNICAL HEAD</p>
+            <span class="badge-person-dept" id="badgeViewDept" style="cursor: pointer;" title="Click to edit department">HARDWARE ARCHITECTURE</span>
           </div>
           <div class="badge-security-block">
             <div class="badge-id-num" id="badgeViewIdNum">ID: RD-FOUNDER-001</div>
@@ -727,6 +1109,9 @@
           </button>
           <button id="btnLinkGoogleDriveBadgePhoto" class="btn-secondary-action" title="Link a Google Drive photo or web image URL">
             <span>🔗 Google Drive Link</span>
+          </button>
+          <button id="btnEditRoleFromBadgeModal" class="btn-secondary-action" style="color: var(--accent-cyan); border-color: rgba(0,229,255,0.3);" title="Update role, designation, or department for this member ID">
+            <span>⚡ Edit Role</span>
           </button>
         </div>
         <div style="display: flex; gap: 6px;">
@@ -769,6 +1154,72 @@
     </div>
   </div>
 
+  <!-- EDIT TASK MODAL -->
+  <div id="editTaskModal" class="modal-overlay hidden" style="z-index: 10005;">
+    <div class="modal-backdrop" id="editTaskBackdrop"></div>
+    <div class="modal-card modal-lg">
+      <div class="modal-head">
+        <div class="head-title-wrap">
+          <span class="modal-icon">&#x270F;&#xFE0F;</span>
+          <span class="modal-title" id="editTaskModalTitle">EDIT WORKSPACE TASK</span>
+        </div>
+        <button id="btnCloseEditTask" class="modal-close-btn">&times;</button>
+      </div>
+
+      <form id="formEditTask" class="modal-body">
+        <input type="hidden" id="editTaskId">
+        
+        <div class="form-group mb-12">
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: block;">Task Title</label>
+          <input type="text" id="editTaskTitle" class="custom-input" placeholder="e.g. Calibrate Ultrasonic Transducer" required>
+        </div>
+
+        <div class="form-row-2 mb-12" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: block;">Assignee</label>
+            <select id="editTaskAssignee" class="custom-select"></select>
+          </div>
+          <div class="form-group">
+            <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: block;">Priority</label>
+            <select id="editTaskPriority" class="custom-select">
+              <option value="NORMAL">Normal</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+              <option value="URGENT">Urgent Priority</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row-2 mb-12" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: block;">Status</label>
+            <select id="editTaskStatus" class="custom-select">
+              <option value="ASSIGNED">Assigned</option>
+              <option value="REACHED">In Progress</option>
+              <option value="ACCOMPLISHED">Completed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: block;">Target / Due Date</label>
+            <input type="text" id="editTaskDue" class="custom-input" placeholder="e.g. Today 5:00 PM">
+          </div>
+        </div>
+
+        <div class="form-group mb-16">
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: block;">Task Description &amp; Requirements</label>
+          <textarea id="editTaskDesc" class="custom-textarea" rows="4" placeholder="Provide requirements or verification notes..."></textarea>
+        </div>
+
+        <div class="modal-foot" style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+          <button type="button" id="btnCancelEditTask" class="btn-secondary-action">Cancel</button>
+          <button type="submit" id="btnSaveEditTask" class="btn-primary-action">
+            <span>💾 Save Task Changes</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- START MEETING MODAL -->
   <div id="meetingModal" class="modal-overlay hidden">
     <div class="modal-backdrop" id="meetingModalBackdrop"></div>
@@ -776,19 +1227,19 @@
       <div class="modal-head">
         <div class="head-title-wrap">
           <span class="modal-icon">&#x1F4F9;</span>
-          <span class="modal-title">START SECURE TEAM MEETING</span>
+          <span class="modal-title" id="meetingModalTitle">START SECURE TEAM MEETING</span>
         </div>
         <button id="btnCloseMeetingModal" class="modal-close-btn">&times;</button>
       </div>
 
       <div class="modal-body text-center">
-        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">
+        <p id="meetingModalDesc" style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">
           Generate an encrypted meeting room link for team voice, video, and screen sharing.
         </p>
         <div class="meeting-provider-grid">
           <button class="btn-provider-choice" id="btnLaunchMeetJitsi">
             <strong>📹 Jitsi Meet (Realtime Encrypted)</strong>
-            <span>https://meet.jit.si/reddot-team-room</span>
+            <span id="meetJitsiRoomText">https://meet.jit.si/reddot-team-room</span>
           </button>
           <button class="btn-provider-choice" id="btnLaunchGoogleMeet">
             <strong>🌐 Google Meet Workspace</strong>
@@ -796,10 +1247,28 @@
           </button>
         </div>
         <div style="margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px;">
-          <button id="btnBroadcastCallInvite" class="btn-primary" style="width: 100%; justify-content: center;">
-            <span>📡 Ring & Broadcast Call Invite to All Members</span>
+          <button id="btnBroadcastCallInvite" class="btn-primary-action" style="width: 100%; justify-content: center;">
+            <span id="btnBroadcastCallInviteText">📡 Ring &amp; Broadcast Call Invite to All Members</span>
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OUTGOING REALTIME CALL SIGNALING MODAL -->
+  <div id="outgoingCallModal" class="modal-overlay hidden" style="z-index: 10001;">
+    <div class="modal-backdrop" id="outgoingCallBackdrop"></div>
+    <div class="modal-card modal-call-card text-center" style="max-width: 420px; padding: 32px 24px; background: rgba(12, 12, 20, 0.98); border: 1px solid var(--accent-cyan); box-shadow: 0 0 50px rgba(0, 229, 255, 0.35);">
+      <div class="call-avatar-wrapper call-pulsing-rings" style="position: relative; width: 88px; height: 88px; margin: 0 auto 18px auto; border-radius: 50%; border: 2px solid var(--accent-cyan); padding: 4px; box-shadow: 0 0 25px var(--accent-cyan);">
+        <div id="outgoingCallAvatar" style="width: 100%; height: 100%; border-radius: 50%; background: var(--surface-card); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: #fff; overflow: hidden;">RD</div>
+      </div>
+      <h3 id="outgoingCallRecipientName" style="font-size: 19px; font-weight: 800; color: #fff; margin-bottom: 6px;">Calling Teammate...</h3>
+      <p id="outgoingCallSubtitle" style="font-size: 11px; color: var(--accent-cyan); margin-bottom: 24px; font-family: var(--font-mono); letter-spacing: 0.8px;">📞 RINGING • WAITING FOR COLLEAGUE TO ANSWER</p>
+      
+      <div style="display: flex; gap: 12px; justify-content: center;">
+        <button id="btnCancelOutgoingCall" class="btn-secondary" style="flex: 1; justify-content: center; background: rgba(255, 59, 48, 0.18); border: 1px solid rgba(255, 59, 48, 0.5); color: #ff5252; font-weight: 700; height: 40px; font-size: 13px;">
+          <span>🔴 End Call</span>
+        </button>
       </div>
     </div>
   </div>
@@ -1142,8 +1611,10 @@
             <option value="Hardware Architecture">Hardware Architecture</option>
             <option value="Firmware & Embedded">Firmware & Embedded</option>
             <option value="AI / ML Systems">AI / ML Systems</option>
+            <option value="Software & Web">Software & Web</option>
             <option value="Robotics & Controls">Robotics & Controls</option>
             <option value="Engineering & Development">Engineering & Development</option>
+            <option value="Operations & Research">Operations & Research</option>
             <option value="Operations & Executive">Operations & Executive</option>
           </select>
         </div>
@@ -1204,7 +1675,112 @@
     </div>
   </div>
 
+  <!-- Image Lightbox Zoom Modal -->
+  <div id="imageLightboxModal" class="modal-overlay hidden" style="z-index: 10500;">
+    <div class="modal-backdrop" id="imageLightboxBackdrop" style="background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);"></div>
+    <div class="lightbox-modal-shell" style="position: relative; z-index: 10501; max-width: 90vw; max-height: 90vh; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <button id="btnCloseLightbox" class="modal-close-btn" style="position: absolute; top: -36px; right: 0; font-size: 28px; color: #fff; cursor: pointer; background: none; border: none;">&times;</button>
+      <img id="lightboxImg" src="" alt="Full Resolution View" style="max-width: 90vw; max-height: 82vh; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.15); object-fit: contain;">
+      <div id="lightboxCaption" style="margin-top: 10px; font-size: 12px; color: #fff; text-align: center; font-family: var(--font-mono);"></div>
+    </div>
+  </div>
+
+  <!-- Schedule Meeting Modal -->
+  <div id="scheduleMeetingModal" class="modal-overlay hidden" style="z-index: 10400;">
+    <div class="modal-backdrop" id="scheduleMeetingBackdrop"></div>
+    <div class="modal-shell" style="max-width: 520px;">
+      <div class="modal-head">
+        <div class="modal-title-wrap">
+          <span class="modal-title-icon">📅</span>
+          <h3 class="modal-title">SCHEDULE TEAM MEETING</h3>
+        </div>
+        <button type="button" id="btnCloseScheduleMeeting" class="modal-close-btn">&times;</button>
+      </div>
+      <form id="formScheduleMeeting">
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
+          <div class="form-group">
+            <label class="form-label">Meeting Title *</label>
+            <input type="text" id="inputMeetingTitle" class="custom-input" placeholder="e.g. Weekly Sprint Alignment" required>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Date *</label>
+              <input type="date" id="inputMeetingDate" class="custom-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Start Time *</label>
+              <input type="time" id="inputMeetingTime" class="custom-input" required>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Duration</label>
+              <select id="selectMeetingDuration" class="custom-select">
+                <option value="15">15 minutes</option>
+                <option value="30" selected>30 minutes</option>
+                <option value="45">45 minutes</option>
+                <option value="60">1 hour</option>
+                <option value="90">1.5 hours</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Channel / Context</label>
+              <select id="selectMeetingChannel" class="custom-select"></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Agenda / Key Topics</label>
+            <textarea id="inputMeetingAgenda" class="custom-textarea" rows="3" placeholder="Key discussion points, deliverables, or agenda..."></textarea>
+          </div>
+        </div>
+        <div class="modal-foot" style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" id="btnCancelScheduleMeeting" class="btn-secondary-action">Cancel</button>
+          <button type="submit" class="btn-primary-action">
+            <span>📅 Schedule &amp; Invite Team</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Quick Teams Status Selector Popup -->
+  <div id="teamsStatusPopup" class="teams-status-popup hidden">
+    <div class="status-popup-header">SET AVAILABILITY</div>
+    <div class="status-option" data-status="available">
+      <span class="status-dot-lg dot-available"></span>
+      <div class="status-meta">
+        <strong>Available</strong>
+        <span>Active &amp; ready to collaborate</span>
+      </div>
+    </div>
+    <div class="status-option" data-status="busy">
+      <span class="status-dot-lg dot-busy"></span>
+      <div class="status-meta">
+        <strong>Busy / In a Meeting</strong>
+        <span>Focus mode active</span>
+      </div>
+    </div>
+    <div class="status-option" data-status="away">
+      <span class="status-dot-lg dot-away"></span>
+      <div class="status-meta">
+        <strong>Away / Be Right Back</strong>
+        <span>Stepped away from workstation</span>
+      </div>
+    </div>
+    <div class="status-option" data-status="dnd">
+      <span class="status-dot-lg dot-dnd"></span>
+      <div class="status-meta">
+        <strong>Do Not Disturb</strong>
+        <span>Mute chimes &amp; notifications</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Toast Notification Container -->
+  <div id="reddotGlobalToast" class="reddot-global-toast hidden"></div>
+
   <!-- Main JavaScript Engine -->
-  <script src="wallpaper.js"></script>
+  <script src="wallpaper.js?v=2.5.2-teams"></script>
 </body>
 </html>
+

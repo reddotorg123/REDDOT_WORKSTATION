@@ -61,8 +61,10 @@
           });
         } catch (_) {}
 
-        if (firebase.database && config.databaseURL) {
-          this.rtdb = firebase.database();
+        if (firebase.database && config.databaseURL && typeof config.databaseURL === 'string' && config.databaseURL.startsWith('http')) {
+          try {
+            this.rtdb = firebase.database();
+          } catch (_) {}
         }
 
         this.initialized = true;
@@ -75,41 +77,43 @@
 
     async ensureKnownTeamMembers() {
       if (!this.db) return;
-      const defaults = [
-        {
-          uid: 'RD-FOUNDER-001',
-          email: 'jagadish2k2006@gmail.com',
-          displayName: 'JAGADISH K',
-          name: 'JAGADISH K',
-          role: 'owner',
-          isOwner: true,
-          dept: 'Hardware Architecture',
-          id: 'RD-FOUNDER-001',
-          active: true,
-          status: 'DUTY_ON'
-        },
-        {
-          uid: 'pavithratech1206',
-          email: 'pavithratech1206@gmail.com',
-          displayName: 'PAVITHRA',
-          name: 'PAVITHRA',
-          role: 'employee',
-          isOwner: false,
-          dept: 'Engineering Architecture',
-          id: 'RD-EMP-002',
-          active: true,
-          status: 'DUTY_ON'
-        }
-      ];
-
-      for (const m of defaults) {
-        try {
-          const docRef = this.db.collection(`organizations/${ORG_ID}/members`).doc(m.uid);
-          const snap = await docRef.get();
-          if (!snap.exists) {
-            await docRef.set({ ...m, createdAt: Date.now(), updatedAt: Date.now() });
+      try {
+        const snap = await this.db.collection(`organizations/${ORG_ID}/members`).get();
+        const existingEmails = new Set();
+        snap.forEach(doc => {
+          const data = doc.data();
+          if (data && data.email) existingEmails.add(data.email.toLowerCase());
+          // Clean up legacy non-auth doc duplicates if auth uid doc exists
+          if (
+            doc.id === 'pavithratech1206' ||
+            doc.id === 'RD-FOUNDER-001' ||
+            doc.id === 'RD-RD-FOU' ||
+            (data && (data.id === 'RD-RD-FOU' || (data.name === 'Team Member' && !data.email)))
+          ) {
+            doc.ref.delete().catch(() => {});
           }
-        } catch (_) {}
+        });
+
+        // Only seed if organization members collection is completely empty
+        if (existingEmails.size === 0) {
+          const founderDoc = {
+            uid: 'Uvhr9MPQ0RODCujtxzUiWcJBzHk2',
+            email: 'jagadish2k2006@gmail.com',
+            displayName: 'JAGADISH K',
+            name: 'JAGADISH K',
+            role: 'owner',
+            isOwner: true,
+            dept: 'Hardware Architecture',
+            id: 'RD-FOUNDER-001',
+            active: true,
+            status: 'DUTY_ON',
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          };
+          await this.db.collection(`organizations/${ORG_ID}/members`).doc(founderDoc.uid).set(founderDoc, { merge: true });
+        }
+      } catch (err) {
+        console.warn('[FIREBASE] ensureKnownTeamMembers note:', err.message);
       }
     },
 
@@ -358,6 +362,8 @@
           snapshot.forEach(doc => {
             const data = doc.data();
             if (data && data.active !== false) {
+              data.docId = doc.id;
+              if (!data.uid) data.uid = doc.id;
               if (!data.id) {
                 data.id = (data.email && data.email.toLowerCase() === 'jagadish2k2006@gmail.com') ? 'RD-FOUNDER-001' : `RD-${(data.uid || doc.id).slice(0, 6).toUpperCase()}`;
               }
@@ -372,7 +378,7 @@
       return unsub;
     },
 
-    async updateMemberRole(targetUid, newRole, newDept = null) {
+    async updateMemberRole(targetUid, newRole, newDept = null, targetEmail = null) {
       if (!targetUid || !newRole) return;
 
       const payload = {
@@ -383,11 +389,108 @@
         payload.dept = String(newDept).trim();
       }
 
+      // 1. Immediately update in local WorkspaceDB so UI reflects changes with zero lag
+      try {
+        if (window.WorkspaceDB && window.WorkspaceDB.data && window.WorkspaceDB.data.members) {
+          Object.values(window.WorkspaceDB.data.members).forEach(m => {
+            if (m && (
+              m.id === targetUid ||
+              m.uid === targetUid ||
+              m.docId === targetUid ||
+              (targetEmail && m.email && m.email.toLowerCase() === targetEmail.toLowerCase())
+            )) {
+              m.role = payload.role;
+              if (payload.dept) m.dept = payload.dept;
+              m.updatedAt = payload.updatedAt;
+            }
+          });
+          window.WorkspaceDB.save();
+        }
+      } catch (_) {}
+
+      // 2. Persist to Cloud Firestore across all matching documents via SDK
       if (this.db) {
         try {
+          // Direct document update on targetUid
           await this.db.collection(`organizations/${ORG_ID}/members`).doc(targetUid).set(payload, { merge: true });
+
+          // Also search and sync other docs matching this member's ID, UID, or Email
+          const membersRef = this.db.collection(`organizations/${ORG_ID}/members`);
+          const snap = await membersRef.get();
+          if (snap && !snap.empty) {
+            const batch = this.db.batch();
+            let batchCount = 0;
+            snap.forEach(doc => {
+              const data = doc.data();
+              if (!data) return;
+              const matchesTarget = (
+                doc.id === targetUid ||
+                doc.id.toLowerCase() === targetUid.toLowerCase() ||
+                data.id === targetUid ||
+                data.uid === targetUid ||
+                (targetEmail && data.email && data.email.toLowerCase() === targetEmail.toLowerCase())
+              );
+              if (matchesTarget) {
+                batch.set(doc.ref, payload, { merge: true });
+                batchCount++;
+              }
+            });
+            if (batchCount > 0) {
+              await batch.commit();
+            }
+          }
         } catch (e) {
           console.warn('[FIREBASE] Role update note:', e.message);
+        }
+      }
+
+      // 3. Direct Cloud Firestore REST API Fallback (Guaranteed persistence)
+      const config = window.REDDOT_FIREBASE_CONFIG || {};
+      if (config && config.projectId && config.apiKey) {
+        try {
+          const patchFields = {
+            role: { stringValue: payload.role },
+            updatedAt: { integerValue: String(payload.updatedAt) }
+          };
+          if (newDept) {
+            patchFields.dept = { stringValue: payload.dept };
+          }
+          const mask = `updateMask.fieldPaths=role&updateMask.fieldPaths=updatedAt${newDept ? '&updateMask.fieldPaths=dept' : ''}`;
+
+          // Direct patch to targetUid document
+          const patchUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/organizations/${ORG_ID}/members/${encodeURIComponent(targetUid)}?${mask}&key=${config.apiKey}`;
+          await fetch(patchUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fields: patchFields })
+          }).catch(() => {});
+
+          // Fetch all docs to ensure duplicate/linked doc IDs are also patched
+          const listUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/organizations/${ORG_ID}/members?key=${config.apiKey}`;
+          const resp = await fetch(listUrl).catch(() => null);
+          if (resp && resp.ok) {
+            const resJson = await resp.json().catch(() => null);
+            if (resJson && resJson.documents) {
+              for (const doc of resJson.documents) {
+                const docId = doc.name ? doc.name.split('/').pop() : '';
+                if (!docId || docId === targetUid) continue;
+                const f = doc.fields || {};
+                const email = f.email ? f.email.stringValue : '';
+                const id = f.id ? f.id.stringValue : '';
+                const uid = f.uid ? f.uid.stringValue : '';
+                if ((targetEmail && email && email.toLowerCase() === targetEmail.toLowerCase()) || id === targetUid || uid === targetUid) {
+                  const subPatchUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/organizations/${ORG_ID}/members/${encodeURIComponent(docId)}?${mask}&key=${config.apiKey}`;
+                  await fetch(subPatchUrl, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fields: patchFields })
+                  }).catch(() => {});
+                }
+              }
+            }
+          }
+        } catch (restErr) {
+          console.warn('[FIREBASE] Role REST update note:', restErr);
         }
       }
 
@@ -526,6 +629,25 @@
       });
     },
 
+    async updateTask(taskId, updates) {
+      if (!this.db || !taskId) return;
+      const cleanUpdates = { ...updates, updatedAt: Date.now() };
+      await this.db.collection(`organizations/${ORG_ID}/tasks`).doc(taskId).set(cleanUpdates, { merge: true });
+
+      const curUid = this.currentUser ? this.currentUser.uid : 'RD-FOUNDER-001';
+      const authorName = this.currentMember?.displayName || this.currentMember?.name || this.currentUser?.displayName || (this.currentUser?.email ? this.currentUser.email.split('@')[0] : 'JAGADISH K');
+      await this.db.collection(`organizations/${ORG_ID}/tasks/${taskId}/activity`).add({
+        eventType: 'TASK_EDITED',
+        authorId: curUid,
+        authorName: authorName,
+        text: `Task details updated: "${cleanUpdates.title || 'Task'}" [${cleanUpdates.status || ''}]`,
+        timestamp: Date.now()
+      }).catch(() => {});
+
+      await this.logAudit('TASK_EDITED', `Updated task ${taskId}: "${cleanUpdates.title || 'Task'}"`, taskId).catch(() => {});
+      return cleanUpdates;
+    },
+
     async deleteTask(taskId) {
       if (!this.currentMember || (this.currentMember.role !== 'owner' && this.currentMember.role !== 'admin')) {
         throw new Error('Permission denied: Only Owners and Admins can delete tasks');
@@ -649,11 +771,43 @@
       }
     },
 
+    async updateChannel(channelId, updates) {
+      if (!channelId || !this.db) return false;
+      const cleanId = channelId.trim();
+      const payload = {
+        name: updates.name ? updates.name.trim() : cleanId,
+        topic: updates.topic !== undefined ? String(updates.topic).trim() : '',
+        updatedAt: Date.now()
+      };
+      try {
+        await this.db.collection(`organizations/${ORG_ID}/channels`).doc(cleanId).set(payload, { merge: true });
+        console.log('[FIREBASE] Channel updated in cloud:', cleanId, payload);
+        return true;
+      } catch (err) {
+        console.error('[FIREBASE] updateChannel error:', err);
+        return false;
+      }
+    },
+
+    async deleteChannel(channelId) {
+      if (!channelId || !this.db) return false;
+      const cleanId = channelId.trim();
+      if (cleanId === 'general') return false; // Protected default channel
+      try {
+        await this.db.collection(`organizations/${ORG_ID}/channels`).doc(cleanId).delete();
+        console.log('[FIREBASE] Channel deleted from cloud:', cleanId);
+        return true;
+      } catch (err) {
+        console.error('[FIREBASE] deleteChannel error:', err);
+        return false;
+      }
+    },
+
     subscribeMessages(channelId, callback) {
       if (!this.db || !channelId) return () => {};
       const unsub = this.db.collection(`organizations/${ORG_ID}/channels/${channelId}/messages`)
         .orderBy('createdAt', 'asc')
-        .limitToLast(150)
+        .limitToLast(200)
         .onSnapshot((snapshot) => {
           const msgs = [];
           snapshot.forEach(doc => {
@@ -666,10 +820,12 @@
       return unsub;
     },
 
-    async sendMessage(channelId, text) {
-      if (!text || !text.trim()) return null;
+    async sendMessage(channelId, text, options = {}) {
+      if ((!text || !text.trim()) && (!options.attachments || options.attachments.length === 0) && !options.voiceNote) {
+        return null;
+      }
 
-      const cleanText = text.trim();
+      const cleanText = text ? text.trim() : '';
       const cleanChannelId = (channelId || 'general').trim();
 
       const senderUid = this.currentUser ? this.currentUser.uid : (this.currentMember ? (this.currentMember.uid || this.currentMember.id) : 'RD-FOUNDER-001');
@@ -678,7 +834,10 @@
       const senderEmail = this.currentUser ? this.currentUser.email.toLowerCase() : 'jagadish2k2006@gmail.com';
       const senderPhoto = this.currentMember?.photoURL || this.currentMember?.photoUrl || this.currentUser?.photoURL || '';
 
+      const msgId = options.id || ('msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
+
       const messageData = {
+        id: String(msgId),
         senderId: String(senderUid || 'RD-FOUNDER-001'),
         senderUid: String(senderUid || 'RD-FOUNDER-001'),
         senderEmpId: String(senderEmpId || 'RD-FOUNDER-001'),
@@ -686,9 +845,16 @@
         senderEmail: String(senderEmail || 'jagadish2k2006@gmail.com').toLowerCase(),
         senderPhoto: String(senderPhoto || ''),
         text: String(cleanText),
-        createdAt: Number(Date.now()),
+        createdAt: Number(options.createdAt || Date.now()),
         editedAt: null,
-        channelId: String(cleanChannelId)
+        isEdited: false,
+        channelId: String(cleanChannelId),
+        reactions: options.reactions || {},
+        replyTo: options.replyTo || null,
+        attachments: options.attachments || [],
+        voiceNote: options.voiceNote || null,
+        mentions: options.mentions || [],
+        isPinned: false
       };
 
       let sent = false;
@@ -696,17 +862,17 @@
       // 1. Try Firebase Client SDK write
       if (this.db) {
         try {
-          const sendPromise = this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages`).add(messageData);
-          // 3-second timeout protection
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SDK_TIMEOUT')), 3000));
+          const docRef = this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages`).doc(msgId);
+          const sendPromise = docRef.set(messageData);
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SDK_TIMEOUT')), 3500));
           await Promise.race([sendPromise, timeoutPromise]);
           sent = true;
 
-          // Update parent channel document metadata in background (Zero blocking!)
+          // Update parent channel document metadata in background
           this.db.collection(`organizations/${ORG_ID}/channels`).doc(cleanChannelId).set({
             id: cleanChannelId,
             isDirectMessage: cleanChannelId.startsWith('dm_'),
-            lastMessageText: cleanText.slice(0, 100),
+            lastMessageText: (cleanText || (options.attachments?.length ? '📎 Attachment' : '🎙️ Voice note')).slice(0, 100),
             lastMessageSender: senderName,
             lastMessageTime: Date.now(),
             updatedAt: Date.now()
@@ -716,12 +882,13 @@
         }
       }
 
-      // 2. Direct Cloud REST API Fallback (Guarantees delivery even if SDK hangs or is in transition)
+      // 2. Direct Cloud REST API Fallback
       if (!sent) {
         try {
-          const restUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/organizations/${ORG_ID}/channels/${cleanChannelId}/messages?key=${config.apiKey}`;
+          const restUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/organizations/${ORG_ID}/channels/${cleanChannelId}/messages/${msgId}?key=${config.apiKey}`;
           const bodyPayload = JSON.stringify({
             fields: {
+              id: { stringValue: messageData.id },
               senderId: { stringValue: messageData.senderId },
               senderUid: { stringValue: messageData.senderUid },
               senderEmpId: { stringValue: messageData.senderEmpId },
@@ -730,12 +897,13 @@
               senderPhoto: { stringValue: messageData.senderPhoto },
               text: { stringValue: messageData.text },
               createdAt: { integerValue: String(messageData.createdAt) },
-              channelId: { stringValue: messageData.channelId }
+              channelId: { stringValue: messageData.channelId },
+              isEdited: { booleanValue: false }
             }
           });
 
           const resp = await fetch(restUrl, {
-            method: 'POST',
+            method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: bodyPayload
           });
@@ -750,6 +918,165 @@
       }
 
       return messageData;
+    },
+
+    async updateMessage(channelId, messageId, newText) {
+      if (!channelId || !messageId || typeof newText !== 'string') return false;
+      const cleanChannelId = channelId.trim();
+      const cleanMessageId = messageId.trim();
+      const cleanText = newText.trim();
+      const updates = {
+        text: cleanText,
+        isEdited: true,
+        editedAt: Date.now()
+      };
+
+      if (this.db) {
+        try {
+          await this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages`).doc(cleanMessageId).set(updates, { merge: true });
+          console.log('[FIREBASE] Message updated in Firestore:', cleanMessageId);
+          return true;
+        } catch (err) {
+          console.warn('[FIREBASE] updateMessage error:', err.message);
+        }
+      }
+
+      // REST fallback
+      try {
+        const config = window.REDDOT_FIREBASE_CONFIG;
+        if (config && config.projectId) {
+          const restUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/organizations/${ORG_ID}/channels/${cleanChannelId}/messages/${cleanMessageId}?updateMask.fieldPaths=text&updateMask.fieldPaths=isEdited&updateMask.fieldPaths=editedAt&key=${config.apiKey}`;
+          await fetch(restUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fields: {
+                text: { stringValue: cleanText },
+                isEdited: { booleanValue: true },
+                editedAt: { integerValue: String(updates.editedAt) }
+              }
+            })
+          });
+          return true;
+        }
+      } catch (_) {}
+
+      return false;
+    },
+
+    async deleteMessage(channelId, messageId) {
+      if (!channelId || !messageId) return false;
+      const cleanChannelId = channelId.trim();
+      const cleanMessageId = messageId.trim();
+
+      if (this.db) {
+        try {
+          await this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages`).doc(cleanMessageId).delete();
+          console.log('[FIREBASE] Message deleted from Firestore:', cleanMessageId);
+          return true;
+        } catch (err) {
+          console.warn('[FIREBASE] deleteMessage error:', err.message);
+        }
+      }
+
+      try {
+        const config = window.REDDOT_FIREBASE_CONFIG;
+        if (config && config.projectId) {
+          const restUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/organizations/${ORG_ID}/channels/${cleanChannelId}/messages/${cleanMessageId}?key=${config.apiKey}`;
+          await fetch(restUrl, { method: 'DELETE' });
+          return true;
+        }
+      } catch (_) {}
+
+      return false;
+    },
+
+    async toggleReaction(channelId, messageId, emoji, userObj = null) {
+      if (!channelId || !messageId || !emoji || !this.db) return false;
+      const cleanChannelId = channelId.trim();
+      const cleanMessageId = messageId.trim();
+
+      try {
+        const docRef = this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages`).doc(cleanMessageId);
+        const doc = await docRef.get();
+        if (!doc.exists) return false;
+
+        const data = doc.data() || {};
+        const reactions = { ...(data.reactions || {}) };
+        let users = Array.isArray(reactions[emoji]) ? [...reactions[emoji]] : [];
+
+        const myUid = userObj?.uid || userObj?.id || this.currentUser?.uid || this.currentMember?.id || 'RD-USER';
+        const myName = userObj?.displayName || userObj?.name || this.currentMember?.displayName || 'Teammate';
+
+        const existingIdx = users.findIndex(u => (typeof u === 'string' ? u === myUid : u.uid === myUid));
+        if (existingIdx >= 0) {
+          users.splice(existingIdx, 1);
+        } else {
+          users.push({ uid: myUid, name: myName });
+        }
+
+        if (users.length === 0) {
+          delete reactions[emoji];
+        } else {
+          reactions[emoji] = users;
+        }
+
+        await docRef.set({ reactions }, { merge: true });
+        return true;
+      } catch (err) {
+        console.warn('[FIREBASE] toggleReaction error:', err);
+        return false;
+      }
+    },
+
+    async pinMessage(channelId, messageId, isPinned = true) {
+      if (!channelId || !messageId || !this.db) return false;
+      const cleanChannelId = channelId.trim();
+      const cleanMessageId = messageId.trim();
+      try {
+        await this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages`).doc(cleanMessageId).set({
+          isPinned: !!isPinned,
+          pinnedAt: isPinned ? Date.now() : null
+        }, { merge: true });
+        return true;
+      } catch (err) {
+        console.warn('[FIREBASE] pinMessage error:', err);
+        return false;
+      }
+    },
+
+    async setTypingStatus(channelId, isTyping = true) {
+      if (!channelId || !this.db) return;
+      const cleanChannelId = channelId.trim();
+      const myUid = this.currentUser?.uid || this.currentMember?.id || 'RD-USER';
+      const myName = this.currentMember?.displayName || this.currentMember?.name || (this.currentUser?.displayName || 'Teammate');
+      const docRef = this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/typing`).doc(myUid);
+      try {
+        if (isTyping) {
+          await docRef.set({ uid: myUid, name: myName, timestamp: Date.now() }, { merge: true });
+        } else {
+          await docRef.delete();
+        }
+      } catch (_) {}
+    },
+
+    subscribeTyping(channelId, callback) {
+      if (!this.db || !channelId) return () => {};
+      const cleanChannelId = channelId.trim();
+      const myUid = this.currentUser?.uid || this.currentMember?.id || 'RD-USER';
+      const unsub = this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/typing`)
+        .onSnapshot(snapshot => {
+          const typers = [];
+          const now = Date.now();
+          snapshot.forEach(doc => {
+            const d = doc.data();
+            if (d && d.uid !== myUid && (now - (d.timestamp || 0) < 6000)) {
+              typers.push(d.name || 'A teammate');
+            }
+          });
+          callback(typers);
+        }, () => {});
+      return unsub;
     },
 
     getDeterministicDMChannelId(userA, userB) {
@@ -917,39 +1244,75 @@
 
     async respondToCall(callId, status = 'ACCEPTED') {
       if (!this.db || !callId) return;
-      await this.db.collection(`organizations/${ORG_ID}/calls`).doc(callId).set({
-        status: status,
-        updatedAt: Date.now()
-      }, { merge: true });
+      try {
+        await this.db.collection(`organizations/${ORG_ID}/calls`).doc(callId).set({
+          status: status,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (e) {
+        console.warn('[FIREBASE] Respond to call note:', e.message);
+      }
+    },
+
+    async cancelCall(callId) {
+      if (!this.db || !callId) return;
+      try {
+        await this.db.collection(`organizations/${ORG_ID}/calls`).doc(callId).set({
+          status: 'CANCELLED',
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (e) {
+        console.warn('[FIREBASE] Cancel call note:', e.message);
+      }
+    },
+
+    listenToCallStatus(callId, callback) {
+      if (!this.db || !callId) return () => {};
+      const unsub = this.db.collection(`organizations/${ORG_ID}/calls`).doc(callId)
+        .onSnapshot((snap) => {
+          if (snap.exists) {
+            callback(snap.data());
+          }
+        }, (err) => {
+          console.warn('[FIREBASE] Call status listener error:', err.message);
+        });
+      this.listeners.push(unsub);
+      return unsub;
     },
 
     subscribeIncomingCalls(callback) {
       if (!this.db) return () => {};
-      const curUid = this.currentUser?.uid;
-      const curEmail = this.currentUser?.email ? this.currentUser.email.toLowerCase().trim() : '';
-      const curId = this.currentMember?.id;
 
       const unsub = this.db.collection(`organizations/${ORG_ID}/calls`)
         .where('status', '==', 'RINGING')
         .onSnapshot((snapshot) => {
+          const curUid = String(this.currentUser?.uid || (window.state?.currentUser?.uid) || (this.currentMember?.uid) || '');
+          const curEmail = String(this.currentUser?.email || (window.state?.currentUser?.email) || (this.currentMember?.email) || '').toLowerCase().trim();
+          const curId = String(this.currentMember?.id || (window.state?.currentMemberId) || (window.state?.currentMember?.id) || '').trim();
+          const curName = String(this.currentMember?.displayName || this.currentMember?.name || (window.state?.currentMember?.name) || '').toLowerCase().trim();
+
           const incoming = [];
           snapshot.forEach(doc => {
             const data = doc.data();
             if (!data) return;
+
             // Ignore calls initiated by myself
-            if (data.callerUid === curUid || (curEmail && data.callerEmail && data.callerEmail.toLowerCase() === curEmail)) return;
+            if ((curUid && data.callerUid === curUid) || (curEmail && data.callerEmail && data.callerEmail.toLowerCase() === curEmail)) return;
 
             // Ignore calls that expired (older than 60 seconds)
-            if (data.createdAt && Date.now() - data.createdAt > 60000) return;
+            if (data.createdAt && (Date.now() - data.createdAt > 60000)) return;
 
-            const tUid = data.targetUid;
-            const tEmail = (data.targetEmail || '').toLowerCase().trim();
+            const tUid = String(data.targetUid || '').trim();
+            const tEmail = String(data.targetEmail || '').toLowerCase().trim();
+            const tName = String(data.targetName || '').toLowerCase().trim();
 
-            const matchesEmail = curEmail && tEmail && (tEmail === curEmail || tEmail.includes(curEmail) || curEmail.includes(tEmail));
-            const matchesUid = curUid && tUid && (tUid === curUid || tUid === 'ALL');
-            const matchesId = curId && tUid && (tUid === curId || tUid === 'ALL');
+            const isBroadcast = tUid === 'ALL' || tName === 'entire team';
+            const matchesEmail = Boolean(curEmail && tEmail && (tEmail === curEmail || curEmail.includes(tEmail) || tEmail.includes(curEmail)));
+            const matchesUid = Boolean(curUid && tUid && (tUid === curUid));
+            const matchesId = Boolean(curId && tUid && (tUid.toLowerCase() === curId.toLowerCase()));
+            const matchesName = Boolean(curName && tName && (curName.includes(tName) || tName.includes(curName)));
 
-            if (matchesEmail || matchesUid || matchesId) {
+            if (isBroadcast || matchesEmail || matchesUid || matchesId || matchesName) {
               incoming.push({ id: doc.id, ...data });
             }
           });
@@ -1015,13 +1378,13 @@
     initPresence(uid, displayName, appVersion = '2.6.0') {
       if (!uid) return;
 
-      // 1. Cloud Firestore Heartbeat & Status
+      // 1. Cloud Firestore Heartbeat & Status (every 20 seconds)
       if (this.db) {
         this.updatePresenceFirestore(uid, 'DUTY_ON');
         if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = setInterval(() => {
           this.updatePresenceFirestore(uid, 'DUTY_ON');
-        }, 25000);
+        }, 20000);
       }
 
       // 2. Realtime Database (RTDB) Presence if configured
@@ -1057,11 +1420,15 @@
 
     updatePresenceFirestore(uid, status = 'DUTY_ON') {
       if (!this.db || !uid) return;
-      this.db.collection(`organizations/${ORG_ID}/members`).doc(uid).set({
+      const payload = {
         status: status,
         lastSeenAt: Date.now(),
-        active: true
-      }, { merge: true }).catch(() => {});
+        active: status !== 'DUTY_OFF'
+      };
+      this.db.collection(`organizations/${ORG_ID}/members`).doc(uid).set(payload, { merge: true }).catch(() => {});
+      if (this.currentMember?.id && this.currentMember.id !== uid) {
+        this.db.collection(`organizations/${ORG_ID}/members`).doc(this.currentMember.id).set(payload, { merge: true }).catch(() => {});
+      }
     },
 
     setPresenceState(stateName) {
@@ -1071,9 +1438,10 @@
           lastSeenAt: firebase.database.ServerValue.TIMESTAMP
         });
       }
-      if (this.currentUser) {
+      const myUid = this.currentUser?.uid || this.currentMember?.uid || (window.state?.currentMemberId);
+      if (myUid) {
         const statusMap = { online: 'DUTY_ON', away: 'DUTY_BREAK', break: 'DUTY_BREAK', offline: 'DUTY_OFF' };
-        this.updatePresenceFirestore(this.currentUser.uid, statusMap[stateName] || 'DUTY_ON');
+        this.updatePresenceFirestore(myUid, statusMap[stateName] || 'DUTY_ON');
       }
     },
 
@@ -1082,8 +1450,9 @@
         clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = null;
       }
-      if (this.currentUser && this.db) {
-        this.updatePresenceFirestore(this.currentUser.uid, 'DUTY_OFF');
+      const myUid = this.currentUser?.uid || this.currentMember?.uid || (window.state?.currentMemberId);
+      if (myUid && this.db) {
+        this.updatePresenceFirestore(myUid, 'DUTY_OFF');
       }
       if (this.presenceRef) {
         this.presenceRef.set({
@@ -1130,6 +1499,180 @@
           const logs = [];
           snapshot.forEach(doc => logs.push({ id: doc.id, ...doc.data() }));
           callback(logs);
+        });
+    },
+
+    // =========================================================================
+    // MICROSOFT TEAMS SUITE: MEETINGS & CALENDAR
+    // =========================================================================
+    async createMeeting(meeting) {
+      if (!meeting) return null;
+      const meetingId = meeting.id || `meet_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+      const payload = {
+        ...meeting,
+        id: meetingId,
+        createdAt: meeting.createdAt || Date.now(),
+        updatedAt: Date.now(),
+        createdBy: this.currentUser?.uid || this.currentMember?.id || 'SYSTEM'
+      };
+
+      if (this.db) {
+        try {
+          await this.db.collection(`organizations/${ORG_ID}/meetings`).doc(meetingId).set(payload, { merge: true });
+        } catch (err) {
+          console.warn('[FIREBASE] createMeeting error:', err);
+        }
+      }
+      return payload;
+    },
+
+    async deleteMeeting(meetingId) {
+      if (!meetingId || !this.db) return false;
+      try {
+        await this.db.collection(`organizations/${ORG_ID}/meetings`).doc(meetingId).delete();
+        return true;
+      } catch (err) {
+        console.warn('[FIREBASE] deleteMeeting error:', err);
+        return false;
+      }
+    },
+
+    subscribeMeetings(callback) {
+      if (!this.db) return () => {};
+      return this.db.collection(`organizations/${ORG_ID}/meetings`)
+        .orderBy('startTime', 'asc')
+        .onSnapshot((snapshot) => {
+          const meetings = [];
+          snapshot.forEach(doc => meetings.push({ id: doc.id, ...doc.data() }));
+          callback(meetings);
+        }, (err) => {
+          console.warn('[FIREBASE] subscribeMeetings note:', err.message);
+        });
+    },
+
+    // =========================================================================
+    // MICROSOFT TEAMS SUITE: THREADED REPLIES
+    // =========================================================================
+    async saveThreadReply(channelId, rootMsgId, replyData) {
+      if (!channelId || !rootMsgId || !replyData) return null;
+      const cleanChannelId = channelId.trim();
+      const cleanRootId = rootMsgId.trim();
+      const replyId = replyData.id || `reply_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+
+      const payload = {
+        ...replyData,
+        id: replyId,
+        rootMsgId: cleanRootId,
+        channelId: cleanChannelId,
+        createdAt: replyData.createdAt || Date.now()
+      };
+
+      if (this.db) {
+        try {
+          const threadRef = this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages/${cleanRootId}/replies`).doc(replyId);
+          await threadRef.set(payload);
+
+          // Update root message reply counter & last reply timestamp
+          const rootRef = this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages`).doc(cleanRootId);
+          await rootRef.set({
+            replyCount: firebase.firestore.FieldValue.increment(1),
+            lastReplyAt: Date.now(),
+            lastReplyUser: replyData.senderName || 'Teammate'
+          }, { merge: true });
+        } catch (err) {
+          console.warn('[FIREBASE] saveThreadReply error:', err);
+        }
+      }
+      return payload;
+    },
+
+    subscribeThreadReplies(channelId, rootMsgId, callback) {
+      if (!channelId || !rootMsgId || !this.db) return () => {};
+      const cleanChannelId = channelId.trim();
+      const cleanRootId = rootMsgId.trim();
+      return this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages/${cleanRootId}/replies`)
+        .orderBy('createdAt', 'asc')
+        .onSnapshot((snapshot) => {
+          const replies = [];
+          snapshot.forEach(doc => replies.push({ id: doc.id, ...doc.data() }));
+          callback(replies);
+        }, (err) => {
+          console.warn('[FIREBASE] subscribeThreadReplies note:', err.message);
+        });
+    },
+
+    // =========================================================================
+    // MICROSOFT TEAMS SUITE: ACTIVITY FEED & NOTIFICATIONS
+    // =========================================================================
+    async logActivity(activity) {
+      if (!activity) return null;
+      const actId = activity.id || `act_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+      const payload = {
+        ...activity,
+        id: actId,
+        timestamp: activity.timestamp || Date.now(),
+        unread: activity.unread !== false
+      };
+
+      if (this.db) {
+        try {
+          await this.db.collection(`organizations/${ORG_ID}/activity`).doc(actId).set(payload);
+        } catch (err) {
+          console.warn('[FIREBASE] logActivity error:', err);
+        }
+      }
+      return payload;
+    },
+
+    subscribeActivity(callback) {
+      if (!this.db) return () => {};
+      return this.db.collection(`organizations/${ORG_ID}/activity`)
+        .orderBy('timestamp', 'desc')
+        .limit(60)
+        .onSnapshot((snapshot) => {
+          const list = [];
+          snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+          callback(list);
+        }, (err) => {
+          console.warn('[FIREBASE] subscribeActivity note:', err.message);
+        });
+    },
+
+    // =========================================================================
+    // MICROSOFT TEAMS SUITE: BOOKMARKED MESSAGES
+    // =========================================================================
+    async toggleBookmark(userId, messageId, bookmarkData = null) {
+      if (!userId || !messageId || !this.db) return false;
+      try {
+        const ref = this.db.collection(`organizations/${ORG_ID}/members/${userId}/bookmarks`).doc(messageId);
+        const snap = await ref.get();
+        if (snap.exists) {
+          await ref.delete();
+          return false;
+        } else {
+          await ref.set({
+            id: messageId,
+            ...(bookmarkData || {}),
+            savedAt: Date.now()
+          });
+          return true;
+        }
+      } catch (err) {
+        console.warn('[FIREBASE] toggleBookmark error:', err);
+        return false;
+      }
+    },
+
+    subscribeBookmarks(userId, callback) {
+      if (!userId || !this.db) return () => {};
+      return this.db.collection(`organizations/${ORG_ID}/members/${userId}/bookmarks`)
+        .orderBy('savedAt', 'desc')
+        .onSnapshot((snapshot) => {
+          const list = [];
+          snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+          callback(list);
+        }, (err) => {
+          console.warn('[FIREBASE] subscribeBookmarks note:', err.message);
         });
     }
   };
