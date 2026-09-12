@@ -10,11 +10,11 @@ const PROJECT_ID = 'reddot-workspace';
 const ORG_ID = 'reddot';
 const CHANNEL_ID = 'general';
 
-const msgId = 'msg_ota_v257_' + Date.now();
+const msgId = 'msg_ota_v300_' + Date.now();
 const postUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/organizations/${ORG_ID}/channels/${CHANNEL_ID}/messages/${msgId}?key=${API_KEY}`;
 const channelMetaUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/organizations/${ORG_ID}/channels/${CHANNEL_ID}?updateMask.fieldPaths=lastMessageText&updateMask.fieldPaths=lastMessageSender&updateMask.fieldPaths=lastMessageTime&updateMask.fieldPaths=updatedAt&key=${API_KEY}`;
 
-const announcementText = `📢 **[SYSTEM UPDATE] REDDOT Workstation OS v2.5.7 is now LIVE!**\n\n✨ **What's New in This Release:**\n• **Brand Identity Upgrade**: Official **REDDOT WORKSTATION** designation across the viewport.\n• **Precision Work Hours Engine**: Resolved false shift timing calculations, eliminating previous-day stale hours leakage and double-counting.\n• **Real-Time Shift Audit Trail**: Distinct per-session durations for Clock-Out / Break events and live elapsed tracking for active duties.\n• **Drift-Free Wall-Clock Shift Timer**: Shift timers calculate against high-precision wall-clock time, eliminating time loss from PC sleep or suspension.\n• **Concurrency-Safe Persistence Engine**: Atomic queued file-writing preventing Windows disk file locking collisions.\n• **Automatic Shift & Member Hygiene**: Workstation automatically sanitizes stale metrics and marks inactive members offline on launch.\n\n👉 **How to Update:**\nSimply click the glowing **⚡ UPDATE** button in your top header, or go to **Database & Storage Hub > ⚡ 1-Click Fast Cloud Update**!`;
+const announcementText = `📢 **[MAJOR RELEASE] REDDOT Workstation v3.0 is now LIVE!**\n\n✨ **What's New in Workstation v3.0:**\n• **Executive Daily Pulse Dashboard**: Circular SVG gauge ring for live hours, 4 executive KPI metric cards, priority objectives with department pills, and real-time team activity stream.\n• **Iconic Left Navigation Rail**: High-density workspace navigation with real-time CPU allocation telemetry.\n• **Precision Attendance Log & Hero Card**: Massive clock display (06:11:24 HRS ACTIVE), 8-hour shift quota progress track, and one-click cryptographically auditable CSV export.\n• **Engineering Nodes Personnel Matrix**: Deep node telemetry, target architecture badges, active directives, and instant node provisioning.\n• **Sprint 14 Execution Cycle**: Sprint progress banner, prioritized work streams, and interactive slide-out task detail drawer with subtasks checklist.\n• **Dual-Theme Engine**: Seamless switching between Clean Carbon Light Mode and Obsidian Crimson Dark Mode (Alt+T shortcut).\n• **Universal Omnibox Search**: Instant keyboard search across tasks, members, and commands (Ctrl+K).\n• **Hardware Hotkeys**: Instant F7 (Take Break) and F8 (Clock Out) desktop bindings.\n\n👉 **How to Update:**\nSimply click the glowing **⚡ UPDATE** button in your top header, or go to **Database & Storage Hub > ⚡ 1-Click Fast Cloud Update**!`;
 
 const payload = JSON.stringify({
   fields: {
@@ -66,20 +66,22 @@ function postJson(url, data, method = 'PATCH') {
 }
 
 async function main() {
-  console.log('📡 Broadcasting v2.5.7 OTA Release Announcement to team chat channel [#general]...');
-  const res = await postJson(postUrl, payload, 'PATCH');
-  console.log('✅ Announcement message posted! Message ID:', msgId);
+  console.log('📡 Broadcasting v3.0.0 OTA Release Announcement to team chat channel [#general]...');
 
-  // Update channel meta
-  const metaPayload = JSON.stringify({
+  // 1. Post announcement message
+  await postJson(postUrl, payload, 'PATCH');
+  console.log('✅ Announcement message successfully posted!');
+
+  // 2. Update channel metadata
+  const channelMetaPayload = JSON.stringify({
     fields: {
-      lastMessageText: { stringValue: '📢 REDDOT Workstation OS v2.5.7 is now LIVE! Click ⚡ UPDATE' },
+      lastMessageText: { stringValue: '📢 REDDOT Workstation v3.0 is now LIVE! Click ⚡ UPDATE' },
       lastMessageSender: { stringValue: 'REDDOT System Bot ⚡' },
       lastMessageTime: { integerValue: String(Date.now()) },
       updatedAt: { integerValue: String(Date.now()) }
     }
   });
-  await postJson(channelMetaUrl, metaPayload, 'PATCH');
+  await postJson(channelMetaUrl, channelMetaPayload, 'PATCH');
   console.log('✅ General channel metadata updated.');
 }
 

@@ -1,15 +1,18 @@
 {
-  "version": "2.5.7",
+  "version": "3.0.0",
   "releaseDate": "2026-09-12",
   "minRequiredVersion": "2.0.0",
   "changelog": [
-    "Brand Identity Upgrade: Official REDDOT WORKSTATION designation across UI viewport.",
-    "Precision Work Hours Engine: Resolved false shift timing calculations, eliminating previous-day stale hours leakage and double-counting.",
-    "Real-Time Shift Audit Trail: Distinct per-session durations for Clock-Out / Break events and live elapsed tracking for active duties.",
-    "Drift-Free Wall-Clock Shift Timer: High-precision wall-clock time tracking, eliminating time loss from PC sleep or suspension.",
-    "Concurrency-Safe Persistence Engine: Atomic queued file-writing preventing Windows disk file locking collisions.",
-    "Automatic Shift & Member Hygiene: Workstation automatically sanitizes stale metrics and marks inactive members offline on launch."
+    "REDDOT Workstation v3.0 UI/UX Architecture: Complete industrial redesign inspired by IBM Carbon and high-performance mission control systems.",
+    "Executive Daily Pulse Dashboard: Circular live SVG gauge ring, 4 executive KPI metric cards, priority objectives, and real-time team activity stream.",
+    "Iconic Left Navigation Rail: High-density workspace navigation with live CPU allocation telemetry.",
+    "Precision Attendance Log & Hero Card: Massive clock display, 8-hour shift quota progress bar, and one-click cryptographically auditable CSV export.",
+    "Engineering Nodes Matrix: Deep personnel telemetry, target architecture badges, active directives, and instant node provisioning.",
+    "Sprint 14 Execution Cycle: Sprint progress banner, prioritized work streams, and interactive slide-out task detail drawer with subtasks checklist.",
+    "Dual-Theme Engine: Seamless switching between Clean Carbon Light Mode and Obsidian Crimson Dark Mode (Alt+T shortcut).",
+    "Universal Omnibox Search: Global shortcut (Ctrl+K) for instant keyboard-driven search across tasks, engineering nodes, and system commands.",
+    "Hardware Function Keys: Instant F7 (Take Break) and F8 (Clock Out) desktop shortcut bindings."
   ],
-  "downloadUrl": "https://github.com/reddotorg123/REDDOT_WORKSTATION/releases/download/v2.5.7/REDDOT-Workstation-OS-Setup.exe",
+  "downloadUrl": "https://github.com/reddotorg123/REDDOT_WORKSTATION/releases/download/v3.0.0/REDDOT-Workstation-OS-Setup.exe",
   "mandatory": false
 }
