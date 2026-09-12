@@ -791,6 +791,19 @@ html, body {
   box-shadow: 0 0 0 2px rgba(0, 210, 255, 0.2);
 }
 
+input[type="date"] {
+  color-scheme: dark;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
 .btn-primary-action {
   background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 100%);
   border: none;
@@ -1244,6 +1257,233 @@ html, body {
   color: var(--text-primary);
 }
 
+/* --- Team Working Hours Dashboard --- */
+.team-hours-section {
+  margin-bottom: 4px;
+}
+
+.team-hours-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.team-hours-card {
+  background: rgba(16, 17, 24, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: var(--transition-fast);
+  position: relative;
+  overflow: hidden;
+}
+.team-hours-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+  transition: var(--transition-fast);
+}
+.team-hours-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+.team-hours-card:hover::before {
+  background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+  opacity: 0.6;
+}
+.team-hours-card.card-online {
+  border-color: rgba(0, 230, 118, 0.2);
+}
+.team-hours-card.card-online::before {
+  background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+  opacity: 0.5;
+}
+.team-hours-card.card-break {
+  border-color: rgba(255, 179, 0, 0.2);
+}
+.team-hours-card.card-break::before {
+  background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
+  opacity: 0.5;
+}
+
+.team-hours-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.team-hours-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.team-hours-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 12px;
+  color: #fff;
+  flex-shrink: 0;
+}
+.team-hours-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+.team-hours-role {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-muted);
+}
+.team-hours-status-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.team-hours-status-badge.status-online {
+  color: #00e676;
+  background: rgba(0, 230, 118, 0.12);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.15);
+}
+.team-hours-status-badge.status-break {
+  color: #ffb300;
+  background: rgba(255, 179, 0, 0.12);
+  border: 1px solid rgba(255, 179, 0, 0.3);
+}
+.team-hours-status-badge.status-offline {
+  color: #727284;
+  background: rgba(114, 114, 132, 0.12);
+  border: 1px solid rgba(114, 114, 132, 0.3);
+}
+
+.team-hours-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.team-hours-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+.team-hours-metric-label {
+  font-size: 8.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.team-hours-metric-val {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+}
+.team-hours-metric-val.val-accent {
+  color: var(--accent-cyan);
+}
+
+.team-hours-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.team-hours-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.team-hours-progress-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.team-hours-progress-pct {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  color: var(--accent-cyan);
+}
+.team-hours-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.team-hours-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  min-width: 0;
+}
+.team-hours-progress-fill.fill-overtime {
+  background: linear-gradient(90deg, var(--accent-gold), var(--accent-red));
+}
+.team-hours-progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 20px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25));
+  border-radius: 0 3px 3px 0;
+}
+
+/* Legend dots */
+.team-hours-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.legend-dot-online { background: var(--accent-green); box-shadow: 0 0 6px rgba(0,230,118,0.4); }
+.legend-dot-break { background: var(--accent-gold); box-shadow: 0 0 6px rgba(255,179,0,0.4); }
+.legend-dot-offline { background: #565668; }
+
+/* Pulse animation for live online status */
+@keyframes pulse-glow-green {
+  0%, 100% { box-shadow: 0 0 4px rgba(0,230,118,0.2); }
+  50% { box-shadow: 0 0 12px rgba(0,230,118,0.5); }
+}
+.team-hours-card.card-online .team-hours-status-badge {
+  animation: pulse-glow-green 2s ease-in-out infinite;
+}
+
 /* ==========================================================================
    TAB 4: TASKS MANAGEMENT
    ========================================================================== */
@@ -1355,8 +1595,28 @@ html, body {
 
 .task-desc { font-size: 11.5px; color: var(--text-secondary); line-height: 1.4; }
 
-.task-meta-row { display: flex; gap: 14px; font-size: 10px; color: var(--text-muted); }
+.task-meta-row { display: flex; gap: 14px; font-size: 10px; color: var(--text-muted); align-items: center; }
 .task-meta-item strong { color: #fff; }
+.task-meta-item.interactive {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.task-meta-item.interactive:hover {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: rgba(0, 229, 255, 0.25);
+  color: var(--accent-cyan);
+}
+.task-meta-item.interactive .task-date-val {
+  color: #fff;
+  font-weight: 600;
+}
+.task-meta-item.interactive:hover .task-date-val {
+  color: var(--accent-cyan);
+}
 
 .task-actions-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
 .btn-task-action {

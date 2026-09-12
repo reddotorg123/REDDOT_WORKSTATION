@@ -538,7 +538,7 @@
       return unsub;
     },
 
-    async createTask({ id, title, description, priority, assigneeId, assigneeName, assigneeEmail, assigneeUid, dueAt }) {
+    async createTask({ id, title, description, priority, assigneeId, assigneeName, assigneeEmail, assigneeUid, dueAt, createdAt, taskDate }) {
       const curUid = this.currentUser ? this.currentUser.uid : 'RD-FOUNDER-001';
       const taskId = id || ('task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
       const creatorName = this.currentMember?.displayName || this.currentMember?.name || this.currentUser?.displayName || (this.currentUser?.email ? this.currentUser.email.split('@')[0] : 'JAGADISH K');
@@ -554,9 +554,10 @@
         assigneeEmail: String(assigneeEmail || '').toLowerCase(),
         createdBy: curUid,
         createdByName: creatorName,
-        createdAt: Date.now(),
+        createdAt: createdAt ? Number(createdAt) : Date.now(),
         updatedAt: Date.now(),
-        dueAt: dueAt || 'Today 5:00 PM'
+        dueAt: dueAt || 'Today 5:00 PM',
+        taskDate: String(taskDate || '')
       };
 
       if (this.db) {
@@ -1418,15 +1419,54 @@
       }
     },
 
-    updatePresenceFirestore(uid, status = 'DUTY_ON') {
+    // --- SHIFT PUNCH AUDIT LOGS (FIRESTORE) ---
+    async recordPunchLog(punch) {
+      if (!this.db || !punch) return;
+      const punchId = punch.id || ('punch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
+      const payload = {
+        id: punchId,
+        workerId: String(punch.workerId || this.currentMember?.id || 'RD-EMP-000'),
+        uid: String(punch.uid || this.currentUser?.uid || ''),
+        name: String(punch.name || this.currentMember?.displayName || this.currentMember?.name || 'Team Member'),
+        email: String(punch.email || this.currentUser?.email || '').toLowerCase(),
+        action: String(punch.action || 'CLOCK_IN'),
+        time: String(punch.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
+        date: String(punch.date || new Date().toLocaleDateString()),
+        timestamp: Number(punch.timestamp || Date.now())
+      };
+      await this.db.collection(`organizations/${ORG_ID}/punchLogs`).doc(punchId).set(payload);
+      return payload;
+    },
+
+    subscribePunchLogs(callback) {
+      if (!this.db) return () => {};
+      const unsub = this.db.collection(`organizations/${ORG_ID}/punchLogs`)
+        .orderBy('timestamp', 'asc')
+        .onSnapshot((snapshot) => {
+          const punches = [];
+          snapshot.forEach(doc => punches.push({ id: doc.id, ...doc.data() }));
+          callback(punches);
+        }, (err) => {
+          console.warn('[FIREBASE] Punch logs subscription error:', err.message);
+        });
+      this.listeners.push(unsub);
+      return unsub;
+    },
+
+    updatePresenceFirestore(uid, status = 'DUTY_ON', todaySeconds = null) {
       if (!this.db || !uid) return;
       const payload = {
         status: status,
         lastSeenAt: Date.now(),
-        active: status !== 'DUTY_OFF'
+        active: status !== 'DUTY_OFF',
+        todayDate: new Date().toDateString()
       };
+      if (todaySeconds !== null && todaySeconds !== undefined && typeof todaySeconds === 'number') {
+        payload.todaySeconds = Math.max(0, Math.floor(todaySeconds));
+        payload.todayHours = Number((payload.todaySeconds / 3600).toFixed(2));
+      }
       this.db.collection(`organizations/${ORG_ID}/members`).doc(uid).set(payload, { merge: true }).catch(() => {});
-      if (this.currentMember?.id && this.currentMember.id !== uid) {
+      if (this.currentMember?.id && this.currentMember.id !== uid && (this.currentMember.uid === uid || this.currentUser?.uid === uid)) {
         this.db.collection(`organizations/${ORG_ID}/members`).doc(this.currentMember.id).set(payload, { merge: true }).catch(() => {});
       }
     },

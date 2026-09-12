@@ -1,14 +1,15 @@
 {
-  "version": "2.5.3",
-  "releaseDate": "2026-09-05",
+  "version": "2.5.7",
+  "releaseDate": "2026-09-12",
   "minRequiredVersion": "2.0.0",
   "changelog": [
-    "Borderless Workspace: Removed top window menu bar for clean, distraction-free immersion",
-    "Interactive Task Editor: In-app modal for editing title, priority, status, assignee, due date, and notes",
-    "Real-Time Hours Today: Live aggregate punch log calculations with 1-second dynamic presence fleet ticker",
-    "Multi-Device Presence Sync: Real-time cross-device heartbeat broadcasting active worked seconds",
-    "Over-The-Air (OTA) Cloud Pipeline: Instant hotpatch distribution and dual GitHub/Firestore mirror sync"
+    "Brand Identity Upgrade: Official REDDOT WORKSTATION designation across UI viewport.",
+    "Precision Work Hours Engine: Resolved false shift timing calculations, eliminating previous-day stale hours leakage and double-counting.",
+    "Real-Time Shift Audit Trail: Distinct per-session durations for Clock-Out / Break events and live elapsed tracking for active duties.",
+    "Drift-Free Wall-Clock Shift Timer: High-precision wall-clock time tracking, eliminating time loss from PC sleep or suspension.",
+    "Concurrency-Safe Persistence Engine: Atomic queued file-writing preventing Windows disk file locking collisions.",
+    "Automatic Shift & Member Hygiene: Workstation automatically sanitizes stale metrics and marks inactive members offline on launch."
   ],
-  "downloadUrl": "https://github.com/reddotorg123/REDDOT_WORKSTATION/releases/download/v2.5.3/REDDOT-Workstation-OS-Setup.exe",
+  "downloadUrl": "https://github.com/reddotorg123/REDDOT_WORKSTATION/releases/download/v2.5.7/REDDOT-Workstation-OS-Setup.exe",
   "mandatory": false
 }

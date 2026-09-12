@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700;800;900&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="style.css?v=2.5.3-teams">
+  <link rel="stylesheet" href="style.css?v=2.5.5-teams">
 
   <!-- Firebase SDK v10 (Compat Build) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -34,7 +34,7 @@
         <div class="ota-banner-text">
           <div class="ota-banner-head">
             <span class="ota-banner-title">NEW WORKSTATION UPDATE AVAILABLE</span>
-            <span class="ota-banner-badge" id="otaBannerBadge">v2.5.3</span>
+            <span class="ota-banner-badge" id="otaBannerBadge">v2.5.5</span>
           </div>
           <p class="ota-banner-desc" id="otaBannerDesc">New release is available with instant hotpatching.</p>
         </div>
@@ -69,7 +69,7 @@
           <span class="brand-hex">&#x2B22;</span>
         </div>
         <div class="brand-meta">
-          <span class="brand-name" id="topBrandName">REDDOT.OS</span>
+          <span class="brand-name" id="topBrandName">REDDOT WORKSTATION</span>
           <span class="brand-sub">WORKSPACE</span>
         </div>
       </div>
@@ -78,7 +78,7 @@
       <div class="top-window-controls">
         <button type="button" id="topOtaPill" class="ota-header-pill hidden" title="New update available! Click to update now">
           <span class="ota-pill-dot"></span>
-          <span id="topOtaPillText">⚡ UPDATE v2.5.3</span>
+          <span id="topOtaPillText">⚡ UPDATE v2.5.5</span>
         </button>
         <button id="btnTopPinToggle" class="win-ctrl-btn" title="Toggle Desktop Background Pin Mode">
           <span class="ctrl-icon" id="topPinIcon">📌</span>
@@ -215,7 +215,7 @@
         <div class="header-right">
           <button type="button" id="headerOtaPill" class="ota-header-pill hidden" title="New update available! Click to update now">
             <span class="ota-pill-dot"></span>
-            <span id="headerOtaPillText">⚡ UPDATE v2.5.3</span>
+            <span id="headerOtaPillText">⚡ UPDATE v2.5.5</span>
           </button>
           <button id="btnCmdPinToggle" class="btn-outline-action" title="Toggle Desktop Background Pin Mode">
             <span id="cmdPinIcon">📌</span> <span id="cmdPinText">Pin Mode</span>
@@ -284,8 +284,29 @@
               </div>
             </div>
 
+            <!-- TEAM WORKING HOURS DASHBOARD -->
+            <div class="team-hours-section">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <h4 class="section-title" style="margin-bottom: 0;">📊 TEAM WORKING HOURS</h4>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span class="team-hours-legend-item"><span class="legend-dot legend-dot-online"></span> Online</span>
+                  <span class="team-hours-legend-item"><span class="legend-dot legend-dot-break"></span> Break</span>
+                  <span class="team-hours-legend-item"><span class="legend-dot legend-dot-offline"></span> Offline</span>
+                </div>
+              </div>
+              <div class="team-hours-grid" id="teamHoursGrid">
+                <!-- Dynamically populated with member hours cards -->
+              </div>
+            </div>
+
             <div class="punch-log-section">
-              <h4 class="section-title">SHIFT PUNCH AUDIT TRAIL</h4>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                <h4 class="section-title" style="margin-bottom: 0;">SHIFT PUNCH AUDIT TRAIL</h4>
+                <div id="punchFilterWrap" class="hidden" style="align-items: center; gap: 8px;">
+                  <label for="punchLogMemberFilter" style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Team Filter:</label>
+                  <select id="punchLogMemberFilter" class="custom-select" style="padding: 4px 10px; font-size: 11px; width: auto; min-width: 150px;"></select>
+                </div>
+              </div>
               <div class="punch-table-wrap">
                 <table class="punch-table">
                   <thead>
@@ -294,6 +315,7 @@
                       <th>Action</th>
                       <th>Timestamp</th>
                       <th>Date</th>
+                      <th>Hours Worked</th>
                     </tr>
                   </thead>
                   <tbody id="punchLogTableBody"></tbody>
@@ -328,9 +350,15 @@
                       <option value="URGENT">Urgent Priority</option>
                     </select>
                   </div>
-                  <div class="form-group">
-                    <label>Due Date / Target</label>
-                    <input type="text" id="taskDeadlineInput" class="custom-input" placeholder="Today 5:00 PM">
+                  <div class="form-row-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                      <label>Task Date (📅)</label>
+                      <input type="date" id="taskDateInput" class="custom-input" style="color-scheme: dark;">
+                    </div>
+                    <div class="form-group">
+                      <label>Due Time / Target (⏰)</label>
+                      <input type="text" id="taskDeadlineInput" class="custom-input" placeholder="Today 5:00 PM">
+                    </div>
                   </div>
                   <div class="form-group">
                     <label>Task Description &amp; Requirements</label>
@@ -954,7 +982,7 @@
                     <button id="btnRevertOtaHotpatchTop" class="btn-secondary-action hidden" style="font-size: 9px; padding: 2px 7px; color: #ffb300; border-color: rgba(255, 179, 0, 0.4);" title="Restore original factory bundled build">
                       <span>↺ Revert Hotpatch</span>
                     </button>
-                    <span id="otaVersionBadge" style="font-family: var(--font-mono); font-size: 10px; background: rgba(0, 210, 255, 0.15); color: var(--accent-cyan); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(0, 210, 255, 0.3);">VERSION 2.5.3 (INSTALLED)</span>
+                    <span id="otaVersionBadge" style="font-family: var(--font-mono); font-size: 10px; background: rgba(0, 210, 255, 0.15); color: var(--accent-cyan); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(0, 210, 255, 0.3);">VERSION 2.5.5 (INSTALLED)</span>
                   </div>
                 </div>
                 <div class="db-card-body">
@@ -1233,17 +1261,22 @@
 
         <div class="form-row-2 mb-12" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
           <div class="form-group">
-            <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: block;">Status</label>
-            <select id="editTaskStatus" class="custom-select">
-              <option value="ASSIGNED">Assigned</option>
-              <option value="REACHED">In Progress</option>
-              <option value="ACCOMPLISHED">Completed</option>
-            </select>
+            <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: block;">Task Date (📅)</label>
+            <input type="date" id="editTaskDate" class="custom-input" style="color-scheme: dark;">
           </div>
           <div class="form-group">
-            <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: block;">Target / Due Date</label>
+            <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: block;">Target / Due Time (⏰)</label>
             <input type="text" id="editTaskDue" class="custom-input" placeholder="e.g. Today 5:00 PM">
           </div>
+        </div>
+
+        <div class="form-group mb-12">
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: block;">Status</label>
+          <select id="editTaskStatus" class="custom-select">
+            <option value="ASSIGNED">Assigned</option>
+            <option value="REACHED">In Progress</option>
+            <option value="ACCOMPLISHED">Completed</option>
+          </select>
         </div>
 
         <div class="form-group mb-16">

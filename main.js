@@ -201,14 +201,52 @@ function loadDatabaseFromDisk() {
   return null;
 }
 
+let isDbSaving = false;
+let pendingDbPayload = null;
+
 function saveDatabaseToDisk(data) {
+  if (!data || typeof data !== 'object') return false;
+  pendingDbPayload = data;
+  drainDbSaveQueue();
+  return true;
+}
+
+function drainDbSaveQueue() {
+  if (isDbSaving || !pendingDbPayload) return;
+  isDbSaving = true;
+  const dataToWrite = pendingDbPayload;
+  pendingDbPayload = null;
+
   try {
     const filePath = getDbPath();
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
-    return true;
+    const payload = JSON.stringify(dataToWrite, null, 2);
+    const tmpPath = `${filePath}.${Date.now()}_${Math.random().toString(36).slice(2, 6)}.tmp`;
+
+    fs.writeFile(tmpPath, payload, 'utf8', (err) => {
+      if (err) {
+        console.error('[DB] Write error:', err);
+        isDbSaving = false;
+        if (pendingDbPayload) drainDbSaveQueue();
+        return;
+      }
+      fs.rename(tmpPath, filePath, (rErr) => {
+        if (rErr) {
+          // Fallback if rename fails due to transient Windows file handle lock
+          fs.writeFile(filePath, payload, 'utf8', () => {
+            try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch (_) {}
+            isDbSaving = false;
+            if (pendingDbPayload) drainDbSaveQueue();
+          });
+          return;
+        }
+        isDbSaving = false;
+        if (pendingDbPayload) drainDbSaveQueue();
+      });
+    });
   } catch (e) {
-    console.error('[DB] Write error:', e);
-    return false;
+    console.error('[DB] Save error:', e);
+    isDbSaving = false;
+    if (pendingDbPayload) drainDbSaveQueue();
   }
 }
 
@@ -292,7 +330,7 @@ function sampleSystemMetrics() {
     autoStart: getAutoStartStatus()
   };
 
-  if (tray) {
+  if (tray && !tray.isDestroyed()) {
     try {
       tray.setToolTip(`REDDOT OS • CPU: ${cpuLoad}% RAM: ${usedMemGB}GB`);
     } catch (_) {}

@@ -47,6 +47,11 @@ service cloud.firestore {
       match /calls/{callId} {
         allow read, write: if true;
       }
+
+      // Shift Punch Logs Collection
+      match /punchLogs/{punchId} {
+        allow read, write: if true;
+      }
     }
   }
 }

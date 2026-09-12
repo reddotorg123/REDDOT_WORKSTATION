@@ -346,7 +346,7 @@
 
           if (
             isDeleted ||
-            id === 'RD-RD-FOU' || id === 'RD-EMP-101' || id === 'RD-EMP-102' || id === 'RD-EMP-103' || id === 'pavithratech1206' ||
+            id === 'RD-RD-FOU' || id === 'RD-RD-EMP' || id === 'RD-EMP-101' || id === 'RD-EMP-102' || id === 'RD-EMP-103' || id === 'pavithratech1206' ||
             (m.name === 'Team Member' && !m.email) ||
             (m.uid === 'RD-FOUNDER-001' && !m.email) ||
             m?.name === 'Alex Rivera' || m?.name === 'Priya Sharma' || m?.name === 'Vikram Malhotra' ||
@@ -360,6 +360,21 @@
             const isFounder = (m.email && m.email.toLowerCase() === 'jagadish2k2006@gmail.com') || m.isOwner;
             m.id = isFounder ? 'RD-FOUNDER-001' : (m.uid ? `RD-${m.uid.slice(0, 6).toUpperCase()}` : `RD-EMP-${Math.floor(100 + Math.random() * 900)}`);
             changed = true;
+          }
+
+          // Database hygiene: Reset stale today's shift metrics for members not seen today
+          const todayDateStr = new Date().toDateString();
+          const isSeenToday = m.lastSeenAt && (new Date(m.lastSeenAt).toDateString() === todayDateStr);
+          if (!isSeenToday) {
+            if (m.todaySeconds !== 0 || m.todayHours !== 0) {
+              m.todaySeconds = 0;
+              m.todayHours = 0;
+              changed = true;
+            }
+            if (m.status === 'DUTY_ON' || m.status === 'DUTY_BREAK') {
+              m.status = 'DUTY_OFF';
+              changed = true;
+            }
           }
         });
         if (changed) {
@@ -524,6 +539,7 @@
   function closeAuthModal() {
     const modal = document.getElementById('authModal');
     if (modal) modal.classList.add('hidden');
+    try { localStorage.setItem('rd_auth_dismissed', '1'); } catch (_) {}
   }
 
   function switchAuthTab(tab) {
@@ -650,10 +666,13 @@
       safeSetText(sessionEmpId, member.id || (isSoleAdmin ? 'RD-FOUNDER-001' : 'ONLINE'));
 
       mountMemberOnWallpaper(state.currentMemberId);
+      reconcilePersonalShiftWithPunches();
       renderWorkers();
       renderTasks();
       renderChatChannelsAndDMs();
       renderFleetTelemetry();
+      renderPunchLogs();
+      renderTeamHoursDashboard();
     } else if (user) {
       const fallbackId = isSoleAdmin ? 'RD-FOUNDER-001' : `RD-${user.uid.slice(0, 6).toUpperCase()}`;
       state.currentMemberId = fallbackId;
@@ -661,6 +680,9 @@
       if (roleDot) roleDot.style.background = '#00e676';
       safeSetText(roleLabel, `${user.email.split('@')[0].toUpperCase()} // ${isSoleAdmin ? 'FOUNDER & ADMIN' : 'ONLINE'}`);
       safeSetText(sessionEmpId, fallbackId);
+      reconcilePersonalShiftWithPunches();
+      renderPunchLogs();
+      renderTeamHoursDashboard();
     } else {
       // Default to Founder session if offline/guest mode so features stay interactive
       state.currentMemberId = 'RD-FOUNDER-001';
@@ -668,7 +690,69 @@
       if (roleDot) roleDot.style.background = '#00e676';
       safeSetText(roleLabel, 'JAGADISH K // FOUNDER & ADMIN');
       safeSetText(sessionEmpId, 'RD-FOUNDER-001');
+      reconcilePersonalShiftWithPunches();
+      renderPunchLogs();
+      renderTeamHoursDashboard();
     }
+  }
+
+  function normalizePunch(p) {
+    if (!p) return null;
+    const punch = { ...p };
+    if (!punch.id) {
+      punch.id = `punch_${punch.workerId || 'legacy'}_${punch.timestamp || Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    }
+    const nameLower = (punch.name || '').toLowerCase().trim();
+    const emailLower = (punch.email || '').toLowerCase().trim();
+    const workerIdStr = String(punch.workerId || '').trim();
+
+    if (!punch.workerId || workerIdStr === 'null' || workerIdStr === 'undefined' || workerIdStr === '') {
+      if (nameLower.includes('jagadish') || emailLower.includes('jagadish')) {
+        punch.workerId = 'RD-FOUNDER-001';
+        punch.name = 'JAGADISH K';
+        if (!punch.email) punch.email = 'jagadish2k2006@gmail.com';
+      } else if (nameLower.includes('pavithra') || emailLower.includes('pavithra')) {
+        punch.workerId = 'RD-EMP-002';
+        punch.name = 'Pavithra R';
+      }
+    }
+    return punch;
+  }
+
+  function getCurrentResolvedMember() {
+    const myUid = state.currentUser?.uid || null;
+    const myEmail = (state.currentUser?.email || '').toLowerCase().trim();
+    const isSoleAdmin = (myEmail === 'jagadish2k2006@gmail.com') || (state.userRole === 'OWNER') || (state.currentMemberId === 'RD-FOUNDER-001');
+
+    if (state.currentMemberId && WorkspaceDB.data.members?.[state.currentMemberId]) {
+      return WorkspaceDB.data.members[state.currentMemberId];
+    }
+    if (myEmail) {
+      const found = Object.values(WorkspaceDB.data.members || {}).find(m => (m.email || '').toLowerCase().trim() === myEmail);
+      if (found) return found;
+    }
+    if (myUid && WorkspaceDB.data.members?.[myUid]) {
+      return WorkspaceDB.data.members[myUid];
+    }
+    if (isSoleAdmin) {
+      return {
+        id: 'RD-FOUNDER-001',
+        uid: myUid || 'RD-FOUNDER-001',
+        name: 'JAGADISH K',
+        displayName: 'JAGADISH K',
+        email: myEmail || 'jagadish2k2006@gmail.com',
+        role: 'owner',
+        isOwner: true
+      };
+    }
+    return {
+      id: state.currentMemberId || (myUid ? `RD-${myUid.slice(0, 6).toUpperCase()}` : 'RD-EMP-001'),
+      uid: myUid,
+      name: state.currentUser?.displayName || (myEmail ? myEmail.split('@')[0] : 'Employee'),
+      displayName: state.currentUser?.displayName || (myEmail ? myEmail.split('@')[0] : 'Employee'),
+      email: myEmail,
+      role: 'Employee'
+    };
   }
 
   function pickPhotoFile() {
@@ -1121,11 +1205,28 @@
         card.style.border = '1px solid rgba(255, 82, 82, 0.4)';
       }
 
-      const isSelf = (member.id === state.currentMemberId || (member.email && member.email.toLowerCase() === state.currentUser?.email?.toLowerCase()) || member.email?.toLowerCase() === 'jagadish2k2006@gmail.com');
-      const isOnline = isSelf || (!member.suspended && member.status === 'DUTY_ON');
-      const isBreak = member.status === 'DUTY_BREAK';
-      const statusClass = member.suspended ? 'pulse-red' : (isOnline ? 'pulse-green' : (isBreak ? 'pulse-amber' : 'pulse-red'));
-      const statusText = member.suspended ? '⛔ Suspended' : (isOnline ? '🟢 Online' : (isBreak ? '🟡 Away' : '🔴 Offline'));
+      const isOnline = isMemberAppOnline(member);
+      const dutyStatus = getMemberDutyStatus(member);
+      const isBreak = dutyStatus === 'DUTY_BREAK';
+      const isOnDuty = dutyStatus === 'DUTY_ON';
+      const isSelf = isSelfMember(member);
+
+      let statusClass = 'pulse-red';
+      let statusText = '🔴 Offline';
+
+      if (member.suspended) {
+        statusClass = 'pulse-red';
+        statusText = '⛔ Suspended';
+      } else if (isBreak) {
+        statusClass = 'pulse-amber';
+        statusText = '🟡 Away';
+      } else if (isOnDuty) {
+        statusClass = 'pulse-green';
+        statusText = '🟢 On Duty';
+      } else if (isOnline) {
+        statusClass = 'pulse-green';
+        statusText = '🟢 Online';
+      }
 
       const safeName = escapeHtml(member.name || member.displayName || 'Member');
       const safeId = escapeHtml(member.id || (member.uid ? `RD-${member.uid.slice(0, 6).toUpperCase()}` : 'RD-EMP-000'));
@@ -1486,6 +1587,34 @@
     });
   }
 
+  function formatTimestampForDateInput(timestamp) {
+    if (!timestamp) return new Date().toISOString().split('T')[0];
+    const d = new Date(Number(timestamp) || timestamp);
+    if (isNaN(d.getTime())) return new Date().toISOString().split('T')[0];
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function parseDateInputToTimestamp(dateStr, existingTimestamp) {
+    if (!dateStr) return existingTimestamp || Date.now();
+    const parts = String(dateStr).trim().split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      const existing = existingTimestamp ? new Date(existingTimestamp) : new Date();
+      const h = isNaN(existing.getHours()) ? 12 : existing.getHours();
+      const min = isNaN(existing.getMinutes()) ? 0 : existing.getMinutes();
+      const s = isNaN(existing.getSeconds()) ? 0 : existing.getSeconds();
+      const result = new Date(y, m, d, h, min, s);
+      return isNaN(result.getTime()) ? (existingTimestamp || Date.now()) : result.getTime();
+    }
+    const parsed = new Date(dateStr).getTime();
+    return isNaN(parsed) ? (existingTimestamp || Date.now()) : parsed;
+  }
+
   function renderTasks() {
     const container = document.getElementById('taskCardsList');
     const totalBadge = document.getElementById('tasksTotalBadge');
@@ -1496,6 +1625,12 @@
     const select = document.getElementById('taskAssigneeSelect');
     if (!select || select.children.length <= 1) {
       populateAssigneeSelect();
+    }
+
+    // Default task creation date input to today if empty
+    const createDateInput = document.getElementById('taskDateInput');
+    if (createDateInput && !createDateInput.value) {
+      createDateInput.value = formatTimestampForDateInput(Date.now());
     }
 
     // Deduplicate tasks: guarantee no task is ever rendered twice
@@ -1571,8 +1706,8 @@
 
         <div class="task-meta-row">
           <span class="task-meta-item">&#x1F464; <strong>${safeAssignee}</strong></span>
-          <span class="task-meta-item">&#x23F0; ${safeDue}</span>
-          <span class="task-meta-item">&#x1F4C5; ${safeCreated}</span>
+          <span class="task-meta-item interactive task-meta-due" data-id="${safeTaskId}" title="Click to edit target / due time">&#x23F0; ${safeDue}</span>
+          <span class="task-meta-item interactive task-meta-date" data-id="${safeTaskId}" title="Click to edit task date">&#x1F4C5; <span class="task-date-val">${safeCreated}</span> ✏️</span>
         </div>
 
         <div class="task-actions-row">
@@ -1622,12 +1757,22 @@
         showQuickToast(`Task "${task.title}" status changed to ${label}`, 'info');
       });
 
+      card.querySelector('.task-meta-date')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditTaskModal(task, 'date');
+      });
+
+      card.querySelector('.task-meta-due')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditTaskModal(task, 'due');
+      });
+
       card.querySelector('.btn-task-view')?.addEventListener('click', () => {
         openTaskActivityModal(task);
       });
 
       card.querySelector('.btn-task-edit')?.addEventListener('click', () => {
-        openEditTaskModal(task);
+        openEditTaskModal(task, 'title');
       });
 
       card.querySelector('.task-status-select')?.addEventListener('change', async (e) => {
@@ -1711,18 +1856,22 @@
           </div>
           <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div class="form-group">
-              <label for="editTaskStatus" class="form-label">Status</label>
-              <select id="editTaskStatus" class="form-select">
-                <option value="ASSIGNED">Assigned</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="REVIEW">Under Review</option>
-                <option value="COMPLETED">Completed</option>
-              </select>
+              <label for="editTaskDate" class="form-label">Task Date (📅)</label>
+              <input type="date" id="editTaskDate" class="form-input" style="color-scheme: dark;" />
             </div>
             <div class="form-group">
-              <label for="editTaskDue" class="form-label">Target Completion</label>
-              <input type="date" id="editTaskDue" class="form-input" />
+              <label for="editTaskDue" class="form-label">Target Completion (⏰)</label>
+              <input type="text" id="editTaskDue" class="form-input" placeholder="e.g. Today 5:00 PM" />
             </div>
+          </div>
+          <div class="form-group">
+            <label for="editTaskStatus" class="form-label">Status</label>
+            <select id="editTaskStatus" class="form-select">
+              <option value="ASSIGNED">Assigned</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="REVIEW">Under Review</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
           </div>
           <div class="form-group">
             <label for="editTaskDesc" class="form-label">Description / Work Notes</label>
@@ -1742,15 +1891,11 @@
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeEditTaskModal();
     });
-    document.getElementById('formEditTask')?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      saveEditTask();
-    });
 
     return modal;
   }
 
-  function openEditTaskModal(task) {
+  function openEditTaskModal(task, focusField = 'title') {
     if (!task) return;
     const modal = ensureEditTaskModal();
     if (!modal) return;
@@ -1763,6 +1908,7 @@
     const prioritySelect = document.getElementById('editTaskPriority');
     const statusSelect = document.getElementById('editTaskStatus');
     const dueInput = document.getElementById('editTaskDue');
+    const dateInput = document.getElementById('editTaskDate');
     const descInput = document.getElementById('editTaskDesc');
 
     if (idInput) idInput.value = task.id || '';
@@ -1796,10 +1942,23 @@
     if (prioritySelect) prioritySelect.value = task.priority || 'NORMAL';
     if (statusSelect) statusSelect.value = task.status || 'ASSIGNED';
     if (dueInput) dueInput.value = task.dueAt || '';
+    if (dateInput) {
+      dateInput.value = formatTimestampForDateInput(task.createdAt || task.taskDate || Date.now());
+    }
     if (descInput) descInput.value = task.description || '';
 
     modal.classList.remove('hidden');
-    setTimeout(() => titleInput?.focus(), 50);
+    setTimeout(() => {
+      if (focusField === 'date' && dateInput) {
+        dateInput.focus();
+        try { dateInput.showPicker?.(); } catch (_) {}
+      } else if (focusField === 'due' && dueInput) {
+        dueInput.focus();
+        dueInput.select();
+      } else {
+        titleInput?.focus();
+      }
+    }, 60);
   }
 
   function closeEditTaskModal() {
@@ -1815,6 +1974,8 @@
 
     safeSetText(document.getElementById('taskModalTitle'), `TASK: ${task.title}`);
 
+    const safeCreatedDate = new Date(task.createdAt || Date.now()).toLocaleDateString();
+
     metaBox.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <span class="task-priority-badge">${escapeHtml(task.priority)}</span>
@@ -1826,8 +1987,9 @@
         </div>
       </div>
       <p style="font-size: 12px; color: #fff; margin-bottom: 8px;">${escapeHtml(task.description || 'No description provided.')}</p>
-      <div style="font-size: 10px; color: var(--text-muted); display: flex; gap: 12px;">
+      <div style="font-size: 10px; color: var(--text-muted); display: flex; gap: 12px; flex-wrap: wrap;">
         <span>Assignee: <strong>${escapeHtml(task.assigneeName || task.assigneeId)}</strong></span>
+        <span>Date: <strong>${escapeHtml(safeCreatedDate)}</strong></span>
         <span>Target: <strong>${escapeHtml(task.dueAt || 'N/A')}</strong></span>
       </div>
     `;
@@ -1951,7 +2113,7 @@
 
       const mName = member.displayName || member.name || (mEmail ? mEmail.split('@')[0] : 'Team Member');
       const safeId = mId || (mUid ? `RD-${mUid.slice(0, 6).toUpperCase()}` : 'RD-EMP');
-      const isOnline = member.status === 'DUTY_ON' || (member.lastSeenAt && (Date.now() - member.lastSeenAt < 60000));
+      const isOnline = isMemberAppOnline(member);
 
       btn.innerHTML = `
         <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${isOnline ? '#00e676' : '#727284'}; margin-right: 6px; box-shadow: ${isOnline ? '0 0 6px #00e676' : 'none'};"></span>
@@ -2695,7 +2857,7 @@
           ${members.slice(0, 15).map(m => `
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: rgba(0,0,0,0.25); border-radius: 6px;">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="width: 8px; height: 8px; border-radius: 50%; background: ${m.status === 'DUTY_ON' ? '#00e676' : '#727284'};"></span>
+                <span style="width: 8px; height: 8px; border-radius: 50%; background: ${isMemberAppOnline(m) ? '#00e676' : '#727284'};"></span>
                 <span style="font-size: 12px; font-weight: 700; color: #fff;">${escapeHtml(m.name || m.displayName || 'Member')}</span>
               </div>
               <span style="font-size: 10px; color: var(--accent-cyan); font-family: var(--font-mono);">${escapeHtml(m.role || 'Member')}</span>
@@ -3572,7 +3734,7 @@
       const safeName = escapeHtml(m.name || m.displayName || 'Member');
       const safeId = escapeHtml(m.id || 'RD-001');
       const avatar = escapeHtml((m.name || 'RD').slice(0, 2).toUpperCase());
-      const isOnline = m.status === 'DUTY_ON';
+      const isOnline = isMemberAppOnline(m);
 
       card.innerHTML = `
         <div class="speed-dial-member">
@@ -3843,7 +4005,286 @@
     });
   }
 
-  // --- TEAM PRESENCE & AUDIT LOGS ---
+  // --- TEAM PRESENCE, DUTY & SHIFT RECONCILIATION LOGIC ---
+  function isFounderMember(member) {
+    if (!member) return false;
+    const mEmail = (member.email || '').toLowerCase().trim();
+    const mId = member.id || (member.uid ? `RD-${member.uid.slice(0, 6).toUpperCase()}` : '');
+    const mName = (member.displayName || member.name || '').toLowerCase().trim();
+    return (mEmail === 'jagadish2k2006@gmail.com') || (mId === 'RD-FOUNDER-001') || !!member.isOwner || mName.includes('jagadish');
+  }
+
+  function isSelfMember(member) {
+    if (!member) return false;
+    const mId = member.id || (member.uid ? `RD-${member.uid.slice(0, 6).toUpperCase()}` : '');
+    const mEmail = (member.email || '').toLowerCase().trim();
+    const curEmail = (state.currentUser?.email || '').toLowerCase().trim();
+    if (mId && state.currentMemberId && mId === state.currentMemberId) return true;
+    if (member.uid && state.currentUser?.uid && member.uid === state.currentUser.uid) return true;
+    if (mEmail && curEmail && mEmail === curEmail) return true;
+    if (mEmail === 'jagadish2k2006@gmail.com' && (curEmail === 'jagadish2k2006@gmail.com' || state.userRole === 'OWNER' || state.currentMemberId === 'RD-FOUNDER-001')) return true;
+    if (isFounderMember(member) && (state.userRole === 'OWNER' || state.currentMemberId === 'RD-FOUNDER-001' || curEmail === 'jagadish2k2006@gmail.com')) return true;
+    return false;
+  }
+
+  function isMemberAppOnline(member) {
+    if (!member || member.suspended) return false;
+    if (isSelfMember(member)) return true; // Workstation app is actively open and running right now
+
+    // For remote members: fresh heartbeat within last 90 seconds
+    const now = Date.now();
+    if (member.lastSeenAt && (now - member.lastSeenAt < 90000)) return true;
+    if (member.status === 'DUTY_ON' && member.lastSeenAt && (now - member.lastSeenAt < 120000)) return true;
+    return false;
+  }
+
+  function getMemberDutyStatus(member) {
+    if (!member) return 'DUTY_OFF';
+    if (member.suspended) return 'SUSPENDED';
+
+    const isSelf = isSelfMember(member);
+    if (isSelf && state.personalShift) {
+      if (state.personalShift.status === 'DUTY_ON') return 'DUTY_ON';
+      if (state.personalShift.status === 'DUTY_BREAK') return 'DUTY_BREAK';
+    }
+
+    const now = Date.now();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfToday = today.getTime();
+    const todayStr = new Date().toLocaleDateString();
+
+    const mId = member.id;
+    const mUid = member.uid;
+    const mEmail = (member.email || '').toLowerCase().trim();
+    const mName = (member.displayName || member.name || '').toLowerCase().trim();
+    const isFounder = isFounderMember(member);
+
+    const rawPunches = (WorkspaceDB.data.punchLogs || []).map(normalizePunch).filter(Boolean);
+    const memberPunchesToday = rawPunches.filter(p => {
+      const pWorkerId = p.workerId;
+      const pEmail = (p.email || '').toLowerCase().trim();
+      const pName = (p.name || '').toLowerCase().trim();
+
+      let match = false;
+      if (mId && pWorkerId === mId) match = true;
+      if (mUid && (pWorkerId === mUid || p.uid === mUid)) match = true;
+      if (mEmail && pEmail && pEmail === mEmail) match = true;
+      if (mName && pName && (pName === mName || pName.includes(mName) || mName.includes(pName))) match = true;
+      if (isFounder && (pWorkerId === 'RD-FOUNDER-001' || pName.includes('jagadish') || pEmail.includes('jagadish'))) match = true;
+      if (!isFounder && mName.includes('pavithra') && (pName.includes('pavithra') || pWorkerId === 'RD-EMP-002')) match = true;
+
+      const isToday = (p.timestamp >= startOfToday) || (p.date === todayStr) || (new Date(p.timestamp || 0).toLocaleDateString() === todayStr);
+      return match && isToday;
+    }).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    if (memberPunchesToday.length > 0) {
+      const lastPunch = memberPunchesToday[memberPunchesToday.length - 1];
+      if (lastPunch.action === 'CLOCK_IN') return 'DUTY_ON';
+      if (lastPunch.action === 'BREAK') return 'DUTY_BREAK';
+      if (lastPunch.action === 'CLOCK_OUT') return 'DUTY_OFF';
+    }
+
+    if (member.status === 'DUTY_ON' || member.status === 'DUTY_BREAK') {
+      const isFresh = member.lastSeenAt && (now - member.lastSeenAt < 120000);
+      if (isFresh || isSelf) return member.status;
+    }
+
+    return 'DUTY_OFF';
+  }
+
+  function startShiftTimerInterval() {
+    if (state.personalShift.timer) clearInterval(state.personalShift.timer);
+    const timerDisplay = document.getElementById('personalShiftTimer');
+    state.personalShift.timer = setInterval(() => {
+      if (state.personalShift.status === 'DUTY_ON') {
+        if (state.personalShift.sessionStartTs) {
+          const elapsedSession = Math.max(0, Math.floor((Date.now() - state.personalShift.sessionStartTs) / 1000));
+          state.personalShift.seconds = (state.personalShift.accumulatedSeconds || 0) + elapsedSession;
+        } else {
+          state.personalShift.seconds++;
+        }
+        if (timerDisplay) timerDisplay.textContent = formatShiftDisplay(state.personalShift.seconds);
+        updateTeamHoursLive();
+        updateLiveFleetHours();
+      }
+    }, 1000);
+  }
+
+  function updateShiftUI() {
+    const badge = document.getElementById('personalShiftBadge');
+    const timerDisplay = document.getElementById('personalShiftTimer');
+    const btnClockIn = document.getElementById('btnPersonalClockIn');
+    const btnBreak = document.getElementById('btnPersonalBreak');
+    const btnClockOut = document.getElementById('btnPersonalClockOut');
+
+    if (badge) {
+      badge.textContent = state.personalShift.status.replace('_', ' ');
+      badge.classList.remove('duty-on', 'duty-break', 'duty-off');
+      if (state.personalShift.status === 'DUTY_ON') badge.classList.add('duty-on');
+      else if (state.personalShift.status === 'DUTY_BREAK') badge.classList.add('duty-break');
+      else badge.classList.add('duty-off');
+    }
+    if (timerDisplay) {
+      timerDisplay.textContent = formatShiftDisplay(state.personalShift.seconds);
+    }
+    if (btnClockIn) btnClockIn.disabled = state.personalShift.status === 'DUTY_ON';
+    if (btnBreak) {
+      btnBreak.disabled = state.personalShift.status === 'DUTY_OFF';
+      const breakSpan = btnBreak.querySelector('span');
+      if (breakSpan) {
+        breakSpan.textContent = state.personalShift.status === 'DUTY_BREAK' ? '▶ Resume Work' : '⏸ Take Break';
+      }
+    }
+    if (btnClockOut) btnClockOut.disabled = state.personalShift.status === 'DUTY_OFF';
+  }
+
+  function reconcilePersonalShiftWithPunches() {
+    const cur = getCurrentResolvedMember();
+    if (!cur) return;
+    const now = Date.now();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfToday = today.getTime();
+    const todayDateStr = today.toDateString();
+
+    const mId = cur.id;
+    const mUid = cur.uid;
+    const mEmail = (cur.email || '').toLowerCase().trim();
+    const mName = (cur.displayName || cur.name || '').toLowerCase().trim();
+    const isFounder = isFounderMember(cur);
+
+    const rawPunches = (WorkspaceDB.data.punchLogs || []).map(normalizePunch).filter(Boolean);
+    const memberPunchesToday = rawPunches.filter(p => {
+      if (!p) return false;
+      const pWorkerId = p.workerId;
+      const pEmail = (p.email || '').toLowerCase().trim();
+      const pName = (p.name || '').toLowerCase().trim();
+
+      let match = false;
+      if (mId && pWorkerId === mId) match = true;
+      if (mUid && (pWorkerId === mUid || p.uid === mUid)) match = true;
+      if (mEmail && pEmail && pEmail === mEmail) match = true;
+      if (mName && pName && (pName === mName || pName.includes(mName) || mName.includes(pName))) match = true;
+      if (isFounder && (pWorkerId === 'RD-FOUNDER-001' || pName.includes('jagadish') || pEmail.includes('jagadish'))) match = true;
+      if (!match) return false;
+
+      const pTs = p.timestamp || 0;
+      if (pTs > 0) return new Date(pTs).toDateString() === todayDateStr;
+      if (p.date) {
+        if (p.date === today.toLocaleDateString() || p.date === todayDateStr) return true;
+        const d = new Date(p.date);
+        return !isNaN(d.getTime()) && d.toDateString() === todayDateStr;
+      }
+      return false;
+    }).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    if (memberPunchesToday.length === 0) {
+      try {
+        const savedShift = JSON.parse(localStorage.getItem('rd_active_shift') || 'null');
+        const isSameWorker = savedShift && (savedShift.workerId === cur.id || savedShift.workerId === cur.uid);
+        const shiftAgeMs = savedShift ? (now - (savedShift.clockInTimestamp || 0)) : Infinity;
+        const isFreshShift = shiftAgeMs >= 0 && shiftAgeMs < 16 * 3600 * 1000;
+        const isSameDate = savedShift && (savedShift.savedDate === todayDateStr);
+
+        if (savedShift && isSameWorker && isFreshShift && isSameDate && (savedShift.status === 'DUTY_ON' || savedShift.status === 'DUTY_BREAK')) {
+          state.personalShift.status = savedShift.status;
+          state.personalShift.sessionStartTs = savedShift.clockInTimestamp || now;
+          state.personalShift.accumulatedSeconds = savedShift.accumulatedSeconds || 0;
+          if (savedShift.status === 'DUTY_ON') {
+            const elapsed = Math.max(0, Math.floor((now - state.personalShift.sessionStartTs) / 1000));
+            state.personalShift.seconds = elapsed + state.personalShift.accumulatedSeconds;
+            startShiftTimerInterval();
+          } else {
+            state.personalShift.seconds = state.personalShift.accumulatedSeconds;
+          }
+          updateShiftUI();
+          return;
+        }
+      } catch (_) {}
+      state.personalShift.status = 'DUTY_OFF';
+      state.personalShift.seconds = 0;
+      state.personalShift.sessionStartTs = null;
+      state.personalShift.accumulatedSeconds = 0;
+      if (state.personalShift.timer) {
+        clearInterval(state.personalShift.timer);
+        state.personalShift.timer = null;
+      }
+      try { localStorage.removeItem('rd_active_shift'); } catch (_) {}
+      updateShiftUI();
+      return;
+    }
+
+    let completedSec = 0;
+    let openPunch = null;
+
+    memberPunchesToday.forEach(p => {
+      const ts = p.timestamp || now;
+      if (p.action === 'CLOCK_IN') {
+        if (!openPunch) {
+          openPunch = p;
+        }
+      } else if (p.action === 'CLOCK_OUT' || p.action === 'BREAK') {
+        if (openPunch) {
+          const start = Math.max(openPunch.timestamp || 0, startOfToday);
+          const end = Math.min(ts, now);
+          if (end > start) completedSec += Math.floor((end - start) / 1000);
+          openPunch = null;
+        }
+      }
+    });
+
+    const lastPunch = memberPunchesToday[memberPunchesToday.length - 1];
+    if (lastPunch.action === 'CLOCK_IN') {
+      state.personalShift.status = 'DUTY_ON';
+      const startTs = lastPunch.timestamp || now;
+      const currentSessionSec = Math.max(0, Math.floor((now - startTs) / 1000));
+      state.personalShift.sessionStartTs = startTs;
+      state.personalShift.accumulatedSeconds = completedSec;
+      state.personalShift.seconds = completedSec + currentSessionSec;
+      try {
+        localStorage.setItem('rd_active_shift', JSON.stringify({
+          status: 'DUTY_ON',
+          clockInTimestamp: startTs,
+          accumulatedSeconds: completedSec,
+          workerId: cur.id,
+          savedDate: todayDateStr
+        }));
+      } catch (_) {}
+      startShiftTimerInterval();
+    } else if (lastPunch.action === 'BREAK') {
+      state.personalShift.status = 'DUTY_BREAK';
+      state.personalShift.sessionStartTs = null;
+      state.personalShift.accumulatedSeconds = completedSec;
+      state.personalShift.seconds = completedSec;
+      if (state.personalShift.timer) {
+        clearInterval(state.personalShift.timer);
+        state.personalShift.timer = null;
+      }
+      try {
+        localStorage.setItem('rd_active_shift', JSON.stringify({
+          status: 'DUTY_BREAK',
+          clockInTimestamp: lastPunch.timestamp || now,
+          accumulatedSeconds: completedSec,
+          workerId: cur.id,
+          savedDate: todayDateStr
+        }));
+      } catch (_) {}
+    } else { // CLOCK_OUT
+      state.personalShift.status = 'DUTY_OFF';
+      state.personalShift.seconds = 0;
+      state.personalShift.sessionStartTs = null;
+      state.personalShift.accumulatedSeconds = 0;
+      if (state.personalShift.timer) {
+        clearInterval(state.personalShift.timer);
+        state.personalShift.timer = null;
+      }
+      try { localStorage.removeItem('rd_active_shift'); } catch (_) {}
+    }
+
+    updateShiftUI();
+  }
+
   function formatShiftDisplay(totalSeconds) {
     if (!totalSeconds || totalSeconds < 0) return '00:00:00';
     const hrs = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
@@ -3858,70 +4299,98 @@
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const startOfToday = today.getTime();
-    const todayStr = new Date().toLocaleDateString();
+    const todayDateStr = today.toDateString();
 
     const mId = member.id;
     const mUid = member.uid;
-    const mEmail = (member.email || '').toLowerCase();
-    const isSelf = (mId === state.currentMemberId || (mEmail && mEmail === state.currentUser?.email?.toLowerCase()) || mEmail === 'jagadish2k2006@gmail.com');
+    const mEmail = (member.email || '').toLowerCase().trim();
+    const mName = (member.displayName || member.name || '').toLowerCase().trim();
+    const isFounder = isFounderMember(member);
+    const isSelf = isSelfMember(member);
 
-    // 1. Calculate from local punch logs for today
-    const memberPunches = (WorkspaceDB.data.punchLogs || []).filter(p => {
+    // 1. Authoritative: Calculate from local & synced punch logs for today
+    const rawPunches = (WorkspaceDB.data.punchLogs || []).map(normalizePunch).filter(Boolean);
+    const memberPunchesToday = rawPunches.filter(p => {
+      if (!p) return false;
       const pWorkerId = p.workerId;
-      const pEmail = (p.email || '').toLowerCase();
-      const matchId = (pWorkerId === mId || (mUid && pWorkerId === mUid));
-      const matchEmail = (mEmail && pEmail && pEmail === mEmail);
-      const isToday = (p.timestamp >= startOfToday) || (p.date === todayStr);
-      return (matchId || matchEmail) && isToday;
+      const pEmail = (p.email || '').toLowerCase().trim();
+      const pName = (p.name || '').toLowerCase().trim();
+
+      // Robust matching against member identifiers
+      let match = false;
+      if (mId && pWorkerId === mId) match = true;
+      if (mUid && (pWorkerId === mUid || p.uid === mUid)) match = true;
+      if (mEmail && pEmail && pEmail === mEmail) match = true;
+      if (mName && pName && (pName === mName || pName.includes(mName) || mName.includes(pName))) match = true;
+      if (isFounder && (pWorkerId === 'RD-FOUNDER-001' || pName.includes('jagadish') || pEmail.includes('jagadish'))) match = true;
+      if (!isFounder && mName.includes('pavithra') && (pName.includes('pavithra') || pWorkerId === 'RD-EMP-002')) match = true;
+      if (!match) return false;
+
+      const pTs = p.timestamp || 0;
+      if (pTs > 0) return new Date(pTs).toDateString() === todayDateStr;
+      if (p.date) {
+        if (p.date === today.toLocaleDateString() || p.date === todayDateStr) return true;
+        const d = new Date(p.date);
+        return !isNaN(d.getTime()) && d.toDateString() === todayDateStr;
+      }
+      return false;
     }).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
     let completedSeconds = 0;
     let openPunchTimestamp = null;
 
-    memberPunches.forEach(p => {
+    memberPunchesToday.forEach(p => {
+      const ts = p.timestamp || now;
       if (p.action === 'CLOCK_IN') {
-        openPunchTimestamp = p.timestamp || now;
+        if (!openPunchTimestamp) {
+          openPunchTimestamp = Math.max(ts, startOfToday);
+        }
       } else if (p.action === 'CLOCK_OUT' || p.action === 'BREAK') {
         if (openPunchTimestamp) {
-          const deltaSec = Math.max(0, Math.floor(((p.timestamp || now) - openPunchTimestamp) / 1000));
-          if (deltaSec < 86400) {
-            completedSeconds += deltaSec;
+          const effectiveEnd = Math.min(ts, now);
+          if (effectiveEnd > openPunchTimestamp) {
+            const deltaSec = Math.floor((effectiveEnd - openPunchTimestamp) / 1000);
+            if (deltaSec > 0 && deltaSec < 86400) {
+              completedSeconds += deltaSec;
+            }
           }
           openPunchTimestamp = null;
         }
       }
     });
 
-    // 2. If this is the active user on this workstation
-    if (isSelf) {
-      const activeShiftSec = state.personalShift?.seconds || 0;
-      let activeCurrent = 0;
-      if (state.personalShift?.status === 'DUTY_ON' || state.personalShift?.status === 'DUTY_BREAK') {
-        activeCurrent = activeShiftSec;
+    // If shift is still open:
+    let liveSeconds = 0;
+    const dutyStatus = getMemberDutyStatus(member);
+    if (openPunchTimestamp && dutyStatus === 'DUTY_ON') {
+      const deltaLive = Math.max(0, Math.floor((now - openPunchTimestamp) / 1000));
+      if (deltaLive > 0 && deltaLive < 86400) {
+        liveSeconds = deltaLive;
       }
-      return Math.max(completedSeconds + (openPunchTimestamp && state.personalShift?.status === 'DUTY_ON' ? Math.max(0, Math.floor((now - openPunchTimestamp) / 1000)) : 0), activeCurrent);
     }
 
-    // 3. For other team members:
-    // If they have reported todaySeconds from cloud sync
-    if (member.todaySeconds && typeof member.todaySeconds === 'number' && member.todaySeconds > 0) {
+    let totalCalculated = completedSeconds + liveSeconds;
+
+    // 2. If this is the active user on this workstation
+    if (isSelf && state.personalShift) {
+      if (state.personalShift.status === 'DUTY_ON' || state.personalShift.status === 'DUTY_BREAK') {
+        totalCalculated = Math.max(totalCalculated, state.personalShift.seconds || 0);
+      }
+    }
+
+    // 3. For remote team members: ONLY consider reported todaySeconds if member was actually active TODAY!
+    const memberLastSeenToday = member.lastSeenAt && (new Date(member.lastSeenAt).toDateString() === todayDateStr);
+    const memberDateMatchesToday = member.todayDate && (member.todayDate === todayDateStr || member.todayDate === today.toLocaleDateString());
+
+    if ((memberLastSeenToday || memberDateMatchesToday) && typeof member.todaySeconds === 'number' && member.todaySeconds > 0) {
       let remoteSec = member.todaySeconds;
-      if (member.status === 'DUTY_ON' && member.lastSeenAt && (now - member.lastSeenAt < 60000)) {
+      if (dutyStatus === 'DUTY_ON' && (now - member.lastSeenAt < 90000)) {
         remoteSec += Math.max(0, Math.floor((now - member.lastSeenAt) / 1000));
       }
-      return Math.max(completedSeconds, remoteSec);
+      totalCalculated = Math.max(totalCalculated, remoteSec);
     }
 
-    if (member.todayHours !== undefined && member.todayHours !== null && typeof member.todayHours === 'number' && member.todayHours > 0) {
-      return Math.max(completedSeconds, Math.round(member.todayHours * 3600));
-    }
-
-    if (openPunchTimestamp && member.status === 'DUTY_ON') {
-      const liveSec = Math.max(0, Math.floor((now - openPunchTimestamp) / 1000));
-      if (liveSec < 86400) completedSeconds += liveSec;
-    }
-
-    return completedSeconds;
+    return Math.max(0, Math.min(86400, Math.floor(totalCalculated)));
   }
 
   function formatMemberHoursToday(totalSeconds) {
@@ -3933,8 +4402,10 @@
     return `${hours.toFixed(1)}h`;
   }
 
+  let lastPresenceSyncTime = 0;
   function updateLiveFleetHours() {
     const members = getUniqueMembersList();
+    const now = Date.now();
     members.forEach(m => {
       const safeId = escapeHtml(m.id || (m.uid ? `RD-${m.uid.slice(0, 6).toUpperCase()}` : 'RD-EMP-000'));
       const el = document.getElementById(`fleetHoursVal_${safeId}`);
@@ -3943,16 +4414,68 @@
         el.textContent = formatMemberHoursToday(sec);
         el.title = `${formatShiftDisplay(sec)} total work time today`;
       }
+
+      const isOnline = isMemberAppOnline(m);
+      const dutyStatus = getMemberDutyStatus(m);
+
       const statusEl = document.getElementById(`fleetStatusVal_${safeId}`);
       if (statusEl) {
-        const isSelf = (m.id === state.currentMemberId || (m.email && m.email.toLowerCase() === state.currentUser?.email?.toLowerCase()) || m.email?.toLowerCase() === 'jagadish2k2006@gmail.com');
-        const isOnline = isSelf ? (state.personalShift?.status === 'DUTY_ON') : (!m.suspended && m.status === 'DUTY_ON');
-        const statusValText = m.suspended ? 'SUSPENDED' : (isOnline ? 'ONLINE' : (isSelf && state.personalShift?.status === 'DUTY_BREAK' ? 'ON BREAK' : 'OFFLINE'));
-        const statusValColor = m.suspended ? '#ff5252' : (isOnline ? '#00e676' : (isSelf && state.personalShift?.status === 'DUTY_BREAK' ? '#ffd600' : '#ff5252'));
+        let statusValText = 'OFFLINE';
+        let statusValColor = '#ff5252';
+
+        if (m.suspended) {
+          statusValText = 'SUSPENDED';
+          statusValColor = '#ff5252';
+        } else if (dutyStatus === 'DUTY_ON') {
+          statusValText = 'ONLINE (ON DUTY)';
+          statusValColor = '#00e676';
+        } else if (dutyStatus === 'DUTY_BREAK') {
+          statusValText = 'ON BREAK';
+          statusValColor = '#ffd600';
+        } else if (isOnline) {
+          statusValText = 'ONLINE (OFF DUTY)';
+          statusValColor = '#00e676';
+        }
+
         statusEl.textContent = statusValText;
         statusEl.style.color = statusValColor;
       }
+
+      // Keep card header status pill synchronized
+      const pillEl = document.getElementById(`fleetPill_${safeId}`);
+      if (pillEl) {
+        if (m.suspended) {
+          pillEl.className = 'fleet-node-status-pill status-duty-off';
+          pillEl.innerHTML = '⛔ Suspended';
+          pillEl.style.color = '#ff5252';
+          pillEl.style.background = 'rgba(255,82,82,0.15)';
+          pillEl.style.borderColor = 'rgba(255,82,82,0.4)';
+        } else if (isOnline) {
+          pillEl.className = 'fleet-node-status-pill status-duty-on';
+          pillEl.innerHTML = '🟢 Online';
+          pillEl.style.color = '#00e676';
+          pillEl.style.background = '';
+          pillEl.style.borderColor = '';
+        } else {
+          pillEl.className = 'fleet-node-status-pill status-duty-off';
+          pillEl.innerHTML = '🔴 Offline';
+          pillEl.style.color = '#ff5252';
+          pillEl.style.background = 'rgba(255,82,82,0.15)';
+          pillEl.style.borderColor = 'rgba(255,82,82,0.4)';
+        }
+      }
     });
+
+    // Throttled sync of self presence & today's hours to Firestore (every 25 seconds)
+    if (window.FirebaseService && FirebaseService.db && (now - lastPresenceSyncTime > 25000)) {
+      lastPresenceSyncTime = now;
+      const selfMember = getCurrentResolvedMember();
+      if (selfMember?.id) {
+        const selfSec = calculateMemberSecondsToday(selfMember);
+        const selfDuty = getMemberDutyStatus(selfMember);
+        FirebaseService.updatePresenceFirestore(selfMember.id, selfDuty, selfSec);
+      }
+    }
   }
 
   function renderFleetTelemetry() {
@@ -3962,7 +4485,7 @@
     grid.replaceChildren();
 
     const members = getUniqueMembersList();
-    const onlineMembersCount = members.filter(m => !m.suspended && (m.status === 'DUTY_ON' || m.id === state.currentMemberId)).length;
+    const onlineMembersCount = members.filter(m => !m.suspended && isMemberAppOnline(m)).length;
     if (countBadge) countBadge.textContent = `${onlineMembersCount} / ${members.length} Online Workstations`;
 
     members.forEach(member => {
@@ -3971,19 +4494,33 @@
 
       const activeTask = (WorkspaceDB.data.tasks || []).find(t => t.assigneeId === member.id && t.status !== 'ACCOMPLISHED');
 
-      const isSelf = (member.id === state.currentMemberId || (member.email && member.email.toLowerCase() === state.currentUser?.email?.toLowerCase()) || member.email?.toLowerCase() === 'jagadish2k2006@gmail.com');
-      const isOnline = isSelf || (!member.suspended && member.status === 'DUTY_ON');
-      const statusPill = member.suspended
-        ? `<span class="fleet-node-status-pill status-duty-off" style="color:#ff5252; background:rgba(255,82,82,0.15); border:1px solid rgba(255,82,82,0.4);">⛔ Suspended</span>`
-        : (isOnline
-          ? `<span class="fleet-node-status-pill status-duty-on">🟢 Online</span>`
-          : `<span class="fleet-node-status-pill status-duty-off" style="color:#ff5252; background:rgba(255,82,82,0.15); border:1px solid rgba(255,82,82,0.4);">🔴 Offline</span>`);
+      const isOnline = isMemberAppOnline(member);
+      const dutyStatus = getMemberDutyStatus(member);
+      const safeId = escapeHtml(member.id || (member.uid ? `RD-${member.uid.slice(0, 6).toUpperCase()}` : 'RD-EMP-000'));
 
-      const statusValText = member.suspended ? 'SUSPENDED' : (isOnline ? 'ONLINE' : 'OFFLINE');
-      const statusValColor = member.suspended ? '#ff5252' : (isOnline ? '#00e676' : '#ff5252');
+      const statusPill = member.suspended
+        ? `<span class="fleet-node-status-pill status-duty-off" id="fleetPill_${safeId}" style="color:#ff5252; background:rgba(255,82,82,0.15); border:1px solid rgba(255,82,82,0.4);">⛔ Suspended</span>`
+        : (isOnline
+          ? `<span class="fleet-node-status-pill status-duty-on" id="fleetPill_${safeId}">🟢 Online</span>`
+          : `<span class="fleet-node-status-pill status-duty-off" id="fleetPill_${safeId}" style="color:#ff5252; background:rgba(255,82,82,0.15); border:1px solid rgba(255,82,82,0.4);">🔴 Offline</span>`);
+
+      let statusValText = 'OFFLINE';
+      let statusValColor = '#ff5252';
+      if (member.suspended) {
+        statusValText = 'SUSPENDED';
+        statusValColor = '#ff5252';
+      } else if (dutyStatus === 'DUTY_ON') {
+        statusValText = 'ONLINE (ON DUTY)';
+        statusValColor = '#00e676';
+      } else if (dutyStatus === 'DUTY_BREAK') {
+        statusValText = 'ON BREAK';
+        statusValColor = '#ffd600';
+      } else if (isOnline) {
+        statusValText = 'ONLINE (OFF DUTY)';
+        statusValColor = '#00e676';
+      }
 
       const safeName = escapeHtml(member.name || member.displayName || 'Member');
-      const safeId = escapeHtml(member.id || (member.uid ? `RD-${member.uid.slice(0, 6).toUpperCase()}` : 'RD-EMP-000'));
       const safeAvatar = escapeHtml(member.avatarText || safeName.slice(0, 2).toUpperCase());
       const safeDept = escapeHtml(member.dept || 'Engineering');
       const totalSeconds = calculateMemberSecondsToday(member);
@@ -4119,190 +4656,492 @@
   }
 
   // --- TIMESHEETS & SHIFT PUNCH LOGS ---
+  function populatePunchLogMemberFilter() {
+    const filterSelect = document.getElementById('punchLogMemberFilter');
+    const filterWrap = document.getElementById('punchFilterWrap');
+    if (!filterSelect) return;
+
+    const myEmail = (state.currentUser?.email || '').toLowerCase().trim();
+    const isFounder = (myEmail === 'jagadish2k2006@gmail.com') || (state.userRole === 'OWNER') || (state.currentMemberId === 'RD-FOUNDER-001');
+
+    if (!isFounder) {
+      if (filterWrap) {
+        filterWrap.classList.add('hidden');
+        filterWrap.style.display = 'none';
+      }
+      return;
+    }
+
+    if (filterWrap) {
+      filterWrap.classList.remove('hidden');
+      filterWrap.style.display = 'flex';
+    }
+
+    const currentVal = filterSelect.value || 'ALL';
+    const members = getUniqueMembersList();
+
+    let html = `<option value="ALL">All Team Members</option>`;
+    html += `<option value="SELF">My Punches Only</option>`;
+    members.forEach(m => {
+      const mId = m.id || m.uid;
+      const mName = m.displayName || m.name || mId;
+      html += `<option value="${escapeHtml(mId)}">${escapeHtml(mName)} (${escapeHtml(m.role || 'Member')})</option>`;
+    });
+    filterSelect.innerHTML = html;
+    filterSelect.value = currentVal;
+  }
+
   function renderPunchLogs() {
     const tbody = document.getElementById('punchLogTableBody');
     if (!tbody) return;
     tbody.replaceChildren();
 
-    const punches = WorkspaceDB.data.punchLogs || [];
-    if (punches.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No shift punches recorded yet.</td></tr>`;
+    populatePunchLogMemberFilter();
+
+    const myEmail = (state.currentUser?.email || '').toLowerCase().trim();
+    const isFounder = (myEmail === 'jagadish2k2006@gmail.com') || (state.userRole === 'OWNER') || (state.currentMemberId === 'RD-FOUNDER-001');
+    const filterSelect = document.getElementById('punchLogMemberFilter');
+    const filterVal = (isFounder && filterSelect) ? (filterSelect.value || 'ALL') : 'SELF';
+
+    const rawPunches = (WorkspaceDB.data.punchLogs || []).map(normalizePunch).filter(Boolean);
+
+    let displayPunches = rawPunches;
+    if (!isFounder || filterVal === 'SELF') {
+      const cur = getCurrentResolvedMember();
+      const curId = cur.id;
+      const curUid = state.currentUser?.uid || cur.uid;
+      const curEmail = myEmail;
+      const curName = (cur.name || cur.displayName || '').toLowerCase().trim();
+
+      displayPunches = rawPunches.filter(p => {
+        if (!p) return false;
+        const pWorkerId = p.workerId;
+        const pEmail = (p.email || '').toLowerCase().trim();
+        const pName = (p.name || '').toLowerCase().trim();
+
+        if (curId && pWorkerId === curId) return true;
+        if (curUid && (pWorkerId === curUid || p.uid === curUid)) return true;
+        if (curEmail && pEmail && pEmail === curEmail) return true;
+        if (curName && pName && (pName === curName || pName.includes(curName) || curName.includes(pName))) return true;
+        if (isFounder && (pWorkerId === 'RD-FOUNDER-001' || pName.includes('jagadish') || pEmail.includes('jagadish'))) return true;
+        if (!isFounder && curName.includes('pavithra') && (pName.includes('pavithra') || pWorkerId === 'RD-EMP-002')) return true;
+        return false;
+      });
+    } else if (filterVal !== 'ALL') {
+      // Specific team member selected in Founder's filter
+      const targetMember = (WorkspaceDB.data.members || {})[filterVal] || getUniqueMembersList().find(m => m.id === filterVal || m.uid === filterVal);
+      const targetName = (targetMember?.name || targetMember?.displayName || '').toLowerCase().trim();
+      const targetEmail = (targetMember?.email || '').toLowerCase().trim();
+
+      displayPunches = rawPunches.filter(p => {
+        if (!p) return false;
+        const pWorkerId = p.workerId;
+        const pEmail = (p.email || '').toLowerCase().trim();
+        const pName = (p.name || '').toLowerCase().trim();
+
+        if (pWorkerId === filterVal || p.uid === filterVal) return true;
+        if (targetEmail && pEmail && pEmail === targetEmail) return true;
+        if (targetName && pName && (pName === targetName || pName.includes(targetName) || targetName.includes(pName))) return true;
+        return false;
+      });
+    }
+
+    if (displayPunches.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">No shift punches recorded yet.</td></tr>`;
       return;
     }
 
-    punches.slice(-15).reverse().forEach(punch => {
+    // Sort descending so the most recent punches appear at the top
+    const sorted = [...displayPunches].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    sorted.slice(0, 50).forEach(punch => {
       const tr = document.createElement('tr');
       const actionColor = punch.action === 'CLOCK_IN' ? 'var(--accent-green)' : (punch.action === 'BREAK' ? 'var(--accent-gold)' : 'var(--accent-red)');
       const actionText = punch.action === 'CLOCK_IN' ? '▶ Clock In' : (punch.action === 'BREAK' ? '⏸ Break' : '⏹ Clock Out');
 
+      const punchWorkerId = punch.workerId;
+      const punchEmail = (punch.email || '').toLowerCase().trim();
+      const punchName = (punch.name || '').toLowerCase().trim();
+
+      // Find all punches for this specific employee sorted chronologically
+      const empPunches = rawPunches.filter(p => {
+        if (!p) return false;
+        if (punchWorkerId && p.workerId === punchWorkerId) return true;
+        if (punchEmail && (p.email || '').toLowerCase().trim() === punchEmail) return true;
+        if (punchName && (p.name || '').toLowerCase().trim() === punchName) return true;
+        return false;
+      }).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+      let hoursWorkedHtml = `<span style="font-family: var(--font-mono); color: var(--text-muted); font-size: 11px;">--</span>`;
+
+      if (punch.action === 'CLOCK_OUT' || punch.action === 'BREAK') {
+        // Look for the closest preceding CLOCK_IN for this punch session
+        const precedingClockIn = [...empPunches]
+          .filter(p => p.action === 'CLOCK_IN' && (p.timestamp || 0) <= (punch.timestamp || 0))
+          .pop();
+
+        if (precedingClockIn && precedingClockIn.timestamp) {
+          const sessionSec = Math.max(0, Math.floor(((punch.timestamp || 0) - precedingClockIn.timestamp) / 1000));
+          const sessionHours = (sessionSec / 3600).toFixed(1);
+          hoursWorkedHtml = `<span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-cyan);" title="${formatShiftDisplay(sessionSec)} session duration">${sessionHours}h</span>`;
+        }
+      } else if (punch.action === 'CLOCK_IN') {
+        // Check if there is any subsequent punch for this employee
+        const punchTs = punch.timestamp || 0;
+        const subsequentPunch = empPunches.find(p => (p.timestamp || 0) > punchTs);
+
+        if (!subsequentPunch) {
+          // This is the latest punch for this worker - if currently active, show live elapsed session
+          const now = Date.now();
+          const targetMember = (WorkspaceDB.data.members || {})[punchWorkerId] ||
+            getUniqueMembersList().find(m => m.id === punchWorkerId || m.uid === punch.uid) ||
+            (punchWorkerId === 'RD-FOUNDER-001' ? { id: 'RD-FOUNDER-001' } : null);
+          const dutyStatus = targetMember ? getMemberDutyStatus(targetMember) : 'DUTY_OFF';
+
+          if (dutyStatus === 'DUTY_ON') {
+            const liveSec = Math.max(0, Math.floor((now - punchTs) / 1000));
+            const liveHours = (liveSec / 3600).toFixed(1);
+            hoursWorkedHtml = `<span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-green);" title="${formatShiftDisplay(liveSec)} live active shift">${liveHours}h <small style="font-size: 10px; opacity: 0.85;">(Active)</small></span>`;
+          }
+        }
+      }
+
       tr.innerHTML = `
-        <td><strong>${escapeHtml(punch.name || punch.workerId)}</strong></td>
+        <td><strong>${escapeHtml(punch.name || punch.workerId || 'Member')}</strong></td>
         <td><span style="color: ${actionColor}; font-weight: 700; font-family: var(--font-mono); font-size: 11px;">${actionText}</span></td>
-        <td>${escapeHtml(punch.time || new Date().toLocaleTimeString())}</td>
-        <td>${escapeHtml(punch.date || 'Today')}</td>
+        <td>${escapeHtml(punch.time || new Date(punch.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</td>
+        <td>${escapeHtml(punch.date || new Date(punch.timestamp || Date.now()).toLocaleDateString())}</td>
+        <td>${hoursWorkedHtml}</td>
       `;
       tbody.appendChild(tr);
     });
+  }
+
+  function calculateMemberWeeklyHours(member) {
+    if (!member) return 0;
+    const now = Date.now();
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)); // Monday
+    startOfWeek.setHours(0, 0, 0, 0);
+    const weekStartMs = startOfWeek.getTime();
+
+    const mId = member.id;
+    const mUid = member.uid;
+    const mEmail = (member.email || '').toLowerCase().trim();
+    const mName = (member.displayName || member.name || '').toLowerCase().trim();
+    const isFounder = isFounderMember(member);
+
+    const rawPunches = (WorkspaceDB.data.punchLogs || []).map(normalizePunch).filter(Boolean);
+    const memberPunches = rawPunches.filter(p => {
+      if (!p) return false;
+      const pWorkerId = p.workerId;
+      const pEmail = (p.email || '').toLowerCase().trim();
+      const pName = (p.name || '').toLowerCase().trim();
+
+      let match = false;
+      if (mId && pWorkerId === mId) match = true;
+      if (mUid && (pWorkerId === mUid || p.uid === mUid)) match = true;
+      if (mEmail && pEmail && pEmail === mEmail) match = true;
+      if (mName && pName && (pName === mName || pName.includes(mName) || mName.includes(pName))) match = true;
+      if (isFounder && (pWorkerId === 'RD-FOUNDER-001' || pName.includes('jagadish') || pEmail.includes('jagadish'))) match = true;
+      if (!isFounder && mName.includes('pavithra') && (pName.includes('pavithra') || pWorkerId === 'RD-EMP-002')) match = true;
+
+      const pTs = p.timestamp || 0;
+      return match && pTs >= weekStartMs;
+    }).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    let weeklySeconds = 0;
+    let openTs = null;
+
+    memberPunches.forEach(p => {
+      const ts = p.timestamp || 0;
+      if (p.action === 'CLOCK_IN') {
+        openTs = ts;
+      } else if (p.action === 'CLOCK_OUT' || p.action === 'BREAK') {
+        if (openTs) {
+          const delta = Math.floor((Math.min(ts, now) - openTs) / 1000);
+          if (delta > 0 && delta < 16 * 3600) {
+            weeklySeconds += delta;
+          }
+          openTs = null;
+        }
+      }
+    });
+
+    // Include live session if currently active
+    const dutyStatus = getMemberDutyStatus(member);
+    if (openTs && dutyStatus === 'DUTY_ON') {
+      const liveDelta = Math.max(0, Math.floor((now - openTs) / 1000));
+      if (liveDelta > 0 && liveDelta < 16 * 3600) {
+        weeklySeconds += liveDelta;
+      }
+    }
+
+    // Consistency check: weekly hours can NEVER be less than today's hours
+    const todaySec = calculateMemberSecondsToday(member);
+    weeklySeconds = Math.max(weeklySeconds, todaySec);
+
+    return Math.max(0, Math.min(86400 * 7, Math.floor(weeklySeconds)));
+  }
+
+  function renderTeamHoursDashboard() {
+    const grid = document.getElementById('teamHoursGrid');
+    if (!grid) return;
+    grid.replaceChildren();
+
+    const members = getUniqueMembersList();
+    if (members.length === 0) {
+      grid.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 12px; grid-column: 1 / -1;">No team members registered yet.</div>`;
+      return;
+    }
+
+    const WORKDAY_TARGET = 8 * 3600; // 8 hours in seconds
+
+    members.forEach(member => {
+      const card = document.createElement('div');
+      card.className = 'team-hours-card';
+
+      const mId = member.id || (member.uid ? `RD-${member.uid.slice(0, 6).toUpperCase()}` : 'RD-EMP-000');
+      const isOnline = isMemberAppOnline(member);
+      const dutyStatus = getMemberDutyStatus(member);
+      const isOnDuty = dutyStatus === 'DUTY_ON';
+      const isOnBreak = dutyStatus === 'DUTY_BREAK';
+
+      if (isOnDuty) card.classList.add('card-online');
+      else if (isOnBreak) card.classList.add('card-break');
+
+      let statusText = '🔴 OFFLINE';
+      let statusClass = 'status-offline';
+
+      if (member.suspended) {
+        statusText = '⛔ SUSPENDED';
+        statusClass = 'status-offline';
+      } else if (isOnDuty) {
+        statusText = '🟢 ON DUTY';
+        statusClass = 'status-online';
+      } else if (isOnBreak) {
+        statusText = '⏸ ON BREAK';
+        statusClass = 'status-break';
+      } else if (isOnline) {
+        statusText = '🟢 ONLINE (OFF DUTY)';
+        statusClass = 'status-online';
+      }
+
+      const safeName = escapeHtml(member.name || member.displayName || 'Team Member');
+      const safeId = escapeHtml(mId);
+      const safeAvatar = escapeHtml(member.avatarText || safeName.slice(0, 2).toUpperCase());
+      const safeRole = escapeHtml(member.role || 'Employee');
+
+      const todaySeconds = calculateMemberSecondsToday(member);
+      const todayHoursStr = formatMemberHoursToday(todaySeconds);
+      const todayTimerStr = formatShiftDisplay(todaySeconds);
+
+      const weeklySeconds = calculateMemberWeeklyHours(member);
+      const weeklyHours = (weeklySeconds / 3600).toFixed(1);
+
+      const progressPct = Math.min(100, (todaySeconds / WORKDAY_TARGET) * 100);
+      const isOvertime = todaySeconds > WORKDAY_TARGET;
+      const fillClass = isOvertime ? 'team-hours-progress-fill fill-overtime' : 'team-hours-progress-fill';
+
+      card.innerHTML = `
+        <div class="team-hours-card-header">
+          <div class="team-hours-identity">
+            <div class="team-hours-avatar">${safeAvatar}</div>
+            <div>
+              <div class="team-hours-name">${safeName}</div>
+              <div class="team-hours-role">${safeId} • ${safeRole}</div>
+            </div>
+          </div>
+          <span class="team-hours-status-badge ${statusClass}" id="teamHrsStatus_${safeId}">${statusText}</span>
+        </div>
+
+        <div class="team-hours-metrics">
+          <div class="team-hours-metric">
+            <span class="team-hours-metric-label">Today</span>
+            <span class="team-hours-metric-val val-accent" id="teamHrsToday_${safeId}" title="${todayTimerStr}">${todayHoursStr}</span>
+          </div>
+          <div class="team-hours-metric">
+            <span class="team-hours-metric-label">This Week</span>
+            <span class="team-hours-metric-val" id="teamHrsWeek_${safeId}">${weeklyHours}h</span>
+          </div>
+        </div>
+
+        <div class="team-hours-progress-wrap">
+          <div class="team-hours-progress-header">
+            <span class="team-hours-progress-label">Daily Target (8h)</span>
+            <span class="team-hours-progress-pct" id="teamHrsPct_${safeId}">${progressPct.toFixed(0)}%</span>
+          </div>
+          <div class="team-hours-progress-bar">
+            <div class="${fillClass}" id="teamHrsFill_${safeId}" style="width: ${progressPct.toFixed(1)}%"></div>
+          </div>
+        </div>
+      `;
+
+      grid.appendChild(card);
+    });
+  }
+
+  // Live in-place update for team hours (called every second on the shifts tab)
+  function updateTeamHoursLive() {
+    const grid = document.getElementById('teamHoursGrid');
+    if (!grid || !grid.children.length) return;
+
+    const WORKDAY_TARGET = 8 * 3600;
+    const members = getUniqueMembersList();
+
+    members.forEach(member => {
+      const mId = member.id || (member.uid ? `RD-${member.uid.slice(0, 6).toUpperCase()}` : 'RD-EMP-000');
+      const safeId = escapeHtml(mId);
+
+      const todayEl = document.getElementById(`teamHrsToday_${safeId}`);
+      const weekEl = document.getElementById(`teamHrsWeek_${safeId}`);
+      const pctEl = document.getElementById(`teamHrsPct_${safeId}`);
+      const fillEl = document.getElementById(`teamHrsFill_${safeId}`);
+      const statusEl = document.getElementById(`teamHrsStatus_${safeId}`);
+
+      if (todayEl) {
+        const todaySec = calculateMemberSecondsToday(member);
+        todayEl.textContent = formatMemberHoursToday(todaySec);
+        todayEl.title = formatShiftDisplay(todaySec);
+
+        if (pctEl) {
+          const pct = Math.min(100, (todaySec / WORKDAY_TARGET) * 100);
+          pctEl.textContent = `${pct.toFixed(0)}%`;
+        }
+        if (fillEl) {
+          const pct = Math.min(100, (todaySec / WORKDAY_TARGET) * 100);
+          fillEl.style.width = `${pct.toFixed(1)}%`;
+          const isOvertime = todaySec > WORKDAY_TARGET;
+          fillEl.className = isOvertime ? 'team-hours-progress-fill fill-overtime' : 'team-hours-progress-fill';
+        }
+      }
+
+      if (weekEl) {
+        const weekSec = calculateMemberWeeklyHours(member);
+        weekEl.textContent = `${(weekSec / 3600).toFixed(1)}h`;
+      }
+
+      if (statusEl) {
+        const isOnline = isMemberAppOnline(member);
+        const dutyStatus = getMemberDutyStatus(member);
+        const isOnDuty = dutyStatus === 'DUTY_ON';
+        const isOnBreak = dutyStatus === 'DUTY_BREAK';
+
+        let statusText = '🔴 OFFLINE';
+        let statusClass = 'status-offline';
+
+        if (member.suspended) {
+          statusText = '⛔ SUSPENDED';
+          statusClass = 'status-offline';
+        } else if (isOnDuty) {
+          statusText = '🟢 ON DUTY';
+          statusClass = 'status-online';
+        } else if (isOnBreak) {
+          statusText = '⏸ ON BREAK';
+          statusClass = 'status-break';
+        } else if (isOnline) {
+          statusText = '🟢 ONLINE (OFF DUTY)';
+          statusClass = 'status-online';
+        }
+
+        statusEl.textContent = statusText;
+        statusEl.className = `team-hours-status-badge ${statusClass}`;
+
+        // Update card border highlight
+        const card = statusEl.closest('.team-hours-card');
+        if (card) {
+          card.classList.remove('card-online', 'card-break');
+          if (isOnDuty) card.classList.add('card-online');
+          else if (isOnBreak) card.classList.add('card-break');
+        }
+      }
+    });
+  }
+
+  function recordPunch(action) {
+    if (!WorkspaceDB.data.punchLogs) WorkspaceDB.data.punchLogs = [];
+    const currentMember = getCurrentResolvedMember();
+    if (!state.currentMemberId && currentMember.id) {
+      state.currentMemberId = currentMember.id;
+    }
+
+    const now = Date.now();
+    const timeStr = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateStr = new Date(now).toLocaleDateString();
+    const punchId = `punch_${currentMember.id || 'emp'}_${now}_${Math.random().toString(36).slice(2, 7)}`;
+
+    const punchData = {
+      id: punchId,
+      workerId: currentMember.id,
+      uid: state.currentUser?.uid || currentMember.uid || null,
+      name: currentMember.displayName || currentMember.name || 'Team Member',
+      email: currentMember.email || (state.currentUser?.email || ''),
+      action: action,
+      time: timeStr,
+      date: dateStr,
+      timestamp: now,
+      cloudSynced: true
+    };
+
+    // Avoid duplicate punch entry within 10 seconds for same action
+    const last = WorkspaceDB.data.punchLogs[WorkspaceDB.data.punchLogs.length - 1];
+    if (last && last.action === action && last.workerId === punchData.workerId && Math.abs(now - (last.timestamp || 0)) < 10000) {
+      return;
+    }
+
+    WorkspaceDB.data.punchLogs.push(punchData);
+    WorkspaceDB.save().catch(() => {});
+    reconcilePersonalShiftWithPunches();
+    renderPunchLogs();
+    renderTeamHoursDashboard();
+    updateLiveFleetHours();
+
+    // Cloud Firestore Persistence & Real-time Broadcast
+    if (window.FirebaseService) {
+      if (typeof FirebaseService.recordPunchLog === 'function') {
+        FirebaseService.recordPunchLog(punchData).catch(err => console.warn('[PUNCH] Cloud sync error:', err));
+      }
+      if (FirebaseService.db) {
+        const status = action === 'CLOCK_IN' ? 'DUTY_ON' : (action === 'BREAK' ? 'DUTY_BREAK' : 'DUTY_OFF');
+        const todaySec = calculateMemberSecondsToday(currentMember);
+        FirebaseService.updatePresenceFirestore(
+          currentMember.id,
+          status,
+          todaySec
+        );
+      }
+    }
   }
 
   function initShiftTimerControls() {
     const btnClockIn = document.getElementById('btnPersonalClockIn');
     const btnBreak = document.getElementById('btnPersonalBreak');
     const btnClockOut = document.getElementById('btnPersonalClockOut');
-    const badge = document.getElementById('personalShiftBadge');
-    const timerDisplay = document.getElementById('personalShiftTimer');
+    const punchFilterSelect = document.getElementById('punchLogMemberFilter');
 
-    function formatShiftDisplay(totalSeconds) {
-      const hrs = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
-      const mins = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
-      const secs = (totalSeconds % 60).toString().padStart(2, '0');
-      return `${hrs}:${mins}:${secs}`;
-    }
-
-    function startShiftTimerInterval() {
-      if (state.personalShift.timer) clearInterval(state.personalShift.timer);
-      state.personalShift.timer = setInterval(() => {
-        if (state.personalShift.status === 'DUTY_ON') {
-          state.personalShift.seconds++;
-          if (timerDisplay) timerDisplay.textContent = formatShiftDisplay(state.personalShift.seconds);
-          updateLiveFleetHours();
-        }
-      }, 1000);
-    }
-
-    function updateShiftUI() {
-      if (badge) {
-        badge.textContent = state.personalShift.status.replace('_', ' ');
-        badge.classList.remove('duty-on', 'duty-break', 'duty-off');
-        if (state.personalShift.status === 'DUTY_ON') badge.classList.add('duty-on');
-        else if (state.personalShift.status === 'DUTY_BREAK') badge.classList.add('duty-break');
-        else badge.classList.add('duty-off');
-      }
-      if (timerDisplay) {
-        timerDisplay.textContent = formatShiftDisplay(state.personalShift.seconds);
-      }
-      if (btnClockIn) btnClockIn.disabled = state.personalShift.status === 'DUTY_ON';
-      if (btnBreak) {
-        btnBreak.disabled = state.personalShift.status === 'DUTY_OFF';
-        const breakSpan = btnBreak.querySelector('span');
-        if (breakSpan) {
-          breakSpan.textContent = state.personalShift.status === 'DUTY_BREAK' ? '▶ Resume Work' : '⏸ Take Break';
-        }
-      }
-      if (btnClockOut) btnClockOut.disabled = state.personalShift.status === 'DUTY_OFF';
-    }
-
-    function recordPunch(action) {
-      if (!WorkspaceDB.data.punchLogs) WorkspaceDB.data.punchLogs = [];
-      const currentMember = WorkspaceDB.data.members[state.currentMemberId] || { id: state.currentMemberId, name: 'JAGADISH K' };
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const dateStr = new Date().toLocaleDateString();
-      const last = WorkspaceDB.data.punchLogs[WorkspaceDB.data.punchLogs.length - 1];
-      if (last && last.action === action && last.workerId === currentMember.id && last.date === dateStr && last.time === timeStr) {
-        return; // Avoid duplicate punch entry within the same minute
-      }
-      WorkspaceDB.data.punchLogs.push({
-        workerId: currentMember.id,
-        name: currentMember.name,
-        action: action,
-        time: timeStr,
-        date: dateStr,
-        timestamp: Date.now()
+    if (punchFilterSelect && !punchFilterSelect.dataset.listenerBound) {
+      punchFilterSelect.dataset.listenerBound = 'true';
+      punchFilterSelect.addEventListener('change', () => {
+        renderPunchLogs();
       });
-      WorkspaceDB.save();
-      renderPunchLogs();
-      updateLiveFleetHours();
-      if (window.FirebaseService && FirebaseService.db) {
-        FirebaseService.updatePresenceFirestore(
-          currentMember.id,
-          action === 'CLOCK_IN' ? 'DUTY_ON' : (action === 'BREAK' ? 'DUTY_BREAK' : 'DUTY_OFF'),
-          state.personalShift?.seconds || 0
-        );
-      }
     }
 
-    // Restore saved shift from localStorage if available, or auto-start clock in immediately
-    try {
-      const savedShift = JSON.parse(localStorage.getItem('rd_active_shift') || 'null');
-      if (savedShift && (savedShift.status === 'DUTY_ON' || savedShift.status === 'DUTY_BREAK')) {
-        state.personalShift.status = savedShift.status;
-        if (savedShift.status === 'DUTY_ON') {
-          const now = Date.now();
-          const elapsed = Math.max(0, Math.floor((now - (savedShift.clockInTimestamp || now)) / 1000));
-          state.personalShift.seconds = elapsed + (savedShift.accumulatedSeconds || 0);
-          startShiftTimerInterval();
-        } else {
-          state.personalShift.seconds = savedShift.accumulatedSeconds || 0;
-        }
-      } else {
-        // Automatic Clock In on Workstation OS launch
-        state.personalShift.status = 'DUTY_ON';
-        const now = Date.now();
-        state.personalShift.seconds = 0;
-        const shiftPayload = {
-          status: 'DUTY_ON',
-          clockInTimestamp: now,
-          accumulatedSeconds: 0,
-          workerId: state.currentMemberId
-        };
-        try { localStorage.setItem('rd_active_shift', JSON.stringify(shiftPayload)); } catch (_) {}
-        recordPunch('CLOCK_IN');
-        startShiftTimerInterval();
-      }
-    } catch (_) {
-      state.personalShift.status = 'DUTY_ON';
-      state.personalShift.seconds = 0;
-      startShiftTimerInterval();
-    }
-    updateShiftUI();
+    // Auto-reconcile active personal shift with today's punches & start timer
+    reconcilePersonalShiftWithPunches();
 
     btnClockIn?.addEventListener('click', () => {
-      state.personalShift.status = 'DUTY_ON';
-      const now = Date.now();
-      const shiftPayload = {
-        status: 'DUTY_ON',
-        clockInTimestamp: now,
-        accumulatedSeconds: state.personalShift.seconds || 0,
-        workerId: state.currentMemberId
-      };
-      try { localStorage.setItem('rd_active_shift', JSON.stringify(shiftPayload)); } catch (_) {}
-      updateShiftUI();
       recordPunch('CLOCK_IN');
-      startShiftTimerInterval();
       playNotificationChirp(true);
       showQuickToast('Shift active: Clocked in successfully!', 'success');
     });
 
     btnBreak?.addEventListener('click', () => {
       if (state.personalShift.status === 'DUTY_BREAK') {
-        state.personalShift.status = 'DUTY_ON';
-        const now = Date.now();
-        const shiftPayload = {
-          status: 'DUTY_ON',
-          clockInTimestamp: now,
-          accumulatedSeconds: state.personalShift.seconds || 0,
-          workerId: state.currentMemberId
-        };
-        try { localStorage.setItem('rd_active_shift', JSON.stringify(shiftPayload)); } catch (_) {}
-        updateShiftUI();
         recordPunch('CLOCK_IN');
-        startShiftTimerInterval();
         playNotificationChirp(true);
         showQuickToast('Resumed active shift duty.', 'success');
       } else if (state.personalShift.status === 'DUTY_ON') {
-        state.personalShift.status = 'DUTY_BREAK';
-        const shiftPayload = {
-          status: 'DUTY_BREAK',
-          clockInTimestamp: Date.now(),
-          accumulatedSeconds: state.personalShift.seconds || 0,
-          workerId: state.currentMemberId
-        };
-        try { localStorage.setItem('rd_active_shift', JSON.stringify(shiftPayload)); } catch (_) {}
-        if (state.personalShift.timer) {
-          clearInterval(state.personalShift.timer);
-          state.personalShift.timer = null;
-        }
-        updateShiftUI();
         recordPunch('BREAK');
         playNotificationChirp(false);
         showQuickToast('Shift paused for break.', 'info');
@@ -4310,15 +5149,7 @@
     });
 
     btnClockOut?.addEventListener('click', () => {
-      state.personalShift.status = 'DUTY_OFF';
-      if (state.personalShift.timer) {
-        clearInterval(state.personalShift.timer);
-        state.personalShift.timer = null;
-      }
       recordPunch('CLOCK_OUT');
-      state.personalShift.seconds = 0;
-      try { localStorage.removeItem('rd_active_shift'); } catch (_) {}
-      updateShiftUI();
       playNotificationChirp(false);
       showQuickToast('Shift logged & clocked out. Have a great rest!', 'info');
     });
@@ -4347,7 +5178,7 @@
 
     if (tabId === 'wallpapers') renderWallpaperGallery();
     else if (tabId === 'workers') renderWorkers();
-    else if (tabId === 'timesheets') renderPunchLogs();
+    else if (tabId === 'timesheets') { reconcilePersonalShiftWithPunches(); renderPunchLogs(); renderTeamHoursDashboard(); }
     else if (tabId === 'tasks') renderTasks();
     else if (tabId === 'chat') {
       renderChatChannelsAndDMs();
@@ -4360,11 +5191,15 @@
     else if (tabId === 'database') WorkspaceDB.updateMetricsUI();
   }
 
-  // Live real-time ticker for presence & fleet telemetry hours
+  // Live real-time ticker for presence & fleet telemetry hours + team working hours
   setInterval(() => {
     const telemetryPane = document.getElementById('tabTelemetryView');
     if (telemetryPane && telemetryPane.classList.contains('active')) {
       updateLiveFleetHours();
+    }
+    const timesheetsPane = document.getElementById('tabTimesheetsView');
+    if (timesheetsPane && timesheetsPane.classList.contains('active')) {
+      updateTeamHoursLive();
     }
   }, 1000);
 
@@ -4401,6 +5236,33 @@
     const card = document.getElementById('lanyardCard');
     if (!card) return;
 
+    let isPhysicsRunning = false;
+
+    function renderPhysicsFrame() {
+      if (!state.tiltEnabled || !card) {
+        isPhysicsRunning = false;
+        return;
+      }
+      const dRotX = (state.mouse.targetRotX - state.card.curRotX);
+      const dRotY = (state.mouse.targetRotY - state.card.curRotY);
+      const dX = (state.mouse.targetX - state.card.curX);
+
+      // Settle smoothly and sleep when delta is imperceptible
+      if (Math.abs(dRotX) > 0.02 || Math.abs(dRotY) > 0.02 || Math.abs(dX) > 0.02) {
+        state.card.curRotX += dRotX * 0.08;
+        state.card.curRotY += dRotY * 0.08;
+        state.card.curX += dX * 0.08;
+        card.style.transform = `translateX(${state.card.curX.toFixed(2)}px) rotateX(${state.card.curRotX.toFixed(2)}deg) rotateY(${state.card.curRotY.toFixed(2)}deg)`;
+        requestAnimationFrame(renderPhysicsFrame);
+      } else {
+        state.card.curRotX = state.mouse.targetRotX;
+        state.card.curRotY = state.mouse.targetRotY;
+        state.card.curX = state.mouse.targetX;
+        card.style.transform = `translateX(${state.card.curX.toFixed(2)}px) rotateX(${state.card.curRotX.toFixed(2)}deg) rotateY(${state.card.curRotY.toFixed(2)}deg)`;
+        isPhysicsRunning = false;
+      }
+    }
+
     const handleMouseMove = (e) => {
       if (!state.tiltEnabled) return;
       const cx = window.innerWidth / 2;
@@ -4411,21 +5273,14 @@
       state.mouse.targetRotY = dx * 16;
       state.mouse.targetRotX = -dy * 14;
       state.mouse.targetX = dx * 12;
+
+      if (!isPhysicsRunning) {
+        isPhysicsRunning = true;
+        requestAnimationFrame(renderPhysicsFrame);
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
-
-    function renderPhysicsFrame() {
-      if (state.tiltEnabled && card) {
-        state.card.curRotX += (state.mouse.targetRotX - state.card.curRotX) * 0.08;
-        state.card.curRotY += (state.mouse.targetRotY - state.card.curRotY) * 0.08;
-        state.card.curX += (state.mouse.targetX - state.card.curX) * 0.08;
-
-        card.style.transform = `translateX(${state.card.curX.toFixed(2)}px) rotateX(${state.card.curRotX.toFixed(2)}deg) rotateY(${state.card.curRotY.toFixed(2)}deg)`;
-      }
-      requestAnimationFrame(renderPhysicsFrame);
-    }
-    requestAnimationFrame(renderPhysicsFrame);
   }
 
   // --- EVENT LISTENERS ---
@@ -4703,6 +5558,8 @@
 
       const priority = document.getElementById('taskPrioritySelect')?.value || 'NORMAL';
       const dueAt = document.getElementById('taskDeadlineInput')?.value.trim() || 'Today 5:00 PM';
+      const rawDate = document.getElementById('taskDateInput')?.value;
+      const taskTimestamp = rawDate ? parseDateInputToTimestamp(rawDate, Date.now()) : Date.now();
       const description = document.getElementById('taskDescInput')?.value.trim();
 
       if (!title) return;
@@ -4722,7 +5579,8 @@
         priority,
         status: 'ASSIGNED',
         dueAt,
-        createdAt: Date.now(),
+        createdAt: taskTimestamp,
+        taskDate: rawDate || formatTimestampForDateInput(taskTimestamp),
         activity: [
           { authorName: creatorName, text: `Created task for ${assigneeName}`, timestamp: Date.now() }
         ]
@@ -4737,7 +5595,9 @@
         try {
           await FirebaseService.createTask({
             id: taskId,
-            title, description, priority, assigneeId, assigneeUid, assigneeName, assigneeEmail, dueAt
+            title, description, priority, assigneeId, assigneeUid, assigneeName, assigneeEmail, dueAt,
+            createdAt: taskTimestamp,
+            taskDate: newTask.taskDate
           });
         } catch (err) {
           console.warn('[FIREBASE] Task cloud creation note:', err.message);
@@ -4745,6 +5605,8 @@
       }
 
       document.getElementById('formCreateTask').reset();
+      const dateInput = document.getElementById('taskDateInput');
+      if (dateInput) dateInput.value = formatTimestampForDateInput(Date.now());
       populateAssigneeSelect();
       renderTasks();
       playNotificationChirp(true);
@@ -4813,7 +5675,13 @@
       const priority = document.getElementById('editTaskPriority')?.value || 'NORMAL';
       const status = document.getElementById('editTaskStatus')?.value || 'ASSIGNED';
       const dueAt = document.getElementById('editTaskDue')?.value.trim() || 'Today 5:00 PM';
+      const rawDate = document.getElementById('editTaskDate')?.value;
       const description = document.getElementById('editTaskDesc')?.value.trim();
+
+      let newTimestamp = task.createdAt || Date.now();
+      if (rawDate) {
+        newTimestamp = parseDateInputToTimestamp(rawDate, task.createdAt);
+      }
 
       const editorName = WorkspaceDB.data.members[state.currentMemberId]?.name || state.currentUser?.displayName || 'JAGADISH K';
 
@@ -4827,12 +5695,14 @@
       task.priority = priority;
       task.status = status;
       task.dueAt = dueAt;
+      task.createdAt = newTimestamp;
+      task.taskDate = rawDate || formatTimestampForDateInput(newTimestamp);
       task.updatedAt = Date.now();
 
       if (!task.activity) task.activity = [];
       task.activity.push({
         authorName: editorName,
-        text: `Updated task details: ${title} (${status})`,
+        text: `Updated task details: ${title} (${new Date(newTimestamp).toLocaleDateString()}, ${status})`,
         timestamp: Date.now()
       });
 
@@ -4850,6 +5720,8 @@
           priority,
           status,
           dueAt,
+          createdAt: newTimestamp,
+          taskDate: task.taskDate,
           updatedAt: Date.now()
         }).catch(err => {
           console.warn('[FIREBASE] Cloud task update note:', err.message);
@@ -6660,10 +7532,10 @@
             if (tombstone.includes(memberId)) return;
             
             // Check if member is actually online based on freshness of heartbeat or local active session
-            const isSelf = (memberId === state.currentMemberId || (cmEmail === state.currentUser?.email?.toLowerCase()) || (cmEmail === 'jagadish2k2006@gmail.com'));
-            const isFreshHeartbeat = cm.lastSeenAt && (Date.now() - cm.lastSeenAt < 60000);
-            const isOnline = isSelf || (!cm.suspended && isFreshHeartbeat && cm.status === 'DUTY_ON');
-            const resolvedStatus = cm.suspended ? 'DUTY_OFF' : (isOnline ? 'DUTY_ON' : 'DUTY_OFF');
+            const isSelf = isSelfMember(cm) || (memberId === state.currentMemberId);
+            const isFreshHeartbeat = cm.lastSeenAt && (Date.now() - cm.lastSeenAt < 90000);
+            const isOnline = isSelf || (!cm.suspended && isFreshHeartbeat && (cm.status === 'DUTY_ON' || cm.status === 'DUTY_BREAK'));
+            const resolvedStatus = cm.suspended ? 'DUTY_OFF' : (isSelf ? (state.personalShift?.status || cm.status || 'DUTY_ON') : (cm.status || (isOnline ? 'DUTY_ON' : 'DUTY_OFF')));
 
             const existing = WorkspaceDB.data.members[memberId] || WorkspaceDB.data.members[cm.uid] || {};
             const cmTime = Number(cm.updatedAt || cm.createdAt || 0);
@@ -6684,8 +7556,9 @@
               photoURL: cm.photoURL || cm.photoUrl || existing.photoURL || '',
               status: resolvedStatus,
               lastSeenAt: cm.lastSeenAt || existing.lastSeenAt || 0,
-              todaySeconds: cm.todaySeconds !== undefined ? cm.todaySeconds : (existing.todaySeconds || 0),
-              todayHours: cm.todayHours !== undefined ? cm.todayHours : (existing.todayHours || 0),
+              todaySeconds: (cm.lastSeenAt && (new Date(cm.lastSeenAt).toDateString() === new Date().toDateString())) ? (cm.todaySeconds !== undefined ? cm.todaySeconds : (existing.todaySeconds || 0)) : 0,
+              todayHours: (cm.lastSeenAt && (new Date(cm.lastSeenAt).toDateString() === new Date().toDateString())) ? (cm.todayHours !== undefined ? cm.todayHours : (existing.todayHours || 0)) : 0,
+              todayDate: (cm.lastSeenAt && (new Date(cm.lastSeenAt).toDateString() === new Date().toDateString())) ? (cm.todayDate || new Date().toDateString()) : null,
               suspended: !!cm.suspended,
               avatarText: (cm.displayName || cm.name || 'RD').slice(0, 2).toUpperCase(),
               updatedAt: Math.max(cmTime, existTime) || Date.now()
@@ -6696,6 +7569,7 @@
           WorkspaceDB.save();
           renderWorkers();
           renderFleetTelemetry();
+          renderTeamHoursDashboard();
           renderChatChannelsAndDMs();
           WorkspaceDB.updateMetricsUI();
         }
@@ -6887,6 +7761,51 @@
           }
         });
       }
+
+      // 9. Real-time Shift Punch Audit Trail Subscription
+      if (typeof FirebaseService.subscribePunchLogs === 'function') {
+        FirebaseService.subscribePunchLogs((cloudPunches) => {
+          if (cloudPunches && Array.isArray(cloudPunches)) {
+            if (!WorkspaceDB.data.punchLogs) WorkspaceDB.data.punchLogs = [];
+            const existingMap = new Map();
+            WorkspaceDB.data.punchLogs.forEach(p => {
+              const norm = normalizePunch(p);
+              if (norm) {
+                const key = norm.id || `${norm.workerId}_${norm.timestamp}_${norm.action}`;
+                existingMap.set(key, norm);
+              }
+            });
+            cloudPunches.forEach(cp => {
+              const norm = normalizePunch(cp);
+              if (norm) {
+                norm.cloudSynced = true;
+                const key = norm.id || `${norm.workerId}_${norm.timestamp}_${norm.action}`;
+                existingMap.set(key, norm);
+              }
+            });
+            WorkspaceDB.data.punchLogs = Array.from(existingMap.values())
+              .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+            WorkspaceDB.save().catch(() => {});
+            reconcilePersonalShiftWithPunches();
+            renderPunchLogs();
+            renderTeamHoursDashboard();
+            updateLiveFleetHours();
+          }
+        });
+      }
+
+      // Sync any unsynced local punches for current user to Cloud Firestore
+      if (typeof FirebaseService.recordPunchLog === 'function') {
+        const cur = getCurrentResolvedMember();
+        const myPunches = (WorkspaceDB.data.punchLogs || []).filter(p => {
+          if (!p || p.cloudSynced) return false;
+          return (p.workerId === cur.id || (cur.uid && p.uid === cur.uid) || (cur.email && p.email && p.email.toLowerCase() === (cur.email || '').toLowerCase()));
+        });
+        myPunches.forEach(p => {
+          p.cloudSynced = true;
+          FirebaseService.recordPunchLog(p).catch(() => {});
+        });
+      }
     }
 
     // Initial Teams Views Render
@@ -6909,7 +7828,7 @@
         updateAuthUI(user, member);
         if (!user) {
           // Open Login Modal on first session without locking screen
-          const hasSeenPrompt = sessionStorage.getItem('rd_auth_prompted');
+          const hasSeenPrompt = sessionStorage.getItem('rd_auth_prompted') || localStorage.getItem('rd_auth_dismissed');
           if (!hasSeenPrompt) {
             sessionStorage.setItem('rd_auth_prompted', '1');
             openAuthModal('signin');
@@ -6929,9 +7848,8 @@
       const now = Date.now();
       Object.values(WorkspaceDB.data.members || {}).forEach(m => {
         if (!m) return;
-        const isSelf = (m.id === state.currentMemberId || (m.email && m.email.toLowerCase() === state.currentUser?.email?.toLowerCase()) || m.email?.toLowerCase() === 'jagadish2k2006@gmail.com');
-        if (isSelf) return;
-        if (m.status === 'DUTY_ON' && (!m.lastSeenAt || (now - m.lastSeenAt > 60000))) {
+        if (isSelfMember(m)) return;
+        if ((m.status === 'DUTY_ON' || m.status === 'DUTY_BREAK') && (!m.lastSeenAt || (now - m.lastSeenAt > 90000))) {
           m.status = 'DUTY_OFF';
           changed = true;
         }
@@ -6990,7 +7908,7 @@
               window.location.reload();
             }
           } catch (e) {
-            alert(`Could not revert hotpatch: ${e.message}`);
+            showQuickToast(`Could not revert hotpatch: ${e.message}`, 'error');
           }
         }
       }
@@ -7151,7 +8069,7 @@
           <div class="ota-banner-text">
             <div class="ota-banner-head">
               <span class="ota-banner-title">NEW WORKSTATION UPDATE AVAILABLE</span>
-              <span class="ota-banner-badge" id="otaBannerBadge">v2.5.3</span>
+              <span class="ota-banner-badge" id="otaBannerBadge">v2.5.5</span>
             </div>
             <p class="ota-banner-desc" id="otaBannerDesc">New release is available with instant hotpatching.</p>
           </div>
@@ -7247,11 +8165,11 @@
         const res = await window.electronAPI.otaApplyHotpatch();
         if (res && res.success) {
           playNotificationChirp(true);
-          if (btn) btn.innerHTML = '<span>✅ Updated to v' + (res.version || '2.5.3') + '! Reloading...</span>';
-          if (bannerDesc) bannerDesc.textContent = `Successfully updated to v${res.version || '2.5.3'}! Reloading workspace...`;
+          if (btn) btn.innerHTML = '<span>✅ Updated to v' + (res.version || '2.5.5') + '! Reloading...</span>';
+          if (bannerDesc) bannerDesc.textContent = `Successfully updated to v${res.version || '2.5.5'}! Reloading workspace...`;
           if (otaStatusText) {
             otaStatusText.style.color = '#00e676';
-            otaStatusText.textContent = `SUCCESSFULLY HOTPATCHED TO v${res.version || '2.5.3'}! REFRESHING WORKSPACE...`;
+            otaStatusText.textContent = `SUCCESSFULLY HOTPATCHED TO v${res.version || '2.5.5'}! REFRESHING WORKSPACE...`;
           }
           if (otaStatusDot) otaStatusDot.className = 'pulse-green';
           setTimeout(() => { window.location.reload(); }, 600);
