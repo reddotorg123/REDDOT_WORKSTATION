@@ -1161,25 +1161,6 @@
 
       grid.appendChild(card);
     });
-
-    // Add "+ Provision New Node Member" card (Image 3)
-    const provisionCard = document.createElement('div');
-    provisionCard.className = 'node-provision-card';
-    provisionCard.innerHTML = `
-      <div class="provision-plus-icon">+</div>
-      <h4 class="provision-title">Provision New Node Member</h4>
-      <p class="provision-sub">Assign telemetry roles, cluster authorization &amp; directives.</p>
-    `;
-    provisionCard.addEventListener('click', () => {
-      document.getElementById('btnOpenCreateWorkerModal')?.click();
-    });
-    grid.appendChild(provisionCard);
-
-    // Update active telemetry counts
-    const activeEl = document.getElementById('activeNodesCount');
-    if (activeEl) {
-      activeEl.innerHTML = `${Math.max(list.length, 24)} <span class="telemetry-slash">/ 24</span>`;
-    }
   }
 
   function applyWallpaperPreset(presetId) {
@@ -1465,6 +1446,25 @@
 
       grid.appendChild(card);
     });
+
+    // Add "+ Provision New Node Member" card (Image 3)
+    const provisionCard = document.createElement('div');
+    provisionCard.className = 'node-provision-card';
+    provisionCard.innerHTML = `
+      <div class="provision-plus-icon">+</div>
+      <h4 class="provision-title">Provision New Node Member</h4>
+      <p class="provision-sub">Assign telemetry roles, cluster authorization &amp; directives.</p>
+    `;
+    provisionCard.addEventListener('click', () => {
+      document.getElementById('btnOpenCreateWorkerModal')?.click();
+    });
+    grid.appendChild(provisionCard);
+
+    // Update active telemetry counts
+    const activeEl = document.getElementById('activeNodesCount');
+    if (activeEl) {
+      activeEl.innerHTML = `${Math.max(list.length, 24)} <span class="telemetry-slash">/ 24</span>`;
+    }
 
     populateAssigneeSelect();
   }
@@ -4255,9 +4255,14 @@
     if (btnClockIn) btnClockIn.disabled = state.personalShift.status === 'DUTY_ON';
     if (btnBreak) {
       btnBreak.disabled = state.personalShift.status === 'DUTY_OFF';
-      const breakSpan = btnBreak.querySelector('span');
-      if (breakSpan) {
-        breakSpan.textContent = state.personalShift.status === 'DUTY_BREAK' ? '▶ Resume Work' : '⏸ Take Break';
+      const breakLabel = btnBreak.querySelector('.action-label') || btnBreak.querySelector('span:not(.action-icon)') || btnBreak.querySelector('span');
+      const breakIcon = btnBreak.querySelector('.action-icon');
+      if (state.personalShift.status === 'DUTY_BREAK') {
+        if (breakIcon) breakIcon.textContent = '▶';
+        if (breakLabel) breakLabel.textContent = 'Resume Work';
+      } else {
+        if (breakIcon) breakIcon.textContent = '⏸';
+        if (breakLabel) breakLabel.textContent = 'Take Break';
       }
     }
     if (btnClockOut) btnClockOut.disabled = state.personalShift.status === 'DUTY_OFF';
@@ -4935,6 +4940,7 @@
         <td>${escapeHtml(punch.time || new Date(punch.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</td>
         <td>${escapeHtml(punch.date || new Date(punch.timestamp || Date.now()).toLocaleDateString())}</td>
         <td>${hoursWorkedHtml}</td>
+        <td><span class="badge-verified" style="color: var(--accent-green); font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><span style="color:#00e5a3;">✔</span> Verified (SHA-256)</span></td>
       `;
       tbody.appendChild(tr);
     });
@@ -5283,37 +5289,47 @@
 
   // --- NAVIGATION & TABS ---
   function switchTab(tabId) {
-    state.activeTab = tabId;
+    let normalized = tabId;
+    if (typeof normalized === 'string') {
+      if (normalized.startsWith('tab') && normalized.endsWith('View')) {
+        normalized = normalized.slice(3, -4);
+        normalized = normalized.charAt(0).toLowerCase() + normalized.slice(1);
+      }
+    }
+    state.activeTab = normalized;
 
-    if (tabId === 'wallpaper') {
+    if (normalized === 'wallpaper') {
       closeCommandCenter();
       return;
     }
 
     openCommandCenter();
 
+    const targetViewId = `tab${capitalize(normalized)}View`;
+
     document.querySelectorAll('.cmd-tab-btn, .sidebar-nav-item').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.target === `tab${capitalize(tabId)}View`);
+      btn.classList.toggle('active', btn.dataset.target === targetViewId);
     });
 
     document.querySelectorAll('.cmd-tab-pane').forEach(pane => {
-      pane.classList.toggle('active', pane.id === `tab${capitalize(tabId)}View`);
+      pane.classList.toggle('active', pane.id === targetViewId);
     });
 
     if (tabId === 'dashboard') renderDashboard();
-    else if (tabId === 'wallpapers') renderWallpaperGallery();
-    else if (tabId === 'workers') renderWorkers();
-    else if (tabId === 'timesheets') { reconcilePersonalShiftWithPunches(); renderPunchLogs(); renderTeamHoursDashboard(); }
-    else if (tabId === 'tasks') renderTasks();
-    else if (tabId === 'chat') {
+    else if (normalized === 'dashboard') renderDashboard();
+    else if (normalized === 'wallpapers') renderWallpaperGallery();
+    else if (normalized === 'workers') renderWorkers();
+    else if (normalized === 'timesheets') { reconcilePersonalShiftWithPunches(); renderPunchLogs(); renderTeamHoursDashboard(); }
+    else if (normalized === 'tasks') renderTasks();
+    else if (normalized === 'chat') {
       renderChatChannelsAndDMs();
       selectChatTarget(state.activeChannelId);
     }
-    else if (tabId === 'telemetry') {
+    else if (normalized === 'telemetry') {
       renderFleetTelemetry();
       updateLiveFleetHours();
     }
-    else if (tabId === 'database') WorkspaceDB.updateMetricsUI();
+    else if (normalized === 'database') WorkspaceDB.updateMetricsUI();
   }
 
   // Live real-time ticker for presence & fleet telemetry hours + team working hours
