@@ -1,25 +1,29 @@
 @echo off
 title REDDOT Workstation OS - Development Runner
 echo ==============================================================
-echo  REDDOT WORKSTATION OS - DESKTOP ^& LIVE WALLPAPER
+echo  REDDOT WORKSTATION OS - DESKTOP ^& LIVE WALLPAPER v3.0.1
 echo  Runs behind all apps on Windows Desktop with System Tray
 echo ==============================================================
 cd /d "%~dp0"
 
-:: Check for Standalone Portable Executable first (zero-dependency)
-echo Launching REDDOT Workstation OS ^& Live Wallpaper Desktop...
-if exist "%~dp0app\v2.5.1\REDDOT-Workstation-OS-Portable\REDDOT-Workstation-OS.exe" (
-  echo Launching via standalone portable application...
-  cd /d "%~dp0app\v2.5.1\REDDOT-Workstation-OS-Portable"
-  start "" "REDDOT-Workstation-OS.exe"
+echo [1/3] Clearing any prior hung background instances...
+taskkill /F /IM "REDDOT Workstation OS.exe" /T >nul 2>&1
+taskkill /F /IM "REDDOT-Workstation-OS.exe" /T >nul 2>&1
+taskkill /F /IM "electron.exe" /T >nul 2>&1
+ping 127.0.0.1 -n 2 >nul
+
+echo [2/3] Synchronizing hotpatch directory...
+call node scripts/sync-hotpatch.js
+
+echo [3/3] Launching REDDOT Workstation OS...
+if exist "%~dp0app\v2.5.3\win-unpacked\REDDOT Workstation OS.exe" (
+  cd /d "%~dp0app\v2.5.3\win-unpacked"
+  start "" "REDDOT Workstation OS.exe"
   exit /b 0
 ) else if exist "%~dp0node_modules\electron\dist\electron.exe" (
-  "%~dp0node_modules\electron\dist\electron.exe" "%~dp0."
+  start "" "%~dp0node_modules\electron\dist\electron.exe" "%~dp0."
+  exit /b 0
 ) else (
-  npx -y electron "%~dp0."
-)
-
-if %ERRORLEVEL% NEQ 0 (
-  echo Error starting Electron desktop window.
-  pause
+  start "" npx -y electron "%~dp0."
+  exit /b 0
 )

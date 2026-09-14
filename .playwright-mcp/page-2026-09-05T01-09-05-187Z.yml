@@ -1,0 +1,141 @@
+- generic [active] [ref=f18e1]:
+  - generic [ref=f18e2]:
+    - banner [ref=f18e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=f18e4] [cursor=pointer]':
+        - generic [ref=f18e5]: ⬢
+        - generic [ref=f18e7]:
+          - generic [ref=f18e8]: REDDOT.OS
+          - generic [ref=f18e9]: WORKSPACE
+      - generic [ref=f18e10]:
+        - button "📌 Pin Mode" [ref=f18e11] [cursor=pointer]:
+          - generic [ref=f18e12]: 📌
+          - generic [ref=f18e13]: Pin Mode
+        - button "−" [ref=f18e14] [cursor=pointer]
+        - button "▢" [ref=f18e16] [cursor=pointer]
+        - button "×" [ref=f18e18] [cursor=pointer]
+    - main [ref=f18e20]:
+      - generic [ref=f18e21]:
+        - generic [ref=f18e22]: (TECHNICAL WORKSPACE)
+        - generic [ref=f18e23]: ORGANIZATION // REDDOT
+      - generic:
+        - heading "REDDOT" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=f18e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=f18e32]
+      - generic [ref=f18e33]:
+        - generic [ref=f18e34]: PERSISTENT WORKSPACE •
+        - generic [ref=f18e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=f18e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=f18e38] [cursor=pointer]:
+        - generic [ref=f18e39]: ⧢
+        - generic [ref=f18e40]: COMMAND CENTER
+        - generic [ref=f18e41]: SPACE
+      - generic [ref=f18e43]:
+        - generic [ref=f18e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=f18e45]: REDDOT • 2026
+  - generic [ref=f18e47]:
+    - banner [ref=f18e48]:
+      - generic [ref=f18e49]:
+        - generic [ref=f18e50]: ◆
+        - generic [ref=f18e51]:
+          - heading "REDDOT WORKSPACE" [level=2] [ref=f18e52]
+          - paragraph [ref=f18e53]: "Enterprise Workforce Command • Org: reddot"
+        - generic "Switch User / View Profile" [ref=f18e54] [cursor=pointer]:
+          - generic [ref=f18e56]: JAGADISH K // FOUNDER & ADMIN
+          - generic [ref=f18e57]: RD-FOUNDER-001
+        - generic "Disk Vault & Cloud Sync Active" [ref=f18e58]: PERSISTENT DB ACTIVE
+      - navigation [ref=f18e59]:
+        - button "🎨 Wallpapers" [ref=f18e60] [cursor=pointer]:
+          - generic [ref=f18e61]: 🎨
+          - generic [ref=f18e62]: Wallpapers
+        - button "👥 Directory & IDs" [ref=f18e63] [cursor=pointer]:
+          - generic [ref=f18e64]: 👥
+          - generic [ref=f18e65]: Directory & IDs
+        - button "⏱ Shifts" [ref=f18e66] [cursor=pointer]:
+          - generic [ref=f18e67]: ⏱
+          - generic [ref=f18e68]: Shifts
+        - button "📋 Tasks" [ref=f18e69] [cursor=pointer]:
+          - generic [ref=f18e70]: 📋
+          - generic [ref=f18e71]: Tasks
+        - button "💬 Team Chat" [ref=f18e72] [cursor=pointer]:
+          - generic [ref=f18e73]: 💬
+          - generic [ref=f18e74]: Team Chat
+        - button "🌐 Presence" [ref=f18e75] [cursor=pointer]:
+          - generic [ref=f18e76]: 🌐
+          - generic [ref=f18e77]: Presence
+        - button "🛡 Database & Storage" [ref=f18e78] [cursor=pointer]:
+          - generic [ref=f18e79]: 🛡
+          - generic [ref=f18e80]: Database & Storage
+      - generic [ref=f18e81]:
+        - button "📌 Pin Mode" [ref=f18e82] [cursor=pointer]:
+          - generic [ref=f18e83]: 📌
+          - generic [ref=f18e84]: Pin Mode
+        - button "⧢ Wallpaper Mode [Esc]" [ref=f18e85] [cursor=pointer]
+        - generic [ref=f18e87]:
+          - button "−" [ref=f18e88] [cursor=pointer]
+          - button "▢" [ref=f18e89] [cursor=pointer]
+          - button "×" [ref=f18e90] [cursor=pointer]
+    - main [ref=f18e91]:
+      - generic [ref=f18e98]:
+        - generic [ref=f18e99]:
+          - textbox "Search team members by name, role, ID, department..." [ref=f18e101]
+          - button "➕ Create Member & ID Card" [ref=f18e103] [cursor=pointer]
+        - generic [ref=f18e104]:
+          - generic [ref=f18e105]:
+            - generic [ref=f18e106]:
+              - generic "🟢 Online" [ref=f18e108]
+              - generic [ref=f18e109]:
+                - heading "JAGADISH K" [level=4] [ref=f18e110]
+                - paragraph [ref=f18e111]: RD-FOUNDER-001 • Hardware Architecture
+                - generic "Click to edit designation & department" [ref=f18e113] [cursor=pointer]: owner ✎
+            - generic [ref=f18e114]:
+              - generic [ref=f18e115]:
+                - button "💬 Chat" [ref=f18e116] [cursor=pointer]
+                - button "📹 Meet" [ref=f18e118] [cursor=pointer]
+                - button "🪪 ID Card" [ref=f18e120] [cursor=pointer]
+                - button "🖼️ Mount" [ref=f18e122] [cursor=pointer]
+              - generic [ref=f18e124]:
+                - button "⭐ Role" [ref=f18e125] [cursor=pointer]
+                - generic [ref=f18e127]: 👑 Workspace Administrator
+          - generic [ref=f18e129]:
+            - generic [ref=f18e130]:
+              - generic "🔴 Offline" [ref=f18e132]
+              - generic [ref=f18e133]:
+                - heading "Pavithra R" [level=4] [ref=f18e134]
+                - paragraph [ref=f18e135]: RD-EMP-002 • Engineering & Development
+                - generic "Click to edit designation & department" [ref=f18e137] [cursor=pointer]: UI/UX DESIGNER ✎
+            - generic [ref=f18e138]:
+              - generic [ref=f18e139]:
+                - button "💬 Chat" [ref=f18e140] [cursor=pointer]
+                - button "📹 Meet" [ref=f18e142] [cursor=pointer]
+                - button "🪪 ID Card" [ref=f18e144] [cursor=pointer]
+                - button "🖼️ Mount" [ref=f18e146] [cursor=pointer]
+              - generic [ref=f18e148]:
+                - button "⭐ Role" [ref=f18e149] [cursor=pointer]
+                - button "⛔ Suspend" [ref=f18e151] [cursor=pointer]
+                - button "🗑️ Delete" [ref=f18e153] [cursor=pointer]
+  - generic [ref=f18e157]:
+    - generic [ref=f18e158]:
+      - generic [ref=f18e159]:
+        - generic [ref=f18e160]: 🔐
+        - generic [ref=f18e161]: REDDOT WORKSTATION ACCESS
+      - button "×" [ref=f18e162] [cursor=pointer]
+    - generic [ref=f18e163]:
+      - button "Sign In with Google Account" [disabled] [ref=f18e164] [cursor=pointer]
+      - generic [ref=f18e171]: OR USE WORK EMAIL
+      - generic [ref=f18e172]:
+        - button "Email Sign In" [ref=f18e173] [cursor=pointer]
+        - button "Create New Profile" [ref=f18e174] [cursor=pointer]
+      - generic [ref=f18e175]:
+        - generic [ref=f18e176]:
+          - generic [ref=f18e177]: Work Email Address
+          - textbox "Work Email Address" [ref=f18e178]:
+            - /placeholder: e.g. jagadish@reddot.com
+        - generic [ref=f18e179]:
+          - generic [ref=f18e180]: Account Password
+          - textbox "Account Password" [ref=f18e181]:
+            - /placeholder: Enter your password
+        - generic [ref=f18e182]:
+          - button "Forgot Password?" [ref=f18e183] [cursor=pointer]
+          - button "⚡ Sign In to Workstation" [ref=f18e184] [cursor=pointer]
+      - button "⚡ Continue in Local Founder Mode (Offline / Disk Vault)" [ref=f18e186] [cursor=pointer]
+  - iframe [aria-hidden] [ref=f18e187]

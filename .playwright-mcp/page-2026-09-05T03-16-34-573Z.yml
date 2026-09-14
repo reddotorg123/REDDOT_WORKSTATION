@@ -1,0 +1,110 @@
+- generic [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - banner [ref=f4e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=f4e4] [cursor=pointer]':
+        - generic [ref=f4e5]: ⬢
+        - generic [ref=f4e7]:
+          - generic [ref=f4e8]: REDDOT.OS
+          - generic [ref=f4e9]: WORKSPACE
+      - generic [ref=f4e10]:
+        - button "📌 Pin Mode" [ref=f4e11] [cursor=pointer]:
+          - generic [ref=f4e12]: 📌
+          - generic [ref=f4e13]: Pin Mode
+        - button "−" [ref=f4e14] [cursor=pointer]
+        - button "▢" [ref=f4e16] [cursor=pointer]
+        - button "×" [ref=f4e18] [cursor=pointer]
+    - main [ref=f4e20]:
+      - generic [ref=f4e21]:
+        - generic [ref=f4e22]: (OWNER)
+        - generic [ref=f4e23]: HARDWARE ARCHITECTURE // RD-FOUNDER-001
+      - generic:
+        - heading "JAGADISH" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=f4e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=f4e32]
+      - generic [ref=f4e33]:
+        - generic [ref=f4e34]: PERSISTENT WORKSPACE •
+        - generic [ref=f4e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=f4e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=f4e38] [cursor=pointer]:
+        - generic [ref=f4e39]: ⧢
+        - generic [ref=f4e40]: COMMAND CENTER
+        - generic [ref=f4e41]: SPACE
+      - generic [ref=f4e43]:
+        - generic [ref=f4e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=f4e45]: JAGADISH K • 2026
+  - generic [ref=f4e47]:
+    - banner [ref=f4e48]:
+      - generic [ref=f4e49]:
+        - generic [ref=f4e50]: ◆
+        - heading "REDDOT WORKSPACE" [level=2] [ref=f4e52]
+        - generic "Switch User / View Profile" [ref=f4e53] [cursor=pointer]: JAGADISH K // FOUNDER & ADMIN
+      - navigation [ref=f4e56]:
+        - button "🎨 Wallpapers" [ref=f4e57] [cursor=pointer]:
+          - generic [ref=f4e58]: 🎨
+          - generic [ref=f4e59]: Wallpapers
+        - button "👥 Directory" [active] [ref=f4e60] [cursor=pointer]:
+          - generic [ref=f4e61]: 👥
+          - generic [ref=f4e62]: Directory
+        - button "⏱ Shifts" [ref=f4e63] [cursor=pointer]:
+          - generic [ref=f4e64]: ⏱
+          - generic [ref=f4e65]: Shifts
+        - button "📋 Tasks" [ref=f4e66] [cursor=pointer]:
+          - generic [ref=f4e67]: 📋
+          - generic [ref=f4e68]: Tasks
+        - button "💬 Team Chat" [ref=f4e69] [cursor=pointer]:
+          - generic [ref=f4e70]: 💬
+          - generic [ref=f4e71]: Team Chat
+        - button "🌐 Presence" [ref=f4e72] [cursor=pointer]:
+          - generic [ref=f4e73]: 🌐
+          - generic [ref=f4e74]: Presence
+        - button "🛡 Database" [ref=f4e75] [cursor=pointer]:
+          - generic [ref=f4e76]: 🛡
+          - generic [ref=f4e77]: Database
+      - generic [ref=f4e78]:
+        - button "📌 Pin Mode" [ref=f4e79] [cursor=pointer]:
+          - generic [ref=f4e80]: 📌
+          - generic [ref=f4e81]: Pin Mode
+        - button "⧢ Wallpaper Mode [Esc]" [ref=f4e82] [cursor=pointer]
+        - generic [ref=f4e84]:
+          - button "−" [ref=f4e85] [cursor=pointer]
+          - button "▢" [ref=f4e86] [cursor=pointer]
+          - button "×" [ref=f4e87] [cursor=pointer]
+    - main [ref=f4e88]:
+      - generic [ref=f4e89]:
+        - generic [ref=f4e90]:
+          - textbox "Search team members by name, role, ID, department..." [ref=f4e92]
+          - button "➕ Create Member & ID Card" [ref=f4e94] [cursor=pointer]
+        - generic [ref=f4e95]:
+          - generic [ref=f4e146]:
+            - generic [ref=f4e147]:
+              - generic "🟢 Online" [ref=f4e149]
+              - generic [ref=f4e150]:
+                - heading "JAGADISH K" [level=4] [ref=f4e151]
+                - paragraph [ref=f4e152]: RD-FOUNDER-001 • Hardware Architecture
+                - generic "Click to edit designation & department" [ref=f4e154] [cursor=pointer]: owner ✎
+            - generic [ref=f4e155]:
+              - generic [ref=f4e156]:
+                - button "💬 Chat" [ref=f4e157] [cursor=pointer]
+                - button "📹 Meet" [ref=f4e159] [cursor=pointer]
+                - button "🪪 ID Card" [ref=f4e161] [cursor=pointer]
+                - button "🖼️ Mount" [ref=f4e163] [cursor=pointer]
+              - generic [ref=f4e165]:
+                - button "⭐ Role" [ref=f4e166] [cursor=pointer]
+                - generic [ref=f4e168]: 👑 Workspace Administrator
+          - generic [ref=f4e170]:
+            - generic [ref=f4e171]:
+              - generic "🔴 Offline" [ref=f4e173]
+              - generic [ref=f4e174]:
+                - heading "Pavithra R" [level=4] [ref=f4e175]
+                - paragraph [ref=f4e176]: RD-EMP-002 • Engineering & Development
+                - generic "Click to edit designation & department" [ref=f4e178] [cursor=pointer]: UI/UX DESIGNER ✎
+            - generic [ref=f4e179]:
+              - generic [ref=f4e180]:
+                - button "💬 Chat" [ref=f4e181] [cursor=pointer]
+                - button "📹 Meet" [ref=f4e183] [cursor=pointer]
+                - button "🪪 ID Card" [ref=f4e185] [cursor=pointer]
+                - button "🖼️ Mount" [ref=f4e187] [cursor=pointer]
+              - generic [ref=f4e189]:
+                - button "⭐ Role" [ref=f4e190] [cursor=pointer]
+                - button "⛔ Suspend" [ref=f4e192] [cursor=pointer]
+                - button "🗑️ Delete" [ref=f4e194] [cursor=pointer]

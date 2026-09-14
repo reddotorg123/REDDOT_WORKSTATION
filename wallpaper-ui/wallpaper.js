@@ -410,7 +410,7 @@
       Object.values(this.data.chats || {}).forEach(arr => msgsCount += (arr ? arr.length : 0));
       const punchesCount = (this.data.punchLogs || []).length;
 
-      safeSetText(document.getElementById('dbStatOnlineCount'), Math.max(1, onlineCount));
+      safeSetText(document.getElementById('dbStatOnlineCount'), onlineCount);
       safeSetText(document.getElementById('dbStatMembersCount'), totalMembersCount);
       safeSetText(document.getElementById('dbStatTasksCount'), tasksCount);
       safeSetText(document.getElementById('dbStatMsgsCount'), msgsCount);
@@ -487,7 +487,7 @@
     activeTab: 'workers',
     activeChannelId: 'general',
     taskFilter: 'ALL',
-    commandCenterOpen: true,
+    commandCenterOpen: false,
     selectedViewingMemberId: null,
     tempNewWorkerPhoto: null,
     tempSignUpPhoto: null,
@@ -495,6 +495,10 @@
     // Teams Collaboration State
     activeHubTab: 'posts',
     activeTeamsRailTab: 'chat',
+    taskViewMode: 'list',
+    taskSortMode: 'due',
+    taskDrawerClosedByUser: false,
+    activeSelectedTask: null,
     activeThreadRootMsgId: null,
     threadUnsubscribe: null,
     activeImportance: 'normal',
@@ -512,6 +516,11 @@
     voiceShouldSend: false,
     teamsPresence: localStorage.getItem('rd_teams_presence') || 'available',
     chatSearchQuery: '',
+    workerSearchQuery: '',
+    workerDeptFilter: 'ALL',
+    workerStatusFilter: 'ALL',
+    incomingCallMicMuted: false,
+    incomingCallCamDisabled: false,
 
     // Shift Tracking
     personalShift: {
@@ -526,6 +535,8 @@
     mouse: { targetRotX: 0, targetRotY: 0, targetX: 0 },
     card: { curRotX: 0, curRotY: 0, curX: 0 }
   };
+
+  window.state = state;
 
   // --- AUTHENTICATION & PROFILE CONTROLLERS ---
   function openAuthModal(initialTab = 'signin') {
@@ -1223,24 +1234,46 @@
     if (!grid) return;
     grid.replaceChildren();
 
-    const searchInput = document.getElementById('searchWorkerInput')?.value?.toLowerCase() || '';
+    const searchInput = (document.getElementById('searchWorkerInput')?.value || state.workerSearchQuery || '').toLowerCase().trim();
+    const deptFilter = (state.workerDeptFilter || 'ALL').toUpperCase();
+    const statusSelect = document.getElementById('workersStatusSelect');
+    const statusFilter = (statusSelect?.value || state.workerStatusFilter || 'ALL').toUpperCase();
     const isFounderAdmin = (state.currentUser?.email?.toLowerCase() === 'jagadish2k2006@gmail.com' || state.userRole === 'OWNER');
 
     const list = getUniqueMembersList().filter(m => {
       // Filter out legacy fake demo names
       if (m.name === 'Alex Rivera' || m.name === 'Priya Sharma' || m.name === 'Vikram Malhotra') return false;
+
+      // 1. Department Filter
+      if (deptFilter !== 'ALL') {
+        const mDept = (m.dept || '').toUpperCase();
+        if (!mDept.includes(deptFilter)) return false;
+      }
+
+      // 2. Status Filter
+      if (statusFilter !== 'ALL') {
+        const isOnline = isMemberAppOnline(m) || isSelfMember(m);
+        const dutyStatus = getMemberDutyStatus(m);
+        if (statusFilter === 'ONLINE' && !isOnline && dutyStatus !== 'DUTY_ON') return false;
+        if (statusFilter === 'ON_BREAK' && dutyStatus !== 'DUTY_BREAK') return false;
+        if (statusFilter === 'IN_FOCUS' && dutyStatus !== 'DUTY_ON' && !isOnline) return false;
+        if (statusFilter === 'OFFLINE' && (isOnline || dutyStatus === 'DUTY_ON' || dutyStatus === 'DUTY_BREAK')) return false;
+      }
+
+      // 3. Search query
       if (!searchInput) return true;
       return (m.name || '').toLowerCase().includes(searchInput) ||
              (m.id || '').toLowerCase().includes(searchInput) ||
              (m.role || '').toLowerCase().includes(searchInput) ||
-             (m.dept || '').toLowerCase().includes(searchInput);
+             (m.dept || '').toLowerCase().includes(searchInput) ||
+             (m.email || '').toLowerCase().includes(searchInput);
     });
 
     if (list.length === 0) {
       grid.innerHTML = `
         <div class="empty-state-box" style="grid-column: 1 / -1; padding: 30px; text-align: center;">
-          <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">No team members registered yet.</p>
-          <p style="font-size: 11px; color: var(--text-muted);">Click <strong>+ Create Member &amp; ID Card</strong> to onboard colleagues or invite them to sign in.</p>
+          <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">No team members matched the selected filters.</p>
+          <p style="font-size: 11px; color: var(--text-muted);">Adjust search terms, department pills, or click <strong>+ Create Member &amp; ID Card</strong>.</p>
         </div>
       `;
       populateAssigneeSelect();
@@ -1316,15 +1349,14 @@
 
         <div class="node-arch-box">
           <div class="node-arch-label">
-            <span>Target Architecture</span>
-            <span class="node-arch-code">${getMemberArchCode(member)}</span>
+            <span>Department</span>
           </div>
           <div class="node-arch-val">${safeDept}</div>
         </div>
 
         <div class="node-directive-box">
-          <div class="node-directive-label">ACTIVE WORK DIRECTIVE</div>
-          <div class="node-directive-text">${escapeHtml(getMemberDirective(member))}</div>
+          <div class="node-directive-label">EMAIL</div>
+          <div class="node-directive-text" style="color: var(--text-secondary); font-size: 12.5px;">${escapeHtml(member.email || 'No email provided')}</div>
         </div>
 
         <div class="node-card-actions">
@@ -1439,6 +1471,8 @@
           renderFleetTelemetry();
           renderChatChannelsAndDMs();
           WorkspaceDB.updateMetricsUI();
+    updateBootProgress(95, "Mounting unified dual-theme engine...", "[THEME] Verifying palette tokens...");
+    setTimeout(dismissBootScreen, 200);
           playNotificationChirp(false);
           showQuickToast(`Member ${member.name} permanently removed.`, 'info');
         }
@@ -1462,8 +1496,12 @@
 
     // Update active telemetry counts
     const activeEl = document.getElementById('activeNodesCount');
+    const onlineNodes = list.filter(m => isMemberAppOnline(m) || isSelfMember(m)).length;
     if (activeEl) {
-      activeEl.innerHTML = `${Math.max(list.length, 24)} <span class="telemetry-slash">/ 24</span>`;
+      activeEl.innerHTML = `${onlineNodes} <span class="telemetry-slash">/ ${list.length}</span>`;
+    }
+    if (statusSelect && statusSelect.options && statusSelect.options.length > 0) {
+      statusSelect.options[0].textContent = `Status: All (${list.length})`;
     }
 
     populateAssigneeSelect();
@@ -1630,26 +1668,42 @@
 
   // --- TASKS MANAGEMENT ---
   function populateAssigneeSelect() {
-    const select = document.getElementById('taskAssigneeSelect');
-    if (!select) return;
-    select.replaceChildren();
+    const selects = [
+      document.getElementById('taskAssigneeSelect'),
+      document.getElementById('taskFilterAssigneeSelect'),
+      document.getElementById('editTaskAssignee')
+    ].filter(Boolean);
 
-    const optAll = document.createElement('option');
-    optAll.value = 'ALL';
-    optAll.dataset.name = 'Entire Team';
-    optAll.dataset.email = '';
-    optAll.textContent = 'Entire Team (ALL)';
-    select.appendChild(optAll);
+    const members = getUniqueMembersList();
 
-    getUniqueMembersList().forEach(m => {
-      const opt = document.createElement('option');
-      const safeMId = m.id || m.uid || 'RD-EMP';
-      const safeMName = m.displayName || m.name || (m.email ? m.email.split('@')[0] : 'Team Member');
-      opt.value = safeMId;
-      opt.dataset.name = safeMName;
-      opt.dataset.email = m.email || '';
-      opt.textContent = `${safeMName} [${safeMId}]`;
-      select.appendChild(opt);
+    selects.forEach(select => {
+      const currentVal = select.value;
+      select.replaceChildren();
+
+      const optAll = document.createElement('option');
+      optAll.value = 'ALL';
+      optAll.dataset.name = 'Entire Team';
+      optAll.dataset.email = '';
+      optAll.textContent = select.id === 'taskFilterAssigneeSelect' ? 'All Members' : 'Entire Team (ALL)';
+      select.appendChild(optAll);
+
+      members.forEach(m => {
+        const opt = document.createElement('option');
+        const safeMId = m.id || m.uid || 'RD-EMP';
+        const safeMName = m.displayName || m.name || (m.email ? m.email.split('@')[0] : 'Team Member');
+        opt.value = safeMId;
+        opt.dataset.name = safeMName;
+        opt.dataset.email = m.email || '';
+        opt.dataset.uid = m.uid || '';
+        opt.textContent = `${safeMName} [${safeMId}]`;
+        select.appendChild(opt);
+      });
+
+      if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
+        select.value = currentVal;
+      } else {
+        select.value = 'ALL';
+      }
     });
   }
 
@@ -1657,25 +1711,12 @@
     if (!timestamp) return new Date().toISOString().split('T')[0];
     const d = new Date(Number(timestamp) || timestamp);
     if (isNaN(d.getTime())) return new Date().toISOString().split('T')[0];
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    return d.toISOString().split('T')[0];
   }
 
   function parseDateInputToTimestamp(dateStr, existingTimestamp) {
-    if (!dateStr) return existingTimestamp || Date.now();
-    const parts = String(dateStr).trim().split('-');
-    if (parts.length === 3) {
-      const y = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1;
-      const d = parseInt(parts[2], 10);
-      const existing = existingTimestamp ? new Date(existingTimestamp) : new Date();
-      const h = isNaN(existing.getHours()) ? 12 : existing.getHours();
-      const min = isNaN(existing.getMinutes()) ? 0 : existing.getMinutes();
-      const s = isNaN(existing.getSeconds()) ? 0 : existing.getSeconds();
-      const result = new Date(y, m, d, h, min, s);
-      return isNaN(result.getTime()) ? (existingTimestamp || Date.now()) : result.getTime();
+    if (!dateStr) {
+      return existingTimestamp || Date.now();
     }
     const parsed = new Date(dateStr).getTime();
     return isNaN(parsed) ? (existingTimestamp || Date.now()) : parsed;
@@ -1687,281 +1728,431 @@
     const inProgressCount = document.getElementById('tasksInProgressCount');
     const completedCount = document.getElementById('tasksCompletedCount');
     if (!container) return;
-    container.replaceChildren();
-    if (completedContainer) completedContainer.replaceChildren();
 
-    // Populate assignee dropdown
+    // Populate all assignee dropdowns
     populateAssigneeSelect();
 
-    // Seed realistic high-priority sprint tasks if empty
-    if (!WorkspaceDB.data.tasks || WorkspaceDB.data.tasks.length === 0) {
-      WorkspaceDB.data.tasks = [
-        {
-          id: 'task_001',
-          code: 'TASK-4892',
-          title: 'Industrial UI Architecture Design',
-          category: 'CORE ARCHITECTURE',
-          pipeline: 'feat/carbon-v4',
-          priority: 'HIGH',
-          status: 'REACHED',
-          dueAt: 'Today, 5:00 PM',
-          assigneeName: 'Jagadish K (Lead Design)',
-          description: 'Formalizing the strict Carbon-compliant micro-tokens, unified visual primitives, spacing lattices, and fluid grid contracts for workstation sub-modules.',
-          scope: 'Refine the high-density workstation UI. Replace bulky UI matrices with clean micro-cards, zero decorative clutter, and absolute typographic rhythm aligned strictly with IBM Carbon principles.',
-          subtasks: [
-            { label: 'Audit color tokens against contrast threshold', done: true },
-            { label: 'Draft high-contrast typography hierarchy', done: true },
-            { label: 'Implement task card hover micro-animations', done: true },
-            { label: 'Conduct keyboard navigation and screen-reader pass', done: false }
-          ],
-          createdAt: Date.now() - 3600000
-        },
-        {
-          id: 'task_002',
-          code: 'TASK-4893',
-          title: 'Local SQLite NVMe WAL Sync Optimization',
-          category: 'STORAGE & NVME',
-          pipeline: 'perf/nvme-wal',
-          priority: 'MEDIUM',
-          status: 'REACHED',
-          dueAt: 'Tomorrow',
-          assigneeName: 'Vikram S (Backend Systems)',
-          description: 'Eliminate synchronous disk lockups across hot telemetry write cycles by migrating ring-buffers directly into zero-copy WAL structures.',
-          scope: 'Benchmark WAL mode performance under 10,000 IOPS writes to NVMe persistent disk vault.',
-          subtasks: [
-            { label: 'Migrate file locking to atomic serial queue', done: true },
-            { label: 'Configure WAL checkpoint intervals', done: false },
-            { label: 'Stress test crash recovery', done: false }
-          ],
-          createdAt: Date.now() - 7200000
-        },
-        {
-          id: 'task_003',
-          code: 'TASK-4894',
-          title: 'TPU Enclave Biometric Pulse Bridge',
-          category: 'HARDWARE KERNEL',
-          pipeline: 'feat/tpu-bridge',
-          priority: 'LOW',
-          status: 'REACHED',
-          dueAt: 'In 4 Days',
-          assigneeName: 'Ananya M (Firmware Engineer)',
-          description: 'Interfacing physical cryptographic keys with embedded security chip enclave, handling real-time driver interrupts securely.',
-          scope: 'Implement hardware interrupt service routines for cryptographic enclave bus transactions.',
-          subtasks: [
-            { label: 'Draft TPU register mappings', done: false },
-            { label: 'Test ring buffer memory safety', done: false }
-          ],
-          createdAt: Date.now() - 14400000
-        }
-      ];
-      WorkspaceDB.save().catch(() => {});
-    }
-
-    // Sprint 14 Metrics
+    // No artificial task seeding - keep only authentic user tasks
     const allTasks = WorkspaceDB.data.tasks || [];
-    const totalCount = Math.max(allTasks.length + 22, 28);
-    const completedTasksList = [
-      {
-        title: 'Zero-Surveillance Privacy Attestation Docs',
-        category: 'Compliance',
-        verifier: 'Pavithra R',
-        time: 'Merged to production 6 hrs ago',
-        badge: '✓ Audit Passed'
-      },
-      {
-        title: 'Tokenized Hex Mappings to Carbon Spec v4.8',
-        category: 'Tokens',
-        verifier: 'Jagadish K',
-        time: 'Merged yesterday 21:40',
-        badge: '✓ Token Validated'
-      }
-    ];
-
-    const completedTotal = 22;
-    const activeLoad = allTasks.filter(t => t.status !== 'COMPLETED').length;
-    const velocityScore = Math.round((completedTotal / totalCount) * 100);
+    const completedTasks = allTasks.filter(t => t.status === 'COMPLETED' || t.status === 'ACCOMPLISHED');
+    const completedTotal = completedTasks.length;
+    const activeTasks = allTasks.filter(t => t.status !== 'COMPLETED' && t.status !== 'ACCOMPLISHED');
+    const totalCount = allTasks.length;
+    const velocityScore = totalCount > 0 ? Math.round((completedTotal / totalCount) * 100) : 0;
 
     const sTotal = document.getElementById('sprintTotalTasks');
     if (sTotal) sTotal.textContent = String(totalCount);
     const sComp = document.getElementById('sprintCompletedTasks');
     if (sComp) sComp.textContent = String(completedTotal);
     const sLoad = document.getElementById('sprintActiveLoad');
-    if (sLoad) sLoad.textContent = String(activeLoad || 6);
+    if (sLoad) sLoad.textContent = String(activeTasks.length);
     const sVelo = document.getElementById('sprintVelocityScore');
     if (sVelo) sVelo.textContent = `${velocityScore}%`;
+    const sBar = document.getElementById('sprintExecutionProgressBar');
+    if (sBar) sBar.style.width = `${velocityScore}%`;
 
-    if (inProgressCount) inProgressCount.textContent = String(allTasks.length);
-    if (completedCount) completedCount.textContent = `${completedTotal} Total`;
+    // Filter tasks
+    let filteredTasks = [...activeTasks];
 
-    // Render In Progress Tasks (Image 4)
-    allTasks.forEach((task, idx) => {
-      const card = document.createElement('div');
-      card.className = 'task-card-v3';
-      if (idx === 0) card.classList.add('active-selected');
+    const searchInput = document.getElementById('filterTaskInput');
+    const searchQuery = (searchInput?.value || '').trim().toLowerCase();
+    if (searchQuery) {
+      filteredTasks = filteredTasks.filter(t => 
+        (t.title && t.title.toLowerCase().includes(searchQuery)) ||
+        (t.code && t.code.toLowerCase().includes(searchQuery)) ||
+        (t.category && t.category.toLowerCase().includes(searchQuery)) ||
+        (t.assigneeName && t.assigneeName.toLowerCase().includes(searchQuery)) ||
+        (t.description && t.description.toLowerCase().includes(searchQuery))
+      );
+    }
 
-      const priorityClass = task.priority === 'HIGH' ? 'p-high' : (task.priority === 'MEDIUM' ? 'p-med' : 'p-low');
-      const safePriority = escapeHtml(task.priority || 'NORMAL');
-      const safeCategory = escapeHtml(task.category || 'CORE ARCHITECTURE');
-      const safeDue = escapeHtml(task.dueAt || 'Due Today, 5:00 PM');
-      const safeTitle = escapeHtml(task.title || 'Workspace Task');
-      const safeDesc = escapeHtml(task.description || '');
-      const safeAssignee = escapeHtml(task.assigneeName || 'Jagadish K (Lead Design)');
-      const assigneeInitials = safeAssignee.slice(0, 2).toUpperCase();
+    const catFilter = document.getElementById('taskFilterCategorySelect')?.value || 'ALL';
+    if (catFilter !== 'ALL') {
+      filteredTasks = filteredTasks.filter(t => (t.category || '').toUpperCase().includes(catFilter.toUpperCase()));
+    }
 
-      const subtasks = task.subtasks || [
-        { label: 'Review scope and requirements', done: true },
-        { label: 'Execute implementation pass', done: true },
-        { label: 'Conduct code audit', done: false }
-      ];
-      const doneSub = subtasks.filter(s => s.done).length;
-      const totalSub = subtasks.length;
-      const subPercent = Math.round((doneSub / totalSub) * 100);
+    const assigneeFilter = document.getElementById('taskFilterAssigneeSelect')?.value || 'ALL';
+    if (assigneeFilter !== 'ALL') {
+      filteredTasks = filteredTasks.filter(t => 
+        t.assigneeId === assigneeFilter || 
+        (t.assigneeName && t.assigneeName.toLowerCase().includes(assigneeFilter.toLowerCase()))
+      );
+    }
 
-      card.innerHTML = `
-        <div class="task-card-meta-top">
-          <div class="task-tags-group">
-            <span class="task-p-badge ${priorityClass}">${safePriority} PRIORITY</span>
-            <span class="task-mod-badge">${safeCategory}</span>
+    const priorityFilter = document.getElementById('taskFilterPrioritySelect')?.value || 'ALL';
+    if (priorityFilter !== 'ALL') {
+      filteredTasks = filteredTasks.filter(t => (t.priority || '').toUpperCase() === priorityFilter.toUpperCase());
+    }
+
+    // Sort tasks
+    if (state.taskSortMode === 'priority') {
+      const pRank = { CRITICAL: 4, URGENT: 4, HIGH: 3, MEDIUM: 2, NORMAL: 2, LOW: 1 };
+      filteredTasks.sort((a, b) => (pRank[b.priority] || 2) - (pRank[a.priority] || 2));
+    } else {
+      filteredTasks.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    }
+
+    // Filter completed tasks by same criteria
+    var filteredCompleted = completedTasks.slice();
+    if (searchQuery) {
+      filteredCompleted = filteredCompleted.filter(function(t) {
+        return (t.title && t.title.toLowerCase().indexOf(searchQuery) !== -1) ||
+          (t.code && t.code.toLowerCase().indexOf(searchQuery) !== -1) ||
+          (t.assigneeName && t.assigneeName.toLowerCase().indexOf(searchQuery) !== -1) ||
+          (t.description && t.description.toLowerCase().indexOf(searchQuery) !== -1);
+      });
+    }
+    if (catFilter !== 'ALL') {
+      filteredCompleted = filteredCompleted.filter(function(t) {
+        return (t.category || '').toUpperCase().indexOf(catFilter.toUpperCase()) !== -1;
+      });
+    }
+    if (assigneeFilter !== 'ALL') {
+      filteredCompleted = filteredCompleted.filter(function(t) {
+        return t.assigneeId === assigneeFilter ||
+          (t.assigneeName && t.assigneeName.toLowerCase().indexOf(assigneeFilter.toLowerCase()) !== -1);
+      });
+    }
+    if (priorityFilter !== 'ALL') {
+      filteredCompleted = filteredCompleted.filter(function(t) {
+        return (t.priority || '').toUpperCase() === priorityFilter.toUpperCase();
+      });
+    }
+
+    var statusFilter = 'ALL';
+    var sfEl = document.getElementById('taskFilterStatusSelect');
+    if (sfEl) statusFilter = sfEl.value || 'ALL';
+
+    if (inProgressCount) inProgressCount.textContent = String(filteredTasks.length);
+    if (completedCount) completedCount.textContent = filteredCompleted.length + ' Total';
+
+    // If Board View is active, render Kanban Board with fully filtered tasks
+    if (state.taskViewMode === 'board') {
+      let boardTasks = [];
+      if (statusFilter === 'ACTIVE') boardTasks = filteredTasks;
+      else if (statusFilter === 'COMPLETED') boardTasks = filteredCompleted;
+      else boardTasks = [...filteredTasks, ...filteredCompleted];
+      renderKanbanBoard(boardTasks);
+      return;
+    }
+
+    // LIST VIEW
+    container.replaceChildren();
+    if (completedContainer) completedContainer.replaceChildren();
+
+    if (filteredTasks.length === 0) {
+      const emptyNotice = document.createElement('div');
+      emptyNotice.style.cssText = 'padding: 28px; text-align: center; color: var(--text-muted); font-size: 13px; background: var(--card-bg); border: 1px dashed var(--card-border); border-radius: 8px;';
+      emptyNotice.innerHTML = '🔍 No matching sprint tasks found. Try adjusting filters or click <strong>+ Add Task</strong> above.';
+      container.appendChild(emptyNotice);
+    } else {
+      filteredTasks.forEach((task, idx) => {
+        const card = document.createElement('div');
+        card.className = 'task-card-v3';
+        card.dataset.taskId = task.id;
+
+        const isSelected = state.activeSelectedTask ? state.activeSelectedTask.id === task.id : idx === 0;
+        if (isSelected) {
+          card.classList.add('active-selected');
+          state.activeSelectedTask = task;
+        }
+
+        const priorityClass = (task.priority === 'HIGH' || task.priority === 'CRITICAL' || task.priority === 'URGENT') ? 'p-high' : (task.priority === 'MEDIUM' ? 'p-med' : 'p-low');
+        const safePriority = escapeHtml(task.priority || 'NORMAL');
+        const safeCategory = escapeHtml(task.category || 'General');
+        const safeDue = escapeHtml(task.dueAt || 'Due Today, 5:00 PM');
+        const safeTitle = escapeHtml(task.title || 'Workspace Task');
+        const safeDesc = escapeHtml(task.description || '');
+        const safeAssignee = escapeHtml(task.assigneeName || 'Jagadish K (Lead Design)');
+        const assigneeInitials = safeAssignee.slice(0, 2).toUpperCase();
+
+        const subtasks = task.subtasks || [
+          { label: 'Review scope and requirements', done: true },
+          { label: 'Execute implementation pass', done: true },
+          { label: 'Conduct code audit', done: false }
+        ];
+        const doneSub = subtasks.filter(s => s.done).length;
+        const totalSub = subtasks.length;
+        const subPercent = totalSub > 0 ? Math.round((doneSub / totalSub) * 100) : 0;
+
+        card.innerHTML = `
+          <div class="task-card-meta-top">
+            <div class="task-tags-group">
+              <span class="task-p-badge ${priorityClass}">${safePriority} Priority</span>
+              <span class="task-mod-badge">${safeCategory}</span>
+            </div>
+            <span class="task-due-date">📅 ${safeDue}</span>
           </div>
-          <span class="task-due-date">📅 ${safeDue}</span>
-        </div>
 
-        <h4 class="task-card-title">${safeTitle}</h4>
-        <p class="task-card-desc">${safeDesc}</p>
+          <h4 class="task-card-title">${safeTitle}</h4>
+          <p class="task-card-desc">${safeDesc}</p>
 
-        <div class="task-card-footer">
-          <div class="task-assignee-chip">
-            <div class="task-assignee-avatar">${assigneeInitials}</div>
-            <span class="task-assignee-name">${safeAssignee}</span>
-          </div>
-          <div class="task-subtasks-progress">
-            <span class="subtasks-count">${doneSub}/${totalSub} subtasks</span>
-            <div class="subtasks-bar-track">
-              <div class="subtasks-bar-fill" style="width: ${subPercent}%;"></div>
+          <div class="task-card-footer">
+            <div class="task-assignee-chip">
+              <div class="task-assignee-avatar">${assigneeInitials}</div>
+              <span class="task-assignee-name">${safeAssignee}</span>
+            </div>
+            <div class="task-subtasks-progress">
+              <span class="subtasks-count">${doneSub}/${totalSub} subtasks</span>
+              <div class="subtasks-bar-track">
+                <div class="subtasks-bar-fill" style="width: ${subPercent}%;"></div>
+              </div>
             </div>
           </div>
+        `;
+
+        card.addEventListener('click', () => {
+          document.querySelectorAll('.task-card-v3').forEach(c => c.classList.remove('active-selected'));
+          card.classList.add('active-selected');
+          state.taskDrawerClosedByUser = false;
+          state.activeSelectedTask = task;
+          openTaskDrawer(task);
+        });
+
+        container.appendChild(card);
+      });
+
+      // Auto-open selected or first task in drawer (unless closed by user)
+      if (!state.taskDrawerClosedByUser) {
+        if (state.activeSelectedTask) {
+          openTaskDrawer(state.activeSelectedTask);
+        } else if (filteredTasks.length > 0) {
+          openTaskDrawer(filteredTasks[0]);
+        } else if (completedTasks.length > 0) {
+          openTaskDrawer(completedTasks[0]);
+        }
+      }
+    }
+
+
+    // Status Filter - show/hide sections
+    var inProgressSection = document.getElementById('inProgressTasksSection');
+    var completedSection = document.getElementById('completedTasksSection');
+    if (statusFilter === 'ACTIVE') {
+      if (inProgressSection) inProgressSection.style.display = '';
+      if (completedSection) completedSection.style.display = 'none';
+    } else if (statusFilter === 'COMPLETED') {
+      if (inProgressSection) inProgressSection.style.display = 'none';
+      if (completedSection) completedSection.style.display = '';
+    } else {
+      if (inProgressSection) inProgressSection.style.display = '';
+      if (completedSection) completedSection.style.display = '';
+    }
+
+    // Render Completed Tasks Section
+    if (completedContainer) {
+      completedContainer.replaceChildren();
+      if (filteredCompleted.length === 0) {
+        const emptyNotice = document.createElement('div');
+        emptyNotice.style.cssText = 'padding: 16px; text-align: center; color: var(--text-muted); font-size: 12px; background: var(--card-bg); border: 1px dashed var(--card-border); border-radius: 8px;';
+        emptyNotice.textContent = completedTasks.length === 0 ? 'No completed tasks yet.' : 'No completed tasks match your filters.';
+        completedContainer.appendChild(emptyNotice);
+      } else {
+        filteredCompleted.forEach(ct => {
+          const row = document.createElement('div');
+          row.style.cssText = 'background:var(--card-bg); border:1px solid var(--card-border); border-radius:8px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; cursor:pointer;';
+          const cat = ct.category || 'Task';
+          const assignee = ct.assigneeName || 'Team Member';
+          const completedDate = ct.accomplishedAt ? new Date(ct.accomplishedAt).toLocaleDateString() : (ct.updatedAt ? new Date(ct.updatedAt).toLocaleDateString() : 'Recently');
+          row.innerHTML = `
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:18px; height:18px; background:#008a3e; color:#fff; border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800;">✓</div>
+              <div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="font-size:13px; font-weight:700; color:var(--text-white);">${escapeHtml(ct.title || 'Task')}</span>
+                  <span style="font-size:10px; background:var(--shell-bg); padding:2px 6px; border-radius:4px; color:var(--text-muted); font-weight:600;">${escapeHtml(cat)}</span>
+                </div>
+                <p style="font-size:11.5px; color:var(--text-muted); margin:2px 0 0 0;">Completed by ${escapeHtml(assignee)} &bull; ${escapeHtml(completedDate)}</p>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:11px; font-weight:700; color:#008a3e; background:rgba(0,138,62,0.1); padding:3px 10px; border-radius:6px; border:1px solid rgba(0,138,62,0.2);">&#10003; Done</span>
+              <button class="btn-row-reopen" data-tid="${ct.id}" style="font-size:11px;font-weight:600;color:#3b82f6;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);border-radius:5px;padding:3px 8px;cursor:pointer;">&#8634; Reopen</button>
+              <button class="btn-row-delete" data-tid="${ct.id}" style="font-size:11px;font-weight:600;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:5px;padding:3px 8px;cursor:pointer;">&#128465;</button>
+            </div>
+          `;
+          row.addEventListener('click', function(e) {
+            if (e.target.closest && (e.target.closest('.btn-row-reopen') || e.target.closest('.btn-row-delete'))) return;
+            state.activeSelectedTask = ct;
+            openTaskDrawer(ct);
+          });
+          const reopenBtn = row.querySelector('.btn-row-reopen');
+          if (reopenBtn) {
+            reopenBtn.addEventListener('click', async function(e) {
+              e.stopPropagation();
+              ct.status = 'IN_PROGRESS';
+              ct.updatedAt = Date.now();
+              delete ct.accomplishedAt;
+              await WorkspaceDB.save();
+              if (window.FirebaseService && FirebaseService.updateTask) {
+                FirebaseService.updateTask(ct.id, { status: 'IN_PROGRESS', updatedAt: Date.now() }).catch(function() {});
+              }
+              showQuickToast('Task "' + ct.title + '" moved back to In Progress.', 'info');
+              playNotificationChirp(true);
+              renderTasks();
+            });
+          }
+          const delBtn = row.querySelector('.btn-row-delete');
+          if (delBtn) {
+            delBtn.addEventListener('click', async function(e) {
+              e.stopPropagation();
+              await deleteTask(ct.id);
+            });
+          }
+          completedContainer.appendChild(row);
+        });
+      }
+    }
+  }
+
+  function renderKanbanBoard(allTasks) {
+    const listDeck = document.getElementById('tasksListDeck');
+    const boardDeck = document.getElementById('tasksBoardDeck');
+    if (listDeck) listDeck.classList.add('hidden');
+    if (boardDeck) boardDeck.classList.remove('hidden');
+
+    const todoCol = document.getElementById('kanbanCardsTodo');
+    const inProgCol = document.getElementById('kanbanCardsInProgress');
+    const compCol = document.getElementById('kanbanCardsCompleted');
+    if (!todoCol || !inProgCol || !compCol) return;
+
+    todoCol.replaceChildren();
+    inProgCol.replaceChildren();
+    compCol.replaceChildren();
+
+    const todoTasks = allTasks.filter(t => t.status === 'ASSIGNED' || t.status === 'TODO' || t.status === 'NEW');
+    const inProgTasks = allTasks.filter(t => t.status === 'REACHED' || t.status === 'IN_PROGRESS' || t.status === 'REVIEW');
+    const compTasks = allTasks.filter(t => t.status === 'COMPLETED' || t.status === 'ACCOMPLISHED');
+
+    safeSetText(document.getElementById('kanbanTodoCount'), String(todoTasks.length));
+    safeSetText(document.getElementById('kanbanInProgressCount'), String(inProgTasks.length));
+    safeSetText(document.getElementById('kanbanCompletedCount'), String(compTasks.length));
+
+    function createKanbanCard(task) {
+      const card = document.createElement('div');
+      card.className = 'kanban-card';
+      const safeTitle = escapeHtml(task.title || 'Sprint Task');
+      const safeCode = escapeHtml(task.code || 'TASK-4892');
+      const safeDue = escapeHtml(task.dueAt || 'Today');
+      const safeAssignee = escapeHtml(task.assigneeName || 'Team');
+      const priorityClass = (task.priority === 'HIGH' || task.priority === 'CRITICAL') ? 'p-high' : (task.priority === 'MEDIUM' ? 'p-med' : 'p-low');
+
+      card.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:10px; font-weight:800; color:var(--text-muted);">${safeCode}</span>
+          <span class="task-p-badge ${priorityClass}" style="font-size:9px; padding:1px 6px;">${escapeHtml(task.priority || 'NORMAL')}</span>
+        </div>
+        <div style="font-size:12.5px; font-weight:700; color:var(--text-white); margin-bottom:8px;">${safeTitle}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:var(--text-muted); border-top:1px solid var(--card-border); padding-top:6px;">
+          <span>👤 ${safeAssignee.slice(0, 16)}</span>
+          <span>⏰ ${safeDue}</span>
         </div>
       `;
 
       card.addEventListener('click', () => {
-        document.querySelectorAll('.task-card-v3').forEach(c => c.classList.remove('active-selected'));
-        card.classList.add('active-selected');
-        openTaskDrawer(task);
+        state.activeSelectedTask = task;
+        openEditTaskModal(task);
       });
-
-      container.appendChild(card);
-    });
-
-    // Auto-open first task in drawer
-    if (allTasks.length > 0) {
-      openTaskDrawer(allTasks[0]);
+      return card;
     }
 
-    // Render Completed Tasks Section (Image 4)
-    if (completedContainer) {
-      completedTasksList.forEach(ct => {
-        const row = document.createElement('div');
-        row.style.cssText = 'background:var(--card-bg); border:1px solid var(--card-border); border-radius:8px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;';
-        row.innerHTML = `
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div style="width:18px; height:18px; background:#008a3e; color:#fff; border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800;">✓</div>
-            <div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:13px; font-weight:700; color:var(--text-white);">${escapeHtml(ct.title)}</span>
-                <span style="font-size:10px; background:var(--shell-bg); padding:2px 6px; border-radius:4px; color:var(--text-muted); font-weight:600;">${escapeHtml(ct.category)}</span>
-              </div>
-              <p style="font-size:11.5px; color:var(--text-muted); margin:2px 0 0 0;">Verified by ${escapeHtml(ct.verifier)} &bull; ${escapeHtml(ct.time)}</p>
-            </div>
-          </div>
-          <span style="font-size:11px; font-weight:700; color:#008a3e; background:rgba(0,138,62,0.1); padding:3px 10px; border-radius:6px; border:1px solid rgba(0,138,62,0.2);">${escapeHtml(ct.badge)}</span>
-        `;
-        completedContainer.appendChild(row);
-      });
+    todoTasks.forEach(t => todoCol.appendChild(createKanbanCard(t)));
+    inProgTasks.forEach(t => inProgCol.appendChild(createKanbanCard(t)));
+    compTasks.forEach(t => compCol.appendChild(createKanbanCard(t)));
+
+    if (todoTasks.length === 0) {
+      todoCol.innerHTML = '<div style="padding:16px; text-align:center; font-size:11px; color:var(--text-muted);">No tasks in backlog</div>';
+    }
+    if (inProgTasks.length === 0) {
+      inProgCol.innerHTML = '<div style="padding:16px; text-align:center; font-size:11px; color:var(--text-muted);">No active tasks</div>';
+    }
+    if (compTasks.length === 0) {
+      compCol.innerHTML = '<div style="padding:16px; text-align:center; font-size:11px; color:var(--text-muted);">No completed tasks yet</div>';
     }
   }
 
   function ensureEditTaskModal() {
-    let modal = document.getElementById('editTaskModal');
-    if (modal) return modal;
+    const modal = document.getElementById('editTaskModal');
+    if (modal) {
+      // Only attach listeners once
+      if (!modal._listenersAttached) {
+        modal._listenersAttached = true;
+        document.getElementById('btnCloseEditTask')?.addEventListener('click', closeEditTaskModal);
+        document.getElementById('btnCancelEditTask')?.addEventListener('click', closeEditTaskModal);
+        document.getElementById('editTaskBackdrop')?.addEventListener('click', (e) => {
+          if (e.target.id === 'editTaskBackdrop') closeEditTaskModal();
+        });
+      }
+      return modal;
+    }
+    return null;
+  }
 
-    modal = document.createElement('div');
-    modal.id = 'editTaskModal';
-    modal.className = 'modal-overlay hidden';
-    modal.innerHTML = `
-      <div class="modal-card">
-        <div class="modal-header">
-          <div class="modal-title-row">
-            <span class="modal-title" id="editTaskModalTitle">EDIT TASK</span>
-            <span class="modal-badge">TEAM CLOUD</span>
-          </div>
-          <button type="button" class="btn-icon" id="btnCloseEditTaskModal" title="Close">✕</button>
-        </div>
-        <form id="formEditTask" class="modal-body">
-          <input type="hidden" id="editTaskId" value="" />
-          <div class="form-group">
-            <label for="editTaskTitle" class="form-label">Task Title</label>
-            <input type="text" id="editTaskTitle" class="form-input" placeholder="What needs to be done?" required />
-          </div>
-          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="form-group">
-              <label for="editTaskAssignee" class="form-label">Assignee</label>
-              <select id="editTaskAssignee" class="form-select">
-                <option value="ALL">Entire Team (ALL)</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="editTaskPriority" class="form-label">Priority</label>
-              <select id="editTaskPriority" class="form-select">
-                <option value="LOW">Low</option>
-                <option value="NORMAL" selected>Normal</option>
-                <option value="HIGH">High</option>
-                <option value="CRITICAL">Critical</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="form-group">
-              <label for="editTaskDate" class="form-label">Task Date (📅)</label>
-              <input type="date" id="editTaskDate" class="form-input" style="color-scheme: dark;" />
-            </div>
-            <div class="form-group">
-              <label for="editTaskDue" class="form-label">Target Completion (⏰)</label>
-              <input type="text" id="editTaskDue" class="form-input" placeholder="e.g. Today 5:00 PM" />
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="editTaskStatus" class="form-label">Status</label>
-            <select id="editTaskStatus" class="form-select">
-              <option value="ASSIGNED">Assigned</option>
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="REVIEW">Under Review</option>
-              <option value="COMPLETED">Completed</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="editTaskDesc" class="form-label">Description / Work Notes</label>
-            <textarea id="editTaskDesc" class="form-textarea" rows="3" placeholder="Provide extra context, links, or requirements..."></textarea>
-          </div>
-          <div class="modal-actions" style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 10px;">
-            <button type="button" class="btn btn-secondary" id="btnCancelEditTask">Cancel</button>
-            <button type="submit" class="btn btn-primary" id="btnSaveEditTask">💾 Save Changes</button>
-          </div>
-        </form>
-      </div>
-    `;
-    document.body.appendChild(modal);
+  function openCreateTaskModal() {
+    const modal = ensureEditTaskModal();
+    if (!modal) return;
 
-    document.getElementById('btnCloseEditTaskModal')?.addEventListener('click', closeEditTaskModal);
-    document.getElementById('btnCancelEditTask')?.addEventListener('click', closeEditTaskModal);
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeEditTaskModal();
+    safeSetText(document.getElementById('editTaskModalTitle'), 'CREATE NEW SPRINT TASK');
+
+    const idInput = document.getElementById('editTaskId');
+    const titleInput = document.getElementById('editTaskTitle');
+    const assigneeSelect = document.getElementById('editTaskAssignee');
+    const prioritySelect = document.getElementById('editTaskPriority');
+    const statusSelect = document.getElementById('editTaskStatus');
+    const dueInput = document.getElementById('editTaskDue');
+    const dateInput = document.getElementById('editTaskDate');
+    const descInput = document.getElementById('editTaskDesc');
+
+    if (idInput) idInput.value = 'new_' + Date.now();
+    if (titleInput) titleInput.value = '';
+
+    if (assigneeSelect) {
+      assigneeSelect.replaceChildren();
+      const optAll = document.createElement('option');
+      optAll.value = 'ALL';
+      optAll.dataset.name = 'Entire Team';
+      optAll.textContent = 'Entire Team (ALL)';
+      assigneeSelect.appendChild(optAll);
+
+      getUniqueMembersList().forEach(m => {
+        const opt = document.createElement('option');
+        const safeMId = m.id || m.uid || 'RD-EMP';
+        const safeMName = m.displayName || m.name || (m.email ? m.email.split('@')[0] : 'Team Member');
+        opt.value = safeMId;
+        opt.dataset.name = safeMName;
+        opt.dataset.email = m.email || '';
+        opt.dataset.uid = m.uid || '';
+        opt.textContent = `${safeMName} [${safeMId}]`;
+        assigneeSelect.appendChild(opt);
+      });
+      assigneeSelect.value = state.currentMemberId || 'ALL';
+    }
+
+    if (prioritySelect) prioritySelect.value = 'HIGH';
+    if (statusSelect) statusSelect.value = 'REACHED';
+    if (dueInput) dueInput.value = 'Today, 5:00 PM';
+    if (dateInput) dateInput.value = formatTimestampForDateInput(Date.now());
+    if (descInput) descInput.value = '';
+
+    // Enable all form fields (in case they were disabled)
+    [titleInput, assigneeSelect, prioritySelect, statusSelect, dueInput, dateInput, descInput].forEach(el => {
+      if (el) { el.disabled = false; el.readOnly = false; }
     });
 
-    return modal;
+    // Hide delete button in create mode
+    const deleteModalBtn = document.getElementById('btnDeleteTaskFromModal');
+    if (deleteModalBtn) deleteModalBtn.style.display = 'none';
+    // Reset save button text for create mode
+    const saveBtn = document.getElementById('btnSaveEditTask');
+    if (saveBtn) saveBtn.textContent = '💾 Create Task';
+
+    modal.classList.remove('hidden');
+    setTimeout(() => titleInput?.focus(), 60);
   }
 
   function openEditTaskModal(task, focusField = 'title') {
     if (!task) return;
+    state.activeSelectedTask = task;
     const modal = ensureEditTaskModal();
     if (!modal) return;
 
@@ -2005,12 +2196,20 @@
     }
 
     if (prioritySelect) prioritySelect.value = task.priority || 'NORMAL';
-    if (statusSelect) statusSelect.value = task.status || 'ASSIGNED';
+    if (statusSelect) {
+      statusSelect.value = task.status === 'COMPLETED' ? 'ACCOMPLISHED' : (task.status || 'REACHED');
+    }
     if (dueInput) dueInput.value = task.dueAt || '';
     if (dateInput) {
       dateInput.value = formatTimestampForDateInput(task.createdAt || task.taskDate || Date.now());
     }
     if (descInput) descInput.value = task.description || '';
+
+        // Show delete button in edit mode
+    const deleteModalBtnEdit = document.getElementById("btnDeleteTaskFromModal");
+    if (deleteModalBtnEdit) deleteModalBtnEdit.style.display = "flex";
+    const saveBtnEdit = document.getElementById("btnSaveEditTask");
+    if (saveBtnEdit) saveBtnEdit.textContent = "💾 Save Task Changes";
 
     modal.classList.remove('hidden');
     setTimeout(() => {
@@ -2020,6 +2219,8 @@
       } else if (focusField === 'due' && dueInput) {
         dueInput.focus();
         dueInput.select();
+      } else if (focusField === 'assignee' && assigneeSelect) {
+        assigneeSelect.focus();
       } else {
         titleInput?.focus();
       }
@@ -3070,14 +3271,35 @@
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       state.voiceAudioChunks = [];
-      state.voiceRecorder = new MediaRecorder(stream);
+
+      let mimeType = 'audio/webm';
+      if (typeof MediaRecorder.isTypeSupported === 'function') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          mimeType = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+          mimeType = 'audio/ogg;codecs=opus';
+        }
+      }
+
+      try {
+        state.voiceRecorder = new MediaRecorder(stream, {
+          mimeType,
+          audioBitsPerSecond: 24000
+        });
+      } catch (_) {
+        state.voiceRecorder = new MediaRecorder(stream);
+      }
+
       state.voiceRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) state.voiceAudioChunks.push(e.data);
       };
       state.voiceRecorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         if (state.voiceShouldSend) {
-          const audioBlob = new Blob(state.voiceAudioChunks, { type: 'audio/webm' });
+          const audioBlob = new Blob(state.voiceAudioChunks, { type: mimeType });
+          if (audioBlob.size > 850 * 1024) {
+            showQuickToast('Voice note exceeded maximum direct sync size limit.', 'warning');
+          }
           const reader = new FileReader();
           reader.onloadend = async () => {
             const dataUrl = reader.result;
@@ -3906,9 +4128,9 @@
     if (filter === 'images') {
       allFiles = allFiles.filter(f => f.type?.startsWith('image/') || f.isImage);
     } else if (filter === 'documents') {
-      allFiles = allFiles.filter(f => f.name?.endsWith('.pdf') || f.name?.endsWith('.doc') || f.name?.endsWith('.txt'));
+      allFiles = allFiles.filter(f => /\.(pdf|doc|docx|xls|xlsx|csv|ppt|pptx|txt|rtf|odt|ods|odp|zip|rar|tar|gz|7z|md)$/i.test(f.name || ''));
     } else if (filter === 'code') {
-      allFiles = allFiles.filter(f => f.name?.endsWith('.js') || f.name?.endsWith('.json') || f.name?.endsWith('.html') || f.name?.endsWith('.css') || f.name?.endsWith('.ts'));
+      allFiles = allFiles.filter(f => /\.(js|ts|jsx|tsx|json|html|css|scss|py|java|c|cpp|cs|go|rs|php|sh|bat|ps1|yml|yaml|xml|sql)$/i.test(f.name || ''));
     }
 
     if (allFiles.length === 0) {
@@ -4240,6 +4462,50 @@
       const remH = Math.floor(remSeconds / 3600);
       const remM = Math.floor((remSeconds % 3600) / 60);
       shiftQuotaRemainingText.textContent = `${remH}h ${remM}m remaining`;
+    }
+
+    // 4. Dashboard Shift Timings & Dynamic Action Buttons Sync
+    const dashShiftStartTime = document.getElementById('dashShiftStartTime');
+    if (dashShiftStartTime) {
+      if (state.personalShift.status === 'DUTY_ON') {
+        const startStr = state.personalShift.sessionStartTs
+          ? new Date(state.personalShift.sessionStartTs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : 'Active';
+        dashShiftStartTime.textContent = `${startStr} IST`;
+      } else if (state.personalShift.status === 'DUTY_BREAK') {
+        dashShiftStartTime.textContent = 'On Break';
+      } else {
+        dashShiftStartTime.textContent = '--:-- (Off Duty)';
+      }
+    }
+
+    const dashShiftExpectedEnd = document.getElementById('dashShiftExpectedEnd');
+    if (dashShiftExpectedEnd) {
+      if (state.personalShift.status === 'DUTY_ON' || state.personalShift.status === 'DUTY_BREAK') {
+        const remSeconds = Math.max(0, (8 * 3600) - personalSec);
+        const remH = Math.floor(remSeconds / 3600);
+        const remM = Math.floor((remSeconds % 3600) / 60);
+        const endTs = Date.now() + (remSeconds * 1000);
+        const endStr = new Date(endTs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        dashShiftExpectedEnd.textContent = `${endStr} (${String(remH).padStart(2, '0')}h ${String(remM).padStart(2, '0')}m left)`;
+      } else {
+        dashShiftExpectedEnd.textContent = '--:-- (Standby)';
+      }
+    }
+
+    const dashBtnBreak = document.getElementById('dashBtnBreak');
+    if (dashBtnBreak) {
+      dashBtnBreak.disabled = state.personalShift.status === 'DUTY_OFF';
+      if (state.personalShift.status === 'DUTY_BREAK') {
+        dashBtnBreak.innerHTML = '<span>&#x25B6; Resume Work</span>';
+      } else {
+        dashBtnBreak.innerHTML = '<span>&#x2615; Take Break</span>';
+      }
+    }
+
+    const dashBtnClockOut = document.getElementById('dashBtnClockOut');
+    if (dashBtnClockOut) {
+      dashBtnClockOut.disabled = state.personalShift.status === 'DUTY_OFF';
     }
 
     if (badge) {
@@ -4876,7 +5142,7 @@
     }
 
     if (displayPunches.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">No shift punches recorded yet.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No shift punches recorded yet.</td></tr>`;
       return;
     }
 
@@ -5319,7 +5585,7 @@
     else if (normalized === 'dashboard') renderDashboard();
     else if (normalized === 'wallpapers') renderWallpaperGallery();
     else if (normalized === 'workers') renderWorkers();
-    else if (normalized === 'timesheets') { reconcilePersonalShiftWithPunches(); renderPunchLogs(); renderTeamHoursDashboard(); }
+    else if (normalized === 'timesheets') { reconcilePersonalShiftWithPunches(); renderPunchLogs(); renderTeamHoursDashboard(); updateAttendanceMetricsUI(); }
     else if (normalized === 'tasks') renderTasks();
     else if (normalized === 'chat') {
       renderChatChannelsAndDMs();
@@ -5330,6 +5596,8 @@
       updateLiveFleetHours();
     }
     else if (normalized === 'database') WorkspaceDB.updateMetricsUI();
+    updateBootProgress(95, "Mounting unified dual-theme engine...", "[THEME] Verifying palette tokens...");
+    setTimeout(dismissBootScreen, 200);
   }
 
   // Live real-time ticker for presence & fleet telemetry hours + team working hours
@@ -5348,14 +5616,22 @@
     state.commandCenterOpen = true;
     document.body.classList.add('mode-command');
     document.body.classList.remove('mode-wallpaper');
-    document.getElementById('commandCenterDrawer')?.classList.remove('collapsed');
+    const drawer = document.getElementById('commandCenterDrawer');
+    if (drawer) {
+      drawer.classList.remove('collapsed');
+      drawer.style.display = 'flex';
+    }
   }
 
   function closeCommandCenter() {
     state.commandCenterOpen = false;
     document.body.classList.remove('mode-command');
     document.body.classList.add('mode-wallpaper');
-    document.getElementById('commandCenterDrawer')?.classList.add('collapsed');
+    const drawer = document.getElementById('commandCenterDrawer');
+    if (drawer) {
+      drawer.classList.add('collapsed');
+      drawer.style.display = 'none';
+    }
   }
 
   function toggleCommandCenter() {
@@ -5779,16 +6055,11 @@
     document.getElementById('formEditTask')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const taskId = document.getElementById('editTaskId')?.value;
-      if (!taskId) return;
-
-      const task = (WorkspaceDB.data.tasks || []).find(t => t.id === taskId);
-      if (!task) {
-        showQuickToast('Task not found', 'error');
+      const title = document.getElementById('editTaskTitle')?.value.trim();
+      if (!title) {
+        showQuickToast('Please provide a task title', 'error');
         return;
       }
-
-      const title = document.getElementById('editTaskTitle')?.value.trim();
-      if (!title) return;
 
       const selectEl = document.getElementById('editTaskAssignee');
       const rawVal = selectEl?.value || 'ALL';
@@ -5814,65 +6085,114 @@
       }
 
       const priority = document.getElementById('editTaskPriority')?.value || 'NORMAL';
-      const status = document.getElementById('editTaskStatus')?.value || 'ASSIGNED';
+      const rawStatus = document.getElementById('editTaskStatus')?.value || 'REACHED';
+      const status = rawStatus === 'ACCOMPLISHED' ? 'COMPLETED' : rawStatus;
       const dueAt = document.getElementById('editTaskDue')?.value.trim() || 'Today 5:00 PM';
       const rawDate = document.getElementById('editTaskDate')?.value;
       const description = document.getElementById('editTaskDesc')?.value.trim();
-
-      let newTimestamp = task.createdAt || Date.now();
-      if (rawDate) {
-        newTimestamp = parseDateInputToTimestamp(rawDate, task.createdAt);
-      }
-
       const editorName = WorkspaceDB.data.members[state.currentMemberId]?.name || state.currentUser?.displayName || 'JAGADISH K';
 
-      // Update local task object
-      task.title = title;
-      task.description = description;
-      task.assigneeId = assigneeId;
-      task.assigneeName = assigneeName;
-      task.assigneeEmail = assigneeEmail;
-      task.assigneeUid = assigneeUid;
-      task.priority = priority;
-      task.status = status;
-      task.dueAt = dueAt;
-      task.createdAt = newTimestamp;
-      task.taskDate = rawDate || formatTimestampForDateInput(newTimestamp);
-      task.updatedAt = Date.now();
+      let task = (WorkspaceDB.data.tasks || []).find(t => t.id === taskId);
 
-      if (!task.activity) task.activity = [];
-      task.activity.push({
-        authorName: editorName,
-        text: `Updated task details: ${title} (${new Date(newTimestamp).toLocaleDateString()}, ${status})`,
-        timestamp: Date.now()
-      });
-
-      await WorkspaceDB.save();
-
-      // Multi-device Cloud Firestore sync
-      if (window.FirebaseService && FirebaseService.updateTask) {
-        FirebaseService.updateTask(task.id, {
+      if (!task || !taskId || taskId.startsWith('new_')) {
+        // Create brand new task
+        const newTimestamp = rawDate ? parseDateInputToTimestamp(rawDate) : Date.now();
+        const newTask = {
+          id: 'task_' + Date.now(),
+          code: 'TASK-' + (Math.floor(1000 + Math.random() * 9000)),
           title,
-          description,
+          category: 'CORE ARCHITECTURE',
+          pipeline: 'feat/sprint-14',
+          priority,
+          status,
+          dueAt,
           assigneeId,
           assigneeName,
           assigneeEmail,
           assigneeUid,
-          priority,
-          status,
-          dueAt,
+          description,
+          scope: description || 'Execute sprint workstation objectives aligned with Reddot engineering standards.',
+          subtasks: [
+            { label: 'Initial specification & architectural verification', done: false },
+            { label: 'Implementation pass & test coverage', done: false },
+            { label: 'Security attestation & code review', done: false }
+          ],
           createdAt: newTimestamp,
-          taskDate: task.taskDate,
-          updatedAt: Date.now()
-        }).catch(err => {
-          console.warn('[FIREBASE] Cloud task update note:', err.message);
-        });
-      }
+          taskDate: rawDate || formatTimestampForDateInput(newTimestamp),
+          updatedAt: Date.now(),
+          activity: [{
+            authorName: editorName,
+            text: `Created new sprint task: ${title}`,
+            timestamp: Date.now()
+          }]
+        };
 
-      closeEditTaskModal();
-      renderTasks();
-      playNotificationChirp(true);
-      showQuickToast(`Task "${title}" updated successfully!`, 'success');
+        if (!WorkspaceDB.data.tasks) WorkspaceDB.data.tasks = [];
+        WorkspaceDB.data.tasks.unshift(newTask);
+        state.activeSelectedTask = newTask;
+
+        await WorkspaceDB.save();
+
+        if (window.FirebaseService?.createTask) {
+          FirebaseService.createTask(newTask).catch(() => {});
+        }
+
+        closeEditTaskModal();
+        renderTasks();
+        playNotificationChirp(true);
+        showQuickToast(`New sprint task "${title}" created successfully!`, 'success');
+      } else {
+        // Update existing task
+        let newTimestamp = task.createdAt || Date.now();
+        if (rawDate) {
+          newTimestamp = parseDateInputToTimestamp(rawDate, task.createdAt);
+        }
+
+        task.title = title;
+        task.description = description;
+        task.assigneeId = assigneeId;
+        task.assigneeName = assigneeName;
+        task.assigneeEmail = assigneeEmail;
+        task.assigneeUid = assigneeUid;
+        task.priority = priority;
+        task.status = status;
+        task.dueAt = dueAt;
+        task.createdAt = newTimestamp;
+        task.taskDate = rawDate || formatTimestampForDateInput(newTimestamp);
+        task.updatedAt = Date.now();
+
+        if (!task.activity) task.activity = [];
+        task.activity.push({
+          authorName: editorName,
+          text: `Updated task details: ${title} (${status})`,
+          timestamp: Date.now()
+        });
+
+        await WorkspaceDB.save();
+
+        if (window.FirebaseService?.updateTask) {
+          FirebaseService.updateTask(task.id, {
+            title,
+            description,
+            assigneeId,
+            assigneeName,
+            assigneeEmail,
+            assigneeUid,
+            priority,
+            status,
+            dueAt,
+            createdAt: newTimestamp,
+            taskDate: task.taskDate,
+            updatedAt: Date.now()
+          }).catch(() => {});
+        }
+
+        closeEditTaskModal();
+        state.activeSelectedTask = task;
+        renderTasks();
+        playNotificationChirp(true);
+        showQuickToast(`Task "${title}" updated successfully!`, 'success');
+      }
     });
 
     // --- TEAMS CHANNEL HUB TABS ---
@@ -6002,24 +6322,95 @@
       document.getElementById('hiddenImageInput')?.click();
     });
 
-    function handleFilesSelected(files) {
-      if (!files || files.length === 0) return;
-      Array.from(files).forEach(file => {
+    function compressImageFile(file, maxWidth = 1280, maxHeight = 1280, quality = 0.75) {
+      return new Promise((resolve) => {
+        if (!file.type.startsWith('image/') || file.type === 'image/gif' || file.type === 'image/svg+xml') {
+          const reader = new FileReader();
+          reader.onload = () => resolve({ dataUrl: reader.result, size: file.size, name: file.name });
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+          return;
+        }
         const reader = new FileReader();
-        reader.onload = () => {
-          const item = {
-            id: 'att_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            isImage: file.type.startsWith('image/'),
-            dataUrl: reader.result
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            let width = img.naturalWidth || img.width;
+            let height = img.naturalHeight || img.height;
+            if (width > maxWidth || height > maxHeight) {
+              if (width / height > maxWidth / maxHeight) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              } else {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, width);
+            canvas.height = Math.max(1, height);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            let format = 'image/webp';
+            let dataUrl = canvas.toDataURL(format, quality);
+            if (!dataUrl.startsWith('data:image/webp')) {
+              format = 'image/jpeg';
+              dataUrl = canvas.toDataURL(format, quality);
+            }
+            const head = dataUrl.indexOf(',') + 1;
+            const approxSize = Math.round((dataUrl.length - head) * 3 / 4);
+            const ext = format === 'image/webp' ? '.webp' : '.jpg';
+            const baseName = file.name.replace(/\.[^/.]+$/, "");
+            resolve({
+              dataUrl,
+              size: approxSize,
+              name: baseName.endsWith(ext) ? baseName : baseName + ext
+            });
           };
-          state.pendingAttachments.push(item);
-          renderPendingAttachments();
+          img.onerror = () => resolve(null);
+          img.src = e.target.result;
         };
+        reader.onerror = () => resolve(null);
         reader.readAsDataURL(file);
       });
+    }
+
+    async function handleFilesSelected(files) {
+      if (!files || files.length === 0) return;
+      for (const file of Array.from(files)) {
+        if (file.type.startsWith('image/')) {
+          const res = await compressImageFile(file);
+          if (!res || !res.dataUrl) continue;
+          state.pendingAttachments.push({
+            id: 'att_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            name: res.name || file.name,
+            size: res.size || file.size,
+            type: 'image/webp',
+            isImage: true,
+            dataUrl: res.dataUrl
+          });
+          renderPendingAttachments();
+        } else {
+          if (file.size > 700 * 1024) {
+            showQuickToast(`File "${file.name}" is ${formatBytes(file.size)}. Direct sync limit is 700KB.`, 'warning');
+            continue;
+          }
+          const reader = new FileReader();
+          reader.onload = () => {
+            state.pendingAttachments.push({
+              id: 'att_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              isImage: false,
+              dataUrl: reader.result
+            });
+            renderPendingAttachments();
+          };
+          reader.readAsDataURL(file);
+        }
+      }
     }
 
     document.getElementById('hiddenFileInput')?.addEventListener('change', (e) => {
@@ -6490,7 +6881,7 @@
       }
     });
 
-    showOutgoingCallModal = function(targetMember, callData, roomUrl) {
+    showOutgoingCallModal = function(targetMember, callData, roomUrl, callType = 'video') {
       const modal = document.getElementById('outgoingCallModal');
       if (!modal) return;
 
@@ -6501,9 +6892,10 @@
       const targetName = targetMember ? (targetMember.name || targetMember.displayName || 'Colleague') : 'Teammate';
       const targetPhoto = targetMember ? (targetMember.photoURL || targetMember.photoUrl || targetMember.idCardPhoto || '') : '';
       const avatarText = targetName.slice(0, 2).toUpperCase();
+      const callTypeLabel = callType.toUpperCase();
 
       if (nameEl) nameEl.textContent = `Calling ${targetName}...`;
-      if (subtitleEl) subtitleEl.textContent = `📞 RINGING • WAITING FOR COLLEAGUE TO ANSWER`;
+      if (subtitleEl) subtitleEl.textContent = `📞 RINGING • WAITING FOR COLLEAGUE TO ANSWER (${callTypeLabel} CALL)`;
 
       if (avatarEl) {
         if (targetPhoto) {
@@ -6560,7 +6952,7 @@
         setTimeout(hideOutgoingCallModal, 2200);
       }, 45000);
 
-      state.activeOutgoingCall = { targetMember, callData, roomUrl, unsubStatus, timeoutId };
+      state.activeOutgoingCall = { targetMember, callData, roomUrl, unsubStatus, timeoutId, callType };
     };
 
     hideOutgoingCallModal = function() {
@@ -6574,34 +6966,64 @@
       }
     };
 
-    document.getElementById('btnCancelOutgoingCall')?.addEventListener('click', () => {
-      if (state.activeOutgoingCall?.callData?.callId && window.FirebaseService?.cancelCall) {
-        FirebaseService.cancelCall(state.activeOutgoingCall.callData.callId);
+    function updateIncomingCallControlsUI() {
+      const micBtn = document.getElementById('btnToggleIncomingCallMic');
+      const camBtn = document.getElementById('btnToggleIncomingCallCam');
+      if (micBtn) {
+        if (state.incomingCallMicMuted) {
+          micBtn.classList.add('muted');
+          const icon = micBtn.querySelector('.call-ctrl-icon');
+          if (icon) icon.textContent = '🔇';
+          const txt = micBtn.querySelector('span:last-child');
+          if (txt) txt.textContent = 'Mic Off';
+        } else {
+          micBtn.classList.remove('muted');
+          const icon = micBtn.querySelector('.call-ctrl-icon');
+          if (icon) icon.textContent = '🎤';
+          const txt = micBtn.querySelector('span:last-child');
+          if (txt) txt.textContent = 'Mic On';
+        }
       }
-      hideOutgoingCallModal();
-    });
-
-    document.getElementById('outgoingCallBackdrop')?.addEventListener('click', () => {
-      if (state.activeOutgoingCall?.callData?.callId && window.FirebaseService?.cancelCall) {
-        FirebaseService.cancelCall(state.activeOutgoingCall.callData.callId);
+      if (camBtn) {
+        if (state.incomingCallCamDisabled) {
+          camBtn.classList.add('muted');
+          const icon = camBtn.querySelector('.call-ctrl-icon');
+          if (icon) icon.textContent = '🚫';
+          const txt = camBtn.querySelector('span:last-child');
+          if (txt) txt.textContent = 'Cam Off';
+        } else {
+          camBtn.classList.remove('muted');
+          const icon = camBtn.querySelector('.call-ctrl-icon');
+          if (icon) icon.textContent = '📹';
+          const txt = camBtn.querySelector('span:last-child');
+          if (txt) txt.textContent = 'Cam On';
+        }
       }
-      hideOutgoingCallModal();
-    });
+    }
 
     showIncomingCallModal = function(callData) {
       const modal = document.getElementById('incomingCallModal');
       if (!modal) return;
 
       const nameEl = document.getElementById('incomingCallCallerName');
+      const deptEl = document.getElementById('incomingCallDept');
+      const empIdEl = document.getElementById('incomingCallEmpId');
+      const typeBadgeEl = document.getElementById('incomingCallTypeBadge');
       const avatarEl = document.getElementById('incomingCallAvatar');
       const subtitleEl = document.getElementById('incomingCallSubtitle');
 
       const callerName = callData.callerName || 'Teammate';
       const callerPhoto = callData.callerPhoto || '';
+      const callerDept = callData.callerDept || 'Hardware Architecture';
+      const callerEmpId = callData.callerEmpId || '';
+      const callType = (callData.callType || 'video').toUpperCase();
       const avatarText = callerName.slice(0, 2).toUpperCase();
 
-      if (nameEl) nameEl.textContent = `${callerName} is calling...`;
-      if (subtitleEl) subtitleEl.textContent = `⚡ INCOMING REALTIME ${String(callData.callType || 'VIDEO').toUpperCase()} CALL`;
+      if (nameEl) nameEl.textContent = callerName;
+      if (deptEl) deptEl.textContent = callerDept;
+      if (empIdEl) empIdEl.textContent = callerEmpId ? `ID: ${callerEmpId}` : '';
+      if (typeBadgeEl) typeBadgeEl.textContent = callType === 'AUDIO' ? '📞 Audio Call' : '📹 Video Call';
+      if (subtitleEl) subtitleEl.textContent = `Incoming ${callType} Call...`;
 
       if (avatarEl) {
         if (callerPhoto) {
@@ -6611,13 +7033,25 @@
         }
       }
 
+      state.activeIncomingCall = callData;
+      state.incomingCallMicMuted = false;
+      state.incomingCallCamDisabled = (callType === 'AUDIO');
+      updateIncomingCallControlsUI();
+
+      modal.style.display = 'flex';
       modal.classList.remove('hidden');
       startIncomingCallRingtone(); // Play continuous dual-tone phone ring!
 
-      if (window.electronAPI && window.electronAPI.showNotification) {
+      if (window.electronAPI && window.electronAPI.incomingCallAlert) {
+        window.electronAPI.incomingCallAlert({
+          callerName,
+          callType,
+          callerDept
+        });
+      } else if (window.electronAPI && window.electronAPI.showNotification) {
         window.electronAPI.showNotification({
           title: `📞 Incoming Call from ${callerName}`,
-          body: `Click to join secure video meeting session.`,
+          body: `Click to join secure ${callType} call session.`,
           targetTab: 'chat'
         });
       }
@@ -6626,7 +7060,10 @@
     hideIncomingCallModal = function() {
       stopIncomingCallRingtone(); // Stop ringing immediately
       const modal = document.getElementById('incomingCallModal');
-      if (modal) modal.classList.add('hidden');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+      }
       state.activeIncomingCall = null;
     };
 
@@ -6677,23 +7114,26 @@
       activeMeetingTargetMember = null;
     };
 
-    startDirectCallWithMember = async function(member) {
+    startDirectCallWithMember = async function(member, callType = 'video') {
       if (!member) return;
       const targetName = member.name || member.displayName || 'Colleague';
       const cleanRoomId = `reddot-call-${(member.id || targetName).toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now().toString(36)}`;
-      const roomUrl = `https://meet.jit.si/${cleanRoomId}`;
+      let roomUrl = `https://meet.jit.si/${cleanRoomId}`;
+      if (callType === 'audio') {
+        roomUrl += '#config.startWithVideoMuted=true';
+      }
 
       let callData = null;
       if (window.FirebaseService?.sendCallInvite) {
         try {
-          callData = await FirebaseService.sendCallInvite(member, roomUrl, 'video');
+          callData = await FirebaseService.sendCallInvite(member, roomUrl, callType);
         } catch (e) {
           console.warn('[CALL] Send invite error:', e);
         }
       }
 
-      showOutgoingCallModal(member, callData, roomUrl);
-    }
+      showOutgoingCallModal(member, callData, roomUrl, callType);
+    };
 
     document.getElementById('btnCloseMeetingModal')?.addEventListener('click', closeMeetingModal);
     document.getElementById('meetingModalBackdrop')?.addEventListener('click', closeMeetingModal);
@@ -7274,15 +7714,31 @@
     });
 
     // Incoming Call Modal Handlers
+    document.getElementById('btnToggleIncomingCallMic')?.addEventListener('click', () => {
+      state.incomingCallMicMuted = !state.incomingCallMicMuted;
+      updateIncomingCallControlsUI();
+    });
+
+    document.getElementById('btnToggleIncomingCallCam')?.addEventListener('click', () => {
+      state.incomingCallCamDisabled = !state.incomingCallCamDisabled;
+      updateIncomingCallControlsUI();
+    });
+
     document.getElementById('btnAcceptIncomingCall')?.addEventListener('click', async () => {
       stopIncomingCallRingtone();
-      if (state.activeIncomingCall) {
-        const call = state.activeIncomingCall;
+      const call = state.activeIncomingCall;
+      hideIncomingCallModal();
+      if (call) {
         if (window.FirebaseService?.respondToCall) {
           await FirebaseService.respondToCall(call.callId, 'ACCEPTED');
         }
-        hideIncomingCallModal();
-        const roomUrl = call.roomUrl || 'https://meet.jit.si/reddot-team-room';
+        let roomUrl = call.roomUrl || 'https://meet.jit.si/reddot-team-room';
+        const params = [];
+        if (state.incomingCallMicMuted) params.push('config.startWithAudioMuted=true');
+        if (state.incomingCallCamDisabled) params.push('config.startWithVideoMuted=true');
+        if (params.length > 0) {
+          roomUrl += (roomUrl.includes('#') ? '&' : '#') + params.join('&');
+        }
         if (window.electronAPI && window.electronAPI.openExternal) {
           await window.electronAPI.openExternal(roomUrl);
         } else {
@@ -7293,12 +7749,12 @@
 
     document.getElementById('btnDeclineIncomingCall')?.addEventListener('click', async () => {
       stopIncomingCallRingtone();
-      if (state.activeIncomingCall) {
-        const call = state.activeIncomingCall;
+      const call = state.activeIncomingCall;
+      hideIncomingCallModal();
+      if (call) {
         if (window.FirebaseService?.respondToCall) {
           await FirebaseService.respondToCall(call.callId, 'DECLINED');
         }
-        hideIncomingCallModal();
       }
     });
 
@@ -7338,13 +7794,15 @@
           activeEl.tagName === 'TEXTAREA' ||
           activeEl.tagName === 'SELECT' ||
           activeEl.isContentEditable ||
-          activeEl.getAttribute('contenteditable') === 'true'
+          (typeof activeEl.getAttribute === 'function' && activeEl.getAttribute('contenteditable') === 'true')
         )) ||
-        e.target.tagName === 'INPUT' ||
-        e.target.tagName === 'TEXTAREA' ||
-        e.target.tagName === 'SELECT' ||
-        e.target.isContentEditable ||
-        e.target.getAttribute('contenteditable') === 'true'
+        (e.target && (
+          e.target.tagName === 'INPUT' ||
+          e.target.tagName === 'TEXTAREA' ||
+          e.target.tagName === 'SELECT' ||
+          e.target.isContentEditable ||
+          (typeof e.target.getAttribute === 'function' && e.target.getAttribute('contenteditable') === 'true')
+        ))
       );
 
       // If user is currently typing in ANY input, textarea, or select: do NOT intercept any keys!
@@ -7483,7 +7941,6 @@
     };
 
     document.getElementById('railBtnMeetNow')?.addEventListener('click', triggerInstantMeeting);
-    document.getElementById('btnStartMeeting')?.addEventListener('click', triggerInstantMeeting);
     document.getElementById('btnQuickMeetCalendar')?.addEventListener('click', triggerInstantMeeting);
 
     // 3. Schedule Meeting Buttons & Modal Handlers
@@ -7573,7 +8030,52 @@
       });
     });
 
-    // 9. Central Files Search Bar
+    // 9. Workers / Team Directory Filters & Search
+    document.getElementById('searchWorkerInput')?.addEventListener('input', (e) => {
+      state.workerSearchQuery = e.target.value.toLowerCase().trim();
+      renderWorkers();
+    });
+
+    document.querySelectorAll('#workersDeptPills .dept-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('#workersDeptPills .dept-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        state.workerDeptFilter = pill.getAttribute('data-dept') || 'ALL';
+        renderWorkers();
+      });
+    });
+
+    document.getElementById('workersStatusSelect')?.addEventListener('change', (e) => {
+      state.workerStatusFilter = e.target.value || 'ALL';
+      renderWorkers();
+    });
+
+    // 10. Direct Audio & Video Call Buttons in Chat Header
+    document.getElementById('btnChatAudioCall')?.addEventListener('click', async () => {
+      if (state.activeChannelId?.startsWith('dm_')) {
+        const memberId = state.activeChannelId.replace('dm_', '');
+        const member = getUniqueMembersList().find(m => m.id === memberId || m.uid === memberId);
+        if (member) {
+          await startDirectCallWithMember(member, 'audio');
+          return;
+        }
+      }
+      openMeetingModal(null);
+    });
+
+    document.getElementById('btnChatVideoCall')?.addEventListener('click', async () => {
+      if (state.activeChannelId?.startsWith('dm_')) {
+        const memberId = state.activeChannelId.replace('dm_', '');
+        const member = getUniqueMembersList().find(m => m.id === memberId || m.uid === memberId);
+        if (member) {
+          await startDirectCallWithMember(member, 'video');
+          return;
+        }
+      }
+      openMeetingModal(null);
+    });
+
+    // 11. Central Files Search Bar
     document.getElementById('searchFilesInput')?.addEventListener('input', (e) => {
       const q = e.target.value.toLowerCase().trim();
       document.querySelectorAll('#centralFilesGrid .central-file-card').forEach(card => {
@@ -7602,65 +8104,185 @@
   // Dashboard, Slide-Out Task Drawer, Engineering Directory, Dual Themes, Omnibox
   // ==========================================================================
 
-  const DEFAULT_PRIORITY_OBJECTIVES = [
-    {
-      id: 'obj-1',
-      tag: 'FIRMWARE',
-      tagClass: 'tag-firmware',
-      due: '02:30 PM (Critical)',
-      isCritical: true,
-      title: 'Review Secure Enclave HSM Microcode Signing',
-      sub: 'Ensure dual-party authorization handoff with the embedded systems engineering squad.',
-      code: 'TASK-4891',
-      pipeline: 'feat/hsm-attest',
-      engineer: 'Jagadish K (Founder)',
-      timeline: 'Due Today, 14:30',
-      scope: 'Review and verify cryptographic signing keys with embedded enclave firmware team.',
-      subtasks: [
-        { label: 'Audit enclave key handshake', done: true },
-        { label: 'Verify RSA-4096 signature bounds', done: true },
-        { label: 'Validate zero-knowledge proofs', done: false }
-      ]
-    },
-    {
-      id: 'obj-2',
-      tag: 'UI ARCHITECTURE',
-      tagClass: 'tag-ui',
-      due: '04:00 PM',
-      isCritical: false,
-      title: 'Audit Carbon Design Token Sync for Mobile Workspace',
-      sub: 'Validate contrast ratios across light and dark variant shifts in production bundle.',
-      code: 'TASK-4892',
-      pipeline: 'feat/carbon-v4',
-      engineer: 'Jagadish K (Founder)',
-      timeline: 'Due Today, 17:00',
-      scope: 'Refine the high-density workstation UI. Replace bulky UI matrices with clean micro-cards, zero decorative clutter, and absolute typographic rhythm aligned strictly with IBM Carbon principles.',
-      subtasks: [
-        { label: 'Audit color tokens against contrast threshold', done: true },
-        { label: 'Draft high-contrast typography hierarchy', done: true },
-        { label: 'Implement task card hover micro-animations', done: true },
-        { label: 'Conduct keyboard navigation and screen-reader pass', done: false }
-      ]
-    },
-    {
-      id: 'obj-3',
-      tag: 'CLOUD SYNC',
-      tagClass: 'tag-cloud',
-      due: '06:15 PM',
-      isCritical: false,
-      title: 'Zero-Egress Distributed Bucket Replication Check',
-      sub: 'Monitor cross-region latency metrics between US-East and EU-Central hubs.',
-      code: 'TASK-4893',
-      pipeline: 'infra/bucket-sync',
-      engineer: 'Elena Rostova',
-      timeline: 'Due Today, 18:15',
-      scope: 'Verify replication stream benchmarks between US-East primary and EU-Central failover bucket nodes.',
-      subtasks: [
-        { label: 'Check replica heartbeat latency', done: true },
-        { label: 'Verify checksum mismatch alerts', done: false }
-      ]
+  function formatRelativeTime(ts) {
+    if (!ts) return 'Recently';
+    const diffSec = Math.max(0, Math.floor((Date.now() - Number(ts)) / 1000));
+    if (diffSec < 60) return `${diffSec}s ago`;
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  }
+
+  function updateAttendanceMetricsUI() {
+    const cur = getCurrentResolvedMember();
+    const curId = cur?.id;
+    const curUid = state.currentUser?.uid || cur?.uid;
+    const curEmail = (state.currentUser?.email || cur?.email || '').toLowerCase().trim();
+    const curName = (cur?.name || cur?.displayName || '').toLowerCase().trim();
+    const isFounder = (curEmail === 'jagadish2k2006@gmail.com') || (state.userRole === 'OWNER') || (curId === 'RD-FOUNDER-001');
+
+    const rawPunches = (WorkspaceDB.data.punchLogs || []).map(normalizePunch).filter(Boolean);
+    const empPunches = rawPunches.filter(p => {
+      if (!p) return false;
+      const pWorkerId = p.workerId;
+      const pEmail = (p.email || '').toLowerCase().trim();
+      const pName = (p.name || '').toLowerCase().trim();
+
+      if (curId && pWorkerId === curId) return true;
+      if (curUid && (pWorkerId === curUid || p.uid === curUid)) return true;
+      if (curEmail && pEmail && pEmail === curEmail) return true;
+      if (curName && pName && (pName === curName || pName.includes(curName) || curName.includes(pName))) return true;
+      if (isFounder && (pWorkerId === 'RD-FOUNDER-001' || pName.includes('jagadish') || pEmail.includes('jagadish'))) return true;
+      return false;
+    }).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    // Calculate start of current week (Monday 00:00:00)
+    const now = new Date();
+    const currentDayOfWeek = (now.getDay() + 6) % 7; // 0 = Mon, 1 = Tue, ..., 6 = Sun
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - currentDayOfWeek);
+    monday.setHours(0, 0, 0, 0);
+    const startOfWeekTs = monday.getTime();
+
+    const daySeconds = [0, 0, 0, 0, 0, 0, 0];
+
+    // Compute session durations from genuine punch timestamps
+    let activeInTs = null;
+    empPunches.forEach(p => {
+      const ts = p.timestamp || 0;
+      if (ts < startOfWeekTs) return;
+      const d = new Date(ts);
+      const dayIdx = (d.getDay() + 6) % 7;
+
+      if (p.action === 'CLOCK_IN') {
+        activeInTs = ts;
+      } else if ((p.action === 'CLOCK_OUT' || p.action === 'BREAK') && activeInTs) {
+        const dur = Math.max(0, Math.floor((ts - activeInTs) / 1000));
+        daySeconds[dayIdx] += dur;
+        activeInTs = null;
+      }
+    });
+
+    // If currently on duty today, factor in the live active seconds
+    if (state.personalShift?.status === 'DUTY_ON' && state.personalShift.seconds) {
+      daySeconds[currentDayOfWeek] = Math.max(daySeconds[currentDayOfWeek], state.personalShift.seconds);
     }
-  ];
+
+    const totalWeekSec = daySeconds.reduce((sum, s) => sum + s, 0);
+    const weeklyHours = (totalWeekSec / 3600).toFixed(1);
+    const weeklyPct = Math.min(100, Math.round((totalWeekSec / (40 * 3600)) * 100));
+
+    const daysElapsed = Math.max(1, currentDayOfWeek + 1);
+    const dailyMean = (totalWeekSec / (daysElapsed * 3600)).toFixed(1);
+
+    const weeklyEl = document.getElementById('weeklyLoadHours');
+    if (weeklyEl) weeklyEl.textContent = weeklyHours;
+    const weeklyBar = document.getElementById('weeklyLoadBar');
+    if (weeklyBar) weeklyBar.style.width = `${weeklyPct}%`;
+    const weeklyTarget = document.getElementById('weeklyLoadTargetText');
+    if (weeklyTarget) weeklyTarget.textContent = `Target: 40.0 hrs • ${weeklyPct}%`;
+
+    const dailyMeanEl = document.getElementById('dailyMeanHours');
+    if (dailyMeanEl) dailyMeanEl.textContent = dailyMean;
+
+    // Update 7-day mini bar chart accurately
+    const chartCols = document.querySelectorAll('#dailyMeanChart .att-chart-col');
+    if (chartCols && chartCols.length >= 7) {
+      const maxDaySec = Math.max(...daySeconds, 8 * 3600);
+      daySeconds.forEach((sec, idx) => {
+        const col = chartCols[idx];
+        if (col) {
+          const bar = col.querySelector('.att-chart-bar');
+          const pct = Math.round((sec / maxDaySec) * 100);
+          if (bar) bar.style.height = `${Math.max(sec > 0 ? 8 : 4, pct)}%`;
+          if (idx === currentDayOfWeek) {
+            col.classList.add('active');
+          } else {
+            col.classList.remove('active');
+          }
+        }
+      });
+    }
+  }
+
+  function updateNotificationsUI() {
+    const listContainer = document.querySelector('#headerNotificationDropdown .notif-list');
+    const badge = document.getElementById('headerNotifBadge');
+    const headSpan = document.querySelector('#headerNotificationDropdown .notif-head span');
+    if (!listContainer) return;
+
+    listContainer.replaceChildren();
+
+    const notifications = [];
+
+    // System initialization notice
+    notifications.push({
+      icon: '💾',
+      title: 'Local Vault Active',
+      desc: 'Workstation NVMe local persistent storage active.',
+      time: 'Online',
+      unread: false
+    });
+
+    // Recent punch notices
+    const punches = (WorkspaceDB.data.punchLogs || []).slice(-3);
+    punches.forEach(p => {
+      const isClockIn = p.action === 'CLOCK_IN';
+      notifications.push({
+        icon: isClockIn ? '🟢' : '⏸️',
+        title: `${p.name || 'Member'} ${isClockIn ? 'Clocked In' : 'Logged Activity'}`,
+        desc: `Verified timestamp at ${p.time || 'workstation'}`,
+        time: p.timestamp ? formatRelativeTime(p.timestamp) : 'Today',
+        unread: false
+      });
+    });
+
+    // Recent task notices
+    const recentTasks = (WorkspaceDB.data.tasks || []).slice(-3);
+    recentTasks.forEach(t => {
+      notifications.push({
+        icon: t.status === 'COMPLETED' || t.status === 'ACCOMPLISHED' ? '✅' : '⚡',
+        title: `Task: ${t.title || 'Sprint Task'}`,
+        desc: `Status: ${t.status || 'Active'} • Assignee: ${t.assigneeName || 'Member'}`,
+        time: t.updatedAt ? formatRelativeTime(t.updatedAt) : 'Recent',
+        unread: false
+      });
+    });
+
+    const unreadCount = notifications.filter(n => n.unread).length;
+    if (badge) {
+      badge.textContent = String(unreadCount);
+      badge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+    }
+    if (headSpan) {
+      headSpan.textContent = `SYSTEM NOTIFICATIONS (${notifications.length})`;
+    }
+
+    if (notifications.length === 0) {
+      const emptyItem = document.createElement('div');
+      emptyItem.style.cssText = 'padding: 24px; text-align: center; color: var(--text-muted); font-size: 11px;';
+      emptyItem.textContent = 'No system notifications.';
+      listContainer.appendChild(emptyItem);
+      return;
+    }
+
+    notifications.slice(0, 5).forEach(n => {
+      const item = document.createElement('div');
+      item.className = `notif-item ${n.unread ? 'notif-item-unread' : ''}`;
+      item.innerHTML = `
+        <span style="font-size: 14px;">${n.icon}</span>
+        <div>
+          <div style="font-weight: 700; font-size: 12px; color: var(--text-white);">${escapeHtml(n.title)}</div>
+          <div style="font-size: 10.5px; opacity: 0.85; color: var(--text-secondary); margin-top: 2px;">${escapeHtml(n.desc)}</div>
+          <div style="color: #0284c7; font-size: 9.5px; margin-top: 3px;">${escapeHtml(n.time)}</div>
+        </div>
+      `;
+      listContainer.appendChild(item);
+    });
+  }
 
   function renderDashboard() {
     const now = new Date();
@@ -7674,32 +8296,44 @@
 
     const dateOptions = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' };
     const dateClusterEl = document.getElementById('dashDateCluster');
-    if (dateClusterEl) dateClusterEl.textContent = `${now.toLocaleDateString('en-US', dateOptions)} • Production Cluster 04a`;
+    if (dateClusterEl) dateClusterEl.textContent = `${now.toLocaleDateString('en-US', dateOptions)} • Workstation OS`;
 
-    // 1. Active Engineers Count
-    const members = Object.values(WorkspaceDB.data.members || {}).filter(m => m && !m.suspended && !m.deleted);
-    const onlineCount = members.filter(m => m.status === 'DUTY_ON' || m.id === state.currentMemberId).length;
-    const breakCount = members.filter(m => m.status === 'DUTY_BREAK').length;
+    // 1. Active Engineers Count - authentic counts only
+    const members = (typeof getUniqueMembersList === 'function')
+      ? getUniqueMembersList()
+      : Object.values(WorkspaceDB.data.members || {}).filter(m => m && !m.suspended && !m.deleted);
+    const onlineCount = members.filter(m => isMemberAppOnline(m) || isSelfMember(m)).length;
+    const breakCount = members.filter(m => getMemberDutyStatus(m) === 'DUTY_BREAK').length;
     const offlineCount = Math.max(0, members.length - onlineCount - breakCount);
 
     const valEng = document.getElementById('dashValEngineersCount');
-    if (valEng) valEng.textContent = String(Math.max(onlineCount, 18));
+    if (valEng) valEng.textContent = String(onlineCount);
     const subEng = document.getElementById('dashSubEngineers');
-    if (subEng) subEng.textContent = `${breakCount} on scheduled break, ${Math.max(offlineCount, 4)} offline`;
+    if (subEng) subEng.textContent = `${onlineCount} active, ${offlineCount} offline`;
 
-    // 2. Sprint Velocity
+    // 2. Sprint Velocity - authentic metrics only
     const tasks = WorkspaceDB.data.tasks || [];
     const doneTasks = tasks.filter(t => t.status === 'COMPLETED' || t.status === 'ACCOMPLISHED').length;
-    const totalTasks = Math.max(tasks.length, 32);
-    const sprintDone = Math.max(doneTasks, 24);
+    const totalTasks = tasks.length;
 
     const valVeloDone = document.getElementById('dashValVelocityDone');
-    if (valVeloDone) valVeloDone.textContent = String(sprintDone);
+    if (valVeloDone) valVeloDone.textContent = String(doneTasks);
     const valVeloTot = document.getElementById('dashValVelocityTotal');
     if (valVeloTot) valVeloTot.textContent = `/ ${totalTasks} Done`;
+    const subVelo = document.getElementById('dashSubVelocity');
+    if (subVelo) {
+      if (totalTasks > 0) {
+        const pct = Math.round((doneTasks / totalTasks) * 100);
+        subVelo.innerHTML = `↗ ${pct}% of tasks completed`;
+      } else {
+        subVelo.textContent = 'No active tasks';
+      }
+    }
 
-    // 3. Trigger Shift UI calculation
+    // 3. Trigger Shift UI & Attendance calculations
     updateShiftUI();
+    updateAttendanceMetricsUI();
+    updateNotificationsUI();
 
     // 4. Render Objectives & Activity
     renderDashboardObjectives();
@@ -7711,25 +8345,59 @@
     if (!container) return;
     container.replaceChildren();
 
-    DEFAULT_PRIORITY_OBJECTIVES.forEach(obj => {
+    const tasks = WorkspaceDB.data.tasks || [];
+    const pendingTasks = tasks.filter(t => t.status !== 'COMPLETED' && t.status !== 'ACCOMPLISHED');
+
+    const pendingBadge = document.getElementById('dashPendingObjectivesCount');
+    if (pendingBadge) {
+      pendingBadge.textContent = `${pendingTasks.length} pending`;
+    }
+
+    if (pendingTasks.length === 0) {
+      const emptyItem = document.createElement('div');
+      emptyItem.style.cssText = 'padding: 24px; text-align: center; color: var(--text-muted); font-size: 12.5px; background: var(--card-bg); border: 1px dashed var(--card-border); border-radius: 8px;';
+      emptyItem.innerHTML = `
+        <div style="font-size: 20px; margin-bottom: 6px;">🎯</div>
+        <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">All Objectives Cleared</div>
+        <p style="font-size: 11.5px; margin: 0 0 12px 0;">No pending priority tasks in sprint. Ready for new assignments.</p>
+        <button type="button" class="btn-dash-action primary" id="btnDashCreateTaskEmpty" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; font-size:12px; cursor:pointer;">
+          <span>+ Create Task</span>
+        </button>
+      `;
+      emptyItem.querySelector('#btnDashCreateTaskEmpty')?.addEventListener('click', () => {
+        switchTab('tasks');
+        document.getElementById('btnOpenCreateTaskModal')?.click();
+      });
+      container.appendChild(emptyItem);
+      return;
+    }
+
+    pendingTasks.slice(0, 5).forEach(task => {
       const item = document.createElement('div');
       item.className = 'dash-objective-item';
+      const categoryTag = task.category || 'General';
+      const dueText = task.dueAt ? `Due ${task.dueAt}` : (task.timeline || 'Pending');
+      const isUrgent = task.priority === 'CRITICAL' || task.priority === 'URGENT' || task.priority === 'HIGH';
+      const subtasks = task.subtasks || [];
+      const hasSubtasks = subtasks.length > 0;
+      const subtaskDone = hasSubtasks && subtasks[0].done;
+
       item.innerHTML = `
         <div class="dash-objective-checkbox">
-          ${obj.subtasks && obj.subtasks[0]?.done ? '<span style="color:#0062ff; font-weight:bold; font-size:11px;">✓</span>' : ''}
+          ${subtaskDone ? '<span style="color:#0062ff; font-weight:bold; font-size:11px;">✓</span>' : ''}
         </div>
         <div class="dash-objective-content">
           <div class="dash-objective-meta">
-            <span class="dash-tag ${obj.tagClass}">${escapeHtml(obj.tag)}</span>
-            <span class="dash-due-time ${obj.isCritical ? 'critical' : ''}">${escapeHtml(obj.due)}</span>
+            <span class="dash-tag tag-ui">${escapeHtml(categoryTag)}</span>
+            <span class="dash-due-time ${isUrgent ? 'critical' : ''}">${escapeHtml(dueText)}</span>
           </div>
-          <h4 class="dash-objective-title">${escapeHtml(obj.title)}</h4>
-          <p class="dash-objective-sub">${escapeHtml(obj.sub)}</p>
+          <h4 class="dash-objective-title">${escapeHtml(task.title || 'Untitled Task')}</h4>
+          <p class="dash-objective-sub">${escapeHtml(task.description || task.scope || 'Assigned sprint objective.')}</p>
         </div>
       `;
       item.addEventListener('click', () => {
         switchTab('tasks');
-        openTaskDrawer(obj);
+        openTaskDrawer(task);
       });
       container.appendChild(item);
     });
@@ -7740,30 +8408,66 @@
     if (!container) return;
     container.replaceChildren();
 
-    const activities = [
-      {
-        author: 'Pavithra R.',
-        time: '8m ago',
-        text: 'Completed UI Token Harmonization in @reddot/tokens-v3 package.'
-      },
-      {
-        author: 'Elena Rostova',
-        time: '1h 14m ago',
-        text: 'Committed patch #fe-9921: Resolved websocket reconnect throttling anomaly.'
-      },
-      {
-        author: 'Marcus Chen',
-        time: '2h 40m ago',
-        text: 'Provisioned secondary staging pool for multi-region load testing.'
-      },
-      {
-        author: 'Jagadish K',
-        time: '4h ago',
-        text: 'Approved release candidate v2.5.7 for enterprise cluster deployment.'
-      }
-    ];
+    const activities = [];
 
-    activities.forEach(act => {
+    // 1. Gather events from WorkspaceDB.data.activity
+    (WorkspaceDB.data.activity || []).forEach(act => {
+      activities.push({
+        author: act.author || act.performedByName || 'System',
+        time: act.timestamp ? formatRelativeTime(act.timestamp) : 'Recently',
+        timestamp: act.timestamp || 0,
+        text: act.text || act.details || act.action || 'System event recorded.'
+      });
+    });
+
+    // 2. Gather genuine recent punches
+    (WorkspaceDB.data.punchLogs || []).slice(-8).forEach(p => {
+      const actionName = p.action === 'CLOCK_IN' ? 'started work shift' : (p.action === 'BREAK' ? 'took a break' : 'clocked out');
+      activities.push({
+        author: p.name || p.workerId || 'Team Member',
+        time: p.timestamp ? formatRelativeTime(p.timestamp) : (p.time || 'Recently'),
+        timestamp: p.timestamp || 0,
+        text: `${actionName} (${p.time || new Date(p.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}).`
+      });
+    });
+
+    // 3. Gather genuine recent tasks
+    (WorkspaceDB.data.tasks || []).forEach(t => {
+      if (t.updatedAt || t.createdAt) {
+        const isDone = t.status === 'COMPLETED' || t.status === 'ACCOMPLISHED';
+        activities.push({
+          author: t.assigneeName || t.createdByName || 'Team Member',
+          time: formatRelativeTime(t.updatedAt || t.createdAt),
+          timestamp: t.updatedAt || t.createdAt,
+          text: isDone ? `Completed sprint task: "${t.title}".` : `Updated sprint task: "${t.title}".`
+        });
+      }
+    });
+
+    // Sort by most recent
+    activities.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    // Deduplicate and take top 5
+    const uniqueActivities = [];
+    const seenTexts = new Set();
+    for (const act of activities) {
+      const key = `${act.author}:${act.text}`;
+      if (!seenTexts.has(key)) {
+        seenTexts.add(key);
+        uniqueActivities.push(act);
+      }
+      if (uniqueActivities.length >= 5) break;
+    }
+
+    if (uniqueActivities.length === 0) {
+      const emptyItem = document.createElement('div');
+      emptyItem.style.cssText = 'padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;';
+      emptyItem.textContent = 'No recent activity recorded. Shift punches and task updates will stream here.';
+      container.appendChild(emptyItem);
+      return;
+    }
+
+    uniqueActivities.forEach(act => {
       const row = document.createElement('div');
       row.className = 'dash-activity-item';
       row.innerHTML = `
@@ -7780,37 +8484,81 @@
     });
   }
 
-  function openTaskDrawer(task) {
+  
+  // DELETE TASK
+  async function deleteTask(taskId) {
+    if (!taskId) return;
+    const tasks = WorkspaceDB.data.tasks || [];
+    const task = tasks.find(function(t) { return t.id === taskId; });
     if (!task) return;
+    const taskTitle = task.title || "this task";
+    const confirmed = window.confirm("Are you sure you want to delete the task:\n\"" + taskTitle + "\"?\n\nThis action cannot be undone.");
+    if (!confirmed) return;
+    WorkspaceDB.data.tasks = tasks.filter(function(t) { return t.id !== taskId; });
+    await WorkspaceDB.save();
+    if (window.FirebaseService && FirebaseService.deleteTask) {
+      FirebaseService.deleteTask(taskId).catch(function() {});
+    }
+    if (state.activeSelectedTask && state.activeSelectedTask.id === taskId) {
+      state.activeSelectedTask = null;
+      const drawer = document.getElementById("taskDetailDrawer");
+      if (drawer) drawer.style.display = "none";
+    }
+    showQuickToast("Task \"" + taskTitle + "\" deleted.", "success");
+    playNotificationChirp(false);
+    renderTasks();
+  }
+function openTaskDrawer(task) {
+    if (!task) return;
+    state.activeSelectedTask = task;
     const drawer = document.getElementById('taskDetailDrawer');
     if (!drawer) return;
 
     const taskCodeEl = document.getElementById('drawerTaskCode');
-    if (taskCodeEl) taskCodeEl.textContent = `${task.code || 'TASK-4892'} • Sprint 14 Node`;
+    const isTaskCompleted = task.status === 'COMPLETED' || task.status === 'ACCOMPLISHED';
+    const drawerStatusLabel = isTaskCompleted ? 'Completed' : (task.status === 'REACHED' ? 'In Progress' : (task.status || 'In Progress'));
+    if (taskCodeEl) taskCodeEl.textContent = (task.code || ('TASK-' + (task.id || '').slice(-4).toUpperCase())) + ' • ' + drawerStatusLabel;
+    // Toggle complete vs reopen button
+    const markCompleteBtn = document.getElementById('btnDrawerMarkComplete');
+    if (markCompleteBtn) {
+      if (isTaskCompleted) {
+        markCompleteBtn.textContent = '\u21BA Reopen Task';
+        markCompleteBtn.style.background = 'rgba(59,130,246,0.15)';
+        markCompleteBtn.style.color = '#3b82f6';
+        markCompleteBtn.style.borderColor = 'rgba(59,130,246,0.3)';
+        markCompleteBtn.dataset.mode = 'reopen';
+      } else {
+        markCompleteBtn.textContent = '\u2714 Mark Task Complete';
+        markCompleteBtn.style.background = '';
+        markCompleteBtn.style.color = '';
+        markCompleteBtn.style.borderColor = '';
+        markCompleteBtn.dataset.mode = 'complete';
+      }
+    }
     const titleEl = document.getElementById('drawerTaskTitle');
     if (titleEl) titleEl.textContent = task.title || 'Task Details';
     const pipeEl = document.getElementById('drawerBranchPipeline');
-    if (pipeEl) pipeEl.textContent = task.pipeline || 'feat/carbon-v4';
+    if (pipeEl) pipeEl.textContent = task.category || 'General';
     const engEl = document.getElementById('drawerLeadEngineer');
-    if (engEl) engEl.textContent = task.engineer || task.assigneeName || 'Jagadish K (Founder)';
+    if (engEl) engEl.textContent = task.assigneeName || task.engineer || 'JAGADISH K';
     const timeEl = document.getElementById('drawerSprintTimeline');
-    if (timeEl) timeEl.textContent = task.timeline || '• Due Today, 17:00';
+    if (timeEl) timeEl.textContent = task.dueAt ? `• Due ${task.dueAt}` : (task.timeline ? `• ${task.timeline}` : '• Active');
     const scopeEl = document.getElementById('drawerScopeText');
-    if (scopeEl) scopeEl.textContent = task.scope || task.description || 'Refine the high-density workstation UI. Replace bulky UI matrices with clean micro-cards, zero decorative clutter, and absolute typographic rhythm aligned strictly with IBM Carbon principles.';
+    if (scopeEl) scopeEl.textContent = task.description || task.scope || 'No additional scope details specified.';
 
-    const subtasks = task.subtasks || [
-      { label: 'Audit color tokens against contrast threshold', done: true },
-      { label: 'Draft high-contrast typography hierarchy', done: true },
-      { label: 'Implement task card hover micro-animations', done: true },
-      { label: 'Conduct keyboard navigation and screen-reader pass', done: false }
-    ];
+    const subtasks = Array.isArray(task.subtasks) && task.subtasks.length > 0
+      ? task.subtasks
+      : [
+          { label: 'Review deliverable requirements', done: task.status === 'COMPLETED' || task.status === 'ACCOMPLISHED' },
+          { label: 'Complete implementation pass', done: task.status === 'COMPLETED' || task.status === 'ACCOMPLISHED' }
+        ];
 
     const doneCount = subtasks.filter(s => s.done).length;
     const totalCount = subtasks.length;
-    const percent = Math.round((doneCount / totalCount) * 100);
+    const percent = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
 
     const doneText = document.getElementById('drawerSubtasksDoneText');
-    if (doneText) doneText.textContent = `${doneCount}/${totalCount} DONE`;
+    if (doneText) doneText.textContent = `${doneCount}/${totalCount} Done`;
     const percentText = document.getElementById('drawerSubtasksPercentText');
     if (percentText) percentText.textContent = `${percent}% Complete`;
 
@@ -7821,25 +8569,131 @@
         const item = document.createElement('div');
         item.className = `subtask-check-row ${st.done ? 'done' : ''}`;
         item.innerHTML = `<div class="subtask-checkbox">${st.done ? '✓' : ''}</div><span>${escapeHtml(st.label)}</span>`;
-        item.addEventListener('click', () => {
+        item.addEventListener('click', async () => {
           st.done = !st.done;
+          await WorkspaceDB.save();
           openTaskDrawer(task);
+          renderTasks();
           playNotificationChirp(true);
         });
         checklist.appendChild(item);
       });
     }
 
+    // Prototype preview
+    const protoImg = document.getElementById('drawerPrototypeImg');
+    const protoFilename = document.getElementById('drawerPrototypeFilename');
+    if (protoImg) {
+      protoImg.src = task.prototypeImg || 'assets/id-card.png';
+      protoImg.style.display = task.prototypeImg ? 'block' : 'none';
+    }
+    if (protoFilename) {
+      protoFilename.textContent = task.prototypeFilename || (task.code ? `${task.code.toLowerCase()}-deliverable.pdf` : 'deliverable-manifest.json');
+      protoFilename.style.display = task.prototypeImg ? 'block' : 'none';
+    }
+
     drawer.style.display = 'flex';
   }
 
-  // --- DUAL THEME ENGINE ---
-  function initThemeEngine() {
-    const saved = localStorage.getItem('reddot_theme') || 'light';
+  // --- DUAL THEME ENGINE (OBSIDIAN DARK FIRST-CLASS) ---
+  
+  // Completed Tasks Archive Modal
+  function showCompletedArchiveModal() {
+    var existing = document.getElementById("completedArchiveOverlay");
+    if (existing) existing.remove();
+    var overlay = document.createElement("div");
+    overlay.id = "completedArchiveOverlay";
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;display:flex;align-items:center;justify-content:center;";
+    document.body.appendChild(overlay);
+
+    function buildModal() {
+      var allTasks = WorkspaceDB.data.tasks || [];
+      var doneTasks = allTasks.filter(function(t) { return t.status === "COMPLETED" || t.status === "ACCOMPLISHED"; });
+      var rows = doneTasks.map(function(ct) {
+        var ddate = ct.accomplishedAt ? new Date(ct.accomplishedAt).toLocaleDateString("en-GB", {day:"2-digit",month:"short",year:"numeric"}) :
+                    ct.updatedAt ? new Date(ct.updatedAt).toLocaleDateString("en-GB", {day:"2-digit",month:"short",year:"numeric"}) : "Unknown";
+        var subs = Array.isArray(ct.subtasks) ? ct.subtasks : [];
+        var doneSub = subs.filter(function(s) { return s.done; }).length;
+        return [
+          "<div class=\"arc-row\" data-id=\"" + ct.id + "\" style=\"background:var(--card-bg,#1d2231);border:1px solid var(--card-border,#2a3040);border-radius:8px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;\">",
+          "  <div style=\"flex:1;min-width:0;\">",
+          "    <div style=\"display:flex;align-items:center;gap:8px;margin-bottom:4px;\">",
+          "      <div style=\"width:16px;height:16px;background:#008a3e;color:#fff;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;flex-shrink:0;\">&#10003;</div>",
+          "      <span style=\"font-size:13px;font-weight:700;color:var(--text-white,#fff);\">" + (ct.title || "Untitled") + "</span>",
+          "      <span style=\"font-size:10px;background:var(--shell-bg,#10141c);padding:2px 7px;border-radius:4px;color:var(--text-muted,#8892a4);font-weight:600;\">" + (ct.category || "General") + "</span>",
+          "    </div>",
+          "    <p style=\"font-size:11px;color:var(--text-muted,#8892a4);margin:0 0 5px 24px;\">" + (ct.description || "") + "</p>",
+          "    <div style=\"display:flex;gap:14px;margin-left:24px;\">",
+          "      <span style=\"font-size:11px;color:var(--text-muted,#8892a4);\">&#128100; " + (ct.assigneeName || "Unknown") + "</span>",
+          "      <span style=\"font-size:11px;color:var(--text-muted,#8892a4);\">&#128197; " + ddate + "</span>",
+          (subs.length > 0 ? "      <span style=\"font-size:11px;color:var(--text-muted,#8892a4);\">" + doneSub + "/" + subs.length + " subtasks</span>" : ""),
+          "    </div>",
+          "  </div>",
+          "  <div style=\"display:flex;flex-direction:column;gap:5px;flex-shrink:0;\">",
+          "    <button class=\"arc-view\" data-id=\"" + ct.id + "\" style=\"font-size:11px;font-weight:600;color:var(--text-white,#fff);background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:5px;padding:4px 10px;cursor:pointer;\">View</button>",
+          "    <button class=\"arc-reopen\" data-id=\"" + ct.id + "\" style=\"font-size:11px;font-weight:600;color:#3b82f6;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);border-radius:5px;padding:4px 10px;cursor:pointer;\">&#8634; Reopen</button>",
+          "    <button class=\"arc-delete\" data-id=\"" + ct.id + "\" style=\"font-size:11px;font-weight:600;color:#ef4444;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:5px;padding:4px 10px;cursor:pointer;\">&#128465; Delete</button>",
+          "  </div>",
+          "</div>"
+        ].join("");
+      }).join("");
+
+      overlay.innerHTML = [
+        "<div style=\"background:var(--panel-bg,#181c24);border:1px solid var(--card-border,#2a3040);border-radius:12px;width:min(700px,95vw);max-height:80vh;display:flex;flex-direction:column;overflow:hidden;\">",
+        "  <div style=\"padding:16px 20px;border-bottom:1px solid var(--card-border,#2a3040);display:flex;align-items:center;justify-content:space-between;\">",
+        "    <div>",
+        "      <h3 style=\"margin:0;font-size:15px;font-weight:700;color:var(--text-white,#fff);\">&#9989; Completed Tasks</h3>",
+        "      <p style=\"margin:3px 0 0;font-size:12px;color:var(--text-muted,#8892a4);\">" + doneTasks.length + " task" + (doneTasks.length !== 1 ? "s" : "") + " completed</p>",
+        "    </div>",
+        "    <button id=\"arcClose\" style=\"background:none;border:none;color:var(--text-muted,#8892a4);font-size:20px;cursor:pointer;padding:4px 8px;\">&#10005;</button>",
+        "  </div>",
+        "  <div style=\"overflow-y:auto;flex:1;padding:14px;\">",
+        (doneTasks.length === 0 ? "<div style=\"text-align:center;padding:40px;color:var(--text-muted,#8892a4);font-size:13px;\">No completed tasks yet.</div>" : rows),
+        "  </div>",
+        "</div>"
+      ].join("");
+
+      document.getElementById("arcClose").addEventListener("click", function() { overlay.remove(); });
+      overlay.addEventListener("click", function(e) { if (e.target === overlay) overlay.remove(); });
+
+      overlay.querySelectorAll(".arc-view").forEach(function(btn) {
+        btn.addEventListener("click", function() {
+          var task = (WorkspaceDB.data.tasks || []).find(function(t) { return t.id === btn.dataset.id; });
+          if (task) { overlay.remove(); state.activeSelectedTask = task; openTaskDrawer(task); }
+        });
+      });
+
+      overlay.querySelectorAll(".arc-reopen").forEach(function(btn) {
+        btn.addEventListener("click", async function() {
+          var task = (WorkspaceDB.data.tasks || []).find(function(t) { return t.id === btn.dataset.id; });
+          if (!task) return;
+          task.status = "IN_PROGRESS"; task.updatedAt = Date.now(); delete task.accomplishedAt;
+          await WorkspaceDB.save();
+          if (window.FirebaseService && FirebaseService.updateTask) FirebaseService.updateTask(task.id, { status: "IN_PROGRESS", updatedAt: Date.now() }).catch(function(){});
+          showQuickToast("Task \"" + task.title + "\" reopened.", "info");
+          playNotificationChirp(true); renderTasks(); buildModal();
+        });
+      });
+
+      overlay.querySelectorAll(".arc-delete").forEach(function(btn) {
+        btn.addEventListener("click", async function() {
+          overlay.remove(); await deleteTask(btn.dataset.id);
+        });
+      });
+    }
+    buildModal();
+  }
+function initThemeEngine() {
+    let saved = localStorage.getItem('reddot_theme');
+    // Enforce dark theme by default, clear any stale 'light' preference
+    if (!saved || saved === 'light') {
+      saved = 'dark';
+      localStorage.setItem('reddot_theme', 'dark');
+    }
     applyTheme(saved);
 
     document.getElementById('btnThemeToggle')?.addEventListener('click', () => {
-      const isDark = document.body.classList.contains('theme-dark');
+      const isDark = document.body.classList.contains('theme-dark') || document.body.classList.contains('theme-obsidian');
       const next = isDark ? 'light' : 'dark';
       applyTheme(next);
       playNotificationChirp(true);
@@ -7858,7 +8712,7 @@
     document.body.classList.remove('theme-light', 'theme-dark', 'theme-obsidian');
     const icon = document.getElementById('themeToggleIcon');
     if (theme === 'dark') {
-      document.body.classList.add('theme-dark');
+      document.body.classList.add('theme-dark', 'theme-obsidian');
       if (icon) icon.textContent = '🌙';
       localStorage.setItem('reddot_theme', 'dark');
     } else {
@@ -7973,7 +8827,7 @@
         }
       });
 
-      const members = Object.values(WorkspaceDB.data.members || {});
+      const members = getUniqueMembersList();
       members.forEach(m => {
         if (m && (!query || m.name?.toLowerCase().includes(query) || m.role?.toLowerCase().includes(query))) {
           results.push({
@@ -8025,7 +8879,7 @@
     document.getElementById('dashBtnLogShift')?.addEventListener('click', () => switchTab('timesheets'));
     document.getElementById('dashBtnNewTask')?.addEventListener('click', () => {
       switchTab('tasks');
-      document.getElementById('btnOpenCreateWorkerModal')?.click();
+      openCreateTaskModal();
     });
     document.getElementById('dashBtnBreak')?.addEventListener('click', () => {
       document.getElementById('btnPersonalBreak')?.click();
@@ -8059,17 +8913,214 @@
       }
     });
 
-    // Task Detail Drawer
+    // Task View Mode Toggle (List vs Board)
+    const btnList = document.getElementById('btnTaskViewList');
+    const btnBoard = document.getElementById('btnTaskViewBoard');
+
+    btnList?.addEventListener('click', () => {
+      state.taskViewMode = 'list';
+      btnList.classList.add('active');
+      btnBoard?.classList.remove('active');
+      document.getElementById('tasksListDeck')?.classList.remove('hidden');
+      document.getElementById('tasksBoardDeck')?.classList.add('hidden');
+      renderTasks();
+    });
+
+    btnBoard?.addEventListener('click', () => {
+      state.taskViewMode = 'board';
+      btnBoard.classList.add('active');
+      btnList?.classList.remove('active');
+      document.getElementById('tasksListDeck')?.classList.add('hidden');
+      document.getElementById('tasksBoardDeck')?.classList.remove('hidden');
+      renderTasks();
+    });
+
+    // Tasks + Add Task Button
+    document.getElementById('btnOpenCreateTaskModal')?.addEventListener('click', () => {
+      openCreateTaskModal();
+    });
+
+    // Task Detail Drawer Buttons
     document.getElementById('btnDrawerClose')?.addEventListener('click', () => {
+      state.taskDrawerClosedByUser = true;
+      state.activeSelectedTask = null;
       const drawer = document.getElementById('taskDetailDrawer');
       if (drawer) drawer.style.display = 'none';
     });
-    document.getElementById('btnDrawerMarkComplete')?.addEventListener('click', () => {
+
+    document.getElementById('btnDrawerExpand')?.addEventListener('click', () => {
+      if (state.activeSelectedTask) {
+        openEditTaskModal(state.activeSelectedTask);
+      }
+    });
+
+    document.getElementById('btnDrawerReassign')?.addEventListener('click', () => {
+      if (state.activeSelectedTask) {
+        openEditTaskModal(state.activeSelectedTask, 'assignee');
+      }
+    });
+
+    document.getElementById('btnDrawerReschedule')?.addEventListener('click', () => {
+      if (state.activeSelectedTask) {
+        openEditTaskModal(state.activeSelectedTask, 'due');
+      }
+    });
+
+    document.getElementById('btnDrawerMarkComplete')?.addEventListener('click', async () => {
+      if (!state.activeSelectedTask) return;
+      const mcBtn = document.getElementById('btnDrawerMarkComplete');
+      const mcMode = mcBtn && mcBtn.dataset.mode ? mcBtn.dataset.mode : 'complete';
+
+      if (mcMode === 'reopen') {
+        state.activeSelectedTask.status = 'IN_PROGRESS';
+        state.activeSelectedTask.updatedAt = Date.now();
+        delete state.activeSelectedTask.accomplishedAt;
+        await WorkspaceDB.save();
+        if (window.FirebaseService && FirebaseService.updateTask) {
+          FirebaseService.updateTask(state.activeSelectedTask.id, { status: 'IN_PROGRESS', updatedAt: Date.now() }).catch(function() {});
+        }
+        showQuickToast('Task "' + state.activeSelectedTask.title + '" moved back to In Progress.', 'info');
+        playNotificationChirp(true);
+        renderTasks();
+        openTaskDrawer(state.activeSelectedTask);
+        return;
+      }
+
+      // Mark as complete
+      state.activeSelectedTask.status = 'COMPLETED';
+      state.activeSelectedTask.updatedAt = Date.now();
+      state.activeSelectedTask.accomplishedAt = Date.now();
+      await WorkspaceDB.save();
+      if (window.FirebaseService && FirebaseService.updateTask) {
+        FirebaseService.updateTask(state.activeSelectedTask.id, {
+          status: 'COMPLETED',
+          updatedAt: Date.now(),
+          accomplishedAt: Date.now()
+        }).catch(function() {});
+      }
       playNotificationChirp(true);
-      showQuickToast('Task marked as complete and verified on ledger!', 'success');
-      const drawer = document.getElementById('taskDetailDrawer');
-      if (drawer) drawer.style.display = 'none';
+      showQuickToast('Task "' + state.activeSelectedTask.title + '" marked as complete!', 'success');
       renderTasks();
+      openTaskDrawer(state.activeSelectedTask);
+    });
+
+    // Task Filter Toolbar Listeners
+    document.getElementById('filterTaskInput')?.addEventListener('input', () => {
+      renderTasks();
+    });
+
+    document.getElementById('taskFilterCategorySelect')?.addEventListener('change', () => {
+      renderTasks();
+    });
+
+    document.getElementById('taskFilterAssigneeSelect')?.addEventListener('change', () => {
+      renderTasks();
+    });
+
+    document.getElementById('taskFilterPrioritySelect')?.addEventListener('change', () => {
+      renderTasks();
+    });
+
+    // Task Sort Button
+    document.querySelector('.btn-sort-tasks')?.addEventListener('click', () => {
+      state.taskSortMode = state.taskSortMode === 'priority' ? 'due' : 'priority';
+      const sortBtn = document.querySelector('.btn-sort-tasks span');
+      if (sortBtn) {
+        sortBtn.textContent = state.taskSortMode === 'priority' ? '⇅ Sort by Priority' : '⇅ Sort by Due Date';
+      }
+      playNotificationChirp(true);
+      showQuickToast(`Tasks sorted by ${state.taskSortMode === 'priority' ? 'Priority (High to Low)' : 'Due Date'}.`, 'info');
+      renderTasks();
+    });
+
+    // Archive Review Button
+    document.querySelector('.btn-archive-review')?.addEventListener('click', () => {
+      playNotificationChirp(true);
+      showCompletedArchiveModal();
+    });
+
+    // Delete button - Drawer Header
+    document.getElementById('btnDrawerDeleteHeader')?.addEventListener('click', async () => {
+      if (state.activeSelectedTask) await deleteTask(state.activeSelectedTask.id);
+    });
+
+    // Delete button - Drawer Footer Action
+    document.getElementById('btnDrawerDeleteAction')?.addEventListener('click', async () => {
+      if (state.activeSelectedTask) await deleteTask(state.activeSelectedTask.id);
+    });
+
+    // Delete button - Edit Task Modal
+    document.getElementById('btnDeleteTaskFromModal')?.addEventListener('click', async () => {
+      const taskId = document.getElementById('editTaskId')?.value || (state.activeSelectedTask && state.activeSelectedTask.id);
+      if (taskId) {
+        closeEditTaskModal();
+        await deleteTask(taskId);
+      }
+    });
+
+    // Status Filter dropdown
+    document.getElementById('taskFilterStatusSelect')?.addEventListener('change', () => {
+      renderTasks();
+    });
+
+    // Header Notification Bell & Dropdown
+    const bellBtn = document.getElementById('btnNotificationBell');
+    const notifDropdown = document.getElementById('headerNotificationDropdown');
+
+    bellBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      notifDropdown?.classList.toggle('hidden');
+    });
+
+    document.getElementById('btnMarkAllNotifsRead')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.notif-item-unread').forEach(item => item.classList.remove('notif-item-unread'));
+      const badge = document.getElementById('headerNotifBadge');
+      if (badge) {
+        badge.textContent = '0';
+        badge.style.display = 'none';
+      }
+      const titleSpan = notifDropdown?.querySelector('.notif-head span');
+      if (titleSpan) titleSpan.textContent = 'SYSTEM NOTIFICATIONS (0)';
+      playNotificationChirp(true);
+      showQuickToast('All notifications marked as read.', 'info');
+    });
+
+    // Close notification dropdown when clicking anywhere outside
+    window.addEventListener('click', (e) => {
+      if (notifDropdown && !notifDropdown.classList.contains('hidden')) {
+        if (!notifDropdown.contains(e.target) && e.target !== bellBtn && !bellBtn?.contains(e.target)) {
+          notifDropdown.classList.add('hidden');
+        }
+      }
+    });
+
+    // Teams Rail direct button bindings
+    document.getElementById('railBtnActivity')?.addEventListener('click', () => switchTeamsRailTab('activity'));
+    document.getElementById('railBtnChat')?.addEventListener('click', () => switchTeamsRailTab('chat'));
+    document.getElementById('railBtnCalendar')?.addEventListener('click', () => switchTeamsRailTab('calendar'));
+    document.getElementById('railBtnCalls')?.addEventListener('click', () => switchTeamsRailTab('calls'));
+    document.getElementById('railBtnFiles')?.addEventListener('click', () => switchTeamsRailTab('files'));
+    document.getElementById('railBtnSaved')?.addEventListener('click', () => switchTeamsRailTab('saved'));
+
+    // Hub Tab direct button bindings
+    document.getElementById('hubTabBtnPosts')?.addEventListener('click', () => switchChatHubTab('posts'));
+    document.getElementById('hubTabBtnFiles')?.addEventListener('click', () => switchChatHubTab('files'));
+    document.getElementById('hubTabBtnPinned')?.addEventListener('click', () => switchChatHubTab('pinned'));
+    document.getElementById('hubTabBtnAbout')?.addEventListener('click', () => switchChatHubTab('about'));
+
+    // Submit button helpers
+    document.getElementById('btnSaveEditTask')?.addEventListener('click', () => {
+      document.getElementById('formEditTask')?.requestSubmit?.();
+    });
+    document.getElementById('btnSubmitCreateChannel')?.addEventListener('click', () => {
+      document.getElementById('formCreateChannelModal')?.requestSubmit?.();
+    });
+    document.getElementById('btnSubmitEditChannel')?.addEventListener('click', () => {
+      document.getElementById('formEditChannelModal')?.requestSubmit?.();
+    });
+    document.getElementById('btnSubmitLinkPhoto')?.addEventListener('click', () => {
+      document.getElementById('formLinkPhotoModal')?.requestSubmit?.();
     });
 
     // Omnibox Header Trigger
@@ -8079,7 +9130,43 @@
     });
   }
 
+  // --- ENTERPRISE BOOTLOADER ANIMATION ---
+  function updateBootProgress(percent, statusText, logLine) {
+    const fill = document.getElementById('bootProgressFill');
+    const pText = document.getElementById('bootPercentText');
+    const sText = document.getElementById('bootStatusText');
+    const feed = document.getElementById('bootTerminalFeed');
+
+    if (fill) fill.style.width = percent + '%';
+    if (pText) pText.textContent = percent + '%';
+    if (sText && statusText) sText.textContent = statusText;
+    if (feed && logLine) {
+      const line = document.createElement('div');
+      line.className = 'boot-log-line active';
+      line.textContent = '> ' + logLine;
+      feed.appendChild(line);
+      feed.scrollTop = feed.scrollHeight;
+    }
+  }
+
+  function dismissBootScreen() {
+    const boot = document.getElementById('appBootScreen');
+    if (boot && !boot.classList.contains('fade-out')) {
+      updateBootProgress(100, 'Workstation Ready. Mounting Executive Shell...', '[READY] All systems nominal. Handshake TLS 1.3 OK.');
+      setTimeout(() => {
+        boot.classList.add('fade-out');
+        setTimeout(() => {
+          if (boot && boot.parentNode) boot.parentNode.removeChild(boot);
+        }, 500);
+      }, 350);
+    }
+  }
+
+  // Safety timer: Never allow boot screen to freeze on screen
+  setTimeout(dismissBootScreen, 2200);
+
   async function init() {
+    updateBootProgress(30, "Initializing persistent database & local storage...", "[DB] Loading native disk store...");
     await ImageCacheManager.init();
     await ImageCacheManager.precacheAllAssets();
     await WorkspaceDB.init();
@@ -8111,15 +9198,21 @@
     initThemeEngine();
     initOmniboxSearch();
     bindV3EventListeners();
-    openCommandCenter();
-    switchTab('dashboard');
+    initPortfolioFirstScreen();
+    updateBootProgress(70, "Syncing telemetry, nodes & tasks...", "[SYNC] Restoring personnel matrix...");
+    closeCommandCenter();
 
     renderWorkers();
     renderTasks();
     renderPunchLogs();
     renderChatChannelsAndDMs();
     renderFleetTelemetry();
+    renderDashboard();
+    updateAttendanceMetricsUI();
+    updateNotificationsUI();
     WorkspaceDB.updateMetricsUI();
+    updateBootProgress(95, "Mounting unified dual-theme engine...", "[THEME] Verifying palette tokens...");
+    setTimeout(dismissBootScreen, 200);
 
     function setupCloudRealtimeSubscriptions() {
       if (!window.FirebaseService || !FirebaseService.db) return;
@@ -8199,6 +9292,8 @@
           renderTeamHoursDashboard();
           renderChatChannelsAndDMs();
           WorkspaceDB.updateMetricsUI();
+    updateBootProgress(95, "Mounting unified dual-theme engine...", "[THEME] Verifying palette tokens...");
+    setTimeout(dismissBootScreen, 200);
         }
       });
 
@@ -8229,6 +9324,7 @@
           WorkspaceDB.data.tasks = deduped;
           WorkspaceDB.save();
           renderTasks();
+          renderDashboard();
         }
       });
 
@@ -8485,6 +9581,8 @@
         renderWorkers();
         renderFleetTelemetry();
         WorkspaceDB.updateMetricsUI();
+    updateBootProgress(95, "Mounting unified dual-theme engine...", "[THEME] Verifying palette tokens...");
+    setTimeout(dismissBootScreen, 200);
       }
     }, 10000);
 
@@ -8933,6 +10031,32 @@
         showQuickToast(`Download failed: ${e.message}`, 'error');
       }
     }
+  }
+
+  // =========================================================================
+  // WALLPAPER FIRST SCREEN WIREUP (CLEAN CONTROLS & COMMAND DOCK)
+  // =========================================================================
+  function initPortfolioFirstScreen() {
+    // Dock Button & Lanyard Badge Click -> Open Command Center
+    document.getElementById('btnOpenCommandCenter')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCommandCenter();
+    });
+
+    document.getElementById('cardBadgeTrigger')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCommandCenter();
+    });
+
+    document.getElementById('btnBrandHome')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleCommandCenter();
+    });
+
+    document.getElementById('btnBrandPortfolio')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleCommandCenter();
+    });
   }
 
   if (document.readyState === 'loading') {

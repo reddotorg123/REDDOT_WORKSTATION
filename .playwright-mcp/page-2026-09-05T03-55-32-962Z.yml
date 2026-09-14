@@ -1,0 +1,78 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=e4] [cursor=pointer]':
+        - generic [ref=e5]: ⬢
+        - generic [ref=e7]:
+          - generic [ref=e8]: REDDOT.OS
+          - generic [ref=e9]: WORKSPACE
+      - generic [ref=e10]:
+        - button "📌 Pin Mode" [ref=e11] [cursor=pointer]:
+          - generic [ref=e12]: 📌
+          - generic [ref=e13]: Pin Mode
+        - button "−" [ref=e14] [cursor=pointer]
+        - button "▢" [ref=e16] [cursor=pointer]
+        - button "×" [ref=e18] [cursor=pointer]
+    - main [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]: (TECHNICAL WORKSPACE)
+        - generic [ref=e23]: ORGANIZATION // REDDOT
+      - generic:
+        - heading "REDDOT" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=e32]
+      - generic [ref=e33]:
+        - generic [ref=e34]: PERSISTENT WORKSPACE •
+        - generic [ref=e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=e38] [cursor=pointer]:
+        - generic [ref=e39]: ⧢
+        - generic [ref=e40]: COMMAND CENTER
+        - generic [ref=e41]: SPACE
+      - generic [ref=e43]:
+        - generic [ref=e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=e45]: REDDOT • 2026
+  - generic [ref=e47]:
+    - banner [ref=e48]:
+      - generic [ref=e49]:
+        - generic [ref=e50]: ◆
+        - generic [ref=e51]:
+          - heading "REDDOT WORKSPACE" [level=2] [ref=e52]
+          - paragraph [ref=e53]: "Enterprise Workforce Command • Org: reddot"
+        - generic "Switch User / View Profile" [ref=e54] [cursor=pointer]:
+          - generic [ref=e56]: JAGADISH K // OWNER
+          - generic [ref=e57]: OWNER
+        - generic "Disk Vault & Cloud Sync Active" [ref=e58]: PERSISTENT DB ACTIVE
+      - navigation [ref=e59]:
+        - button "🎨 Wallpapers" [ref=e60] [cursor=pointer]:
+          - generic [ref=e61]: 🎨
+          - generic [ref=e62]: Wallpapers
+        - button "👥 Directory" [ref=e63] [cursor=pointer]:
+          - generic [ref=e64]: 👥
+          - generic [ref=e65]: Directory
+        - button "⏱ Shifts" [ref=e66] [cursor=pointer]:
+          - generic [ref=e67]: ⏱
+          - generic [ref=e68]: Shifts
+        - button "📋 Tasks" [ref=e69] [cursor=pointer]:
+          - generic [ref=e70]: 📋
+          - generic [ref=e71]: Tasks
+        - button "💬 Team Chat" [ref=e72] [cursor=pointer]:
+          - generic [ref=e73]: 💬
+          - generic [ref=e74]: Team Chat
+        - button "🌐 Presence" [ref=e75] [cursor=pointer]:
+          - generic [ref=e76]: 🌐
+          - generic [ref=e77]: Presence
+        - button "🛡 Database" [ref=e78] [cursor=pointer]:
+          - generic [ref=e79]: 🛡
+          - generic [ref=e80]: Database
+      - generic [ref=e81]:
+        - button "📌 Pin Mode" [ref=e82] [cursor=pointer]
+        - button "⧢ Wallpaper Mode [Esc]" [ref=e83] [cursor=pointer]
+        - generic [ref=e84]:
+          - button "−" [ref=e85] [cursor=pointer]
+          - button "▢" [ref=e86] [cursor=pointer]
+          - button "×" [ref=e87] [cursor=pointer]
+    - main [ref=e88]:
+      - generic [ref=e91]:
+        - heading "HARDWARE ARCHITECTURE WALLPAPER MATRIX" [level=3] [ref=e92]
+        - paragraph [ref=e93]: Select your workstation aesthetic preset or customize hardware telemetry overlays.

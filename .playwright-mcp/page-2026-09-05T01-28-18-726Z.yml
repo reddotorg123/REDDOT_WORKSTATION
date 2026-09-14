@@ -1,0 +1,104 @@
+- generic [active] [ref=f18e1]:
+  - generic [ref=f18e2]:
+    - banner [ref=f18e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=f18e4] [cursor=pointer]':
+        - generic [ref=f18e5]: ⬢
+        - generic [ref=f18e7]:
+          - generic [ref=f18e8]: REDDOT.OS
+          - generic [ref=f18e9]: WORKSPACE
+      - generic [ref=f18e10]:
+        - button "📌 Pin Mode" [ref=f18e11] [cursor=pointer]:
+          - generic [ref=f18e12]: 📌
+          - generic [ref=f18e13]: Pin Mode
+        - button "−" [ref=f18e14] [cursor=pointer]
+        - button "▢" [ref=f18e16] [cursor=pointer]
+        - button "×" [ref=f18e18] [cursor=pointer]
+    - main [ref=f18e20]:
+      - generic [ref=f18e21]:
+        - generic [ref=f18e22]: (OWNER)
+        - generic [ref=f18e23]: HARDWARE ARCHITECTURE // RD-FOUNDER-001
+      - generic:
+        - heading "JAGADISH" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=f18e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=f18e32]
+      - generic [ref=f18e33]:
+        - generic [ref=f18e34]: PERSISTENT WORKSPACE •
+        - generic [ref=f18e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=f18e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=f18e38] [cursor=pointer]:
+        - generic [ref=f18e39]: ⧢
+        - generic [ref=f18e40]: COMMAND CENTER
+        - generic [ref=f18e41]: SPACE
+      - generic [ref=f18e43]:
+        - generic [ref=f18e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=f18e45]: JAGADISH K • 2026
+  - generic [ref=f18e47]:
+    - banner [ref=f18e48]:
+      - generic [ref=f18e49]:
+        - generic [ref=f18e50]: ◆
+        - generic [ref=f18e51]:
+          - heading "REDDOT WORKSPACE" [level=2] [ref=f18e52]
+          - paragraph [ref=f18e53]: "Enterprise Workforce Command • Org: reddot"
+        - generic "Switch User / View Profile" [ref=f18e54] [cursor=pointer]:
+          - generic [ref=f18e56]: JAGADISH K // FOUNDER & ADMIN
+          - generic [ref=f18e57]: RD-FOUNDER-001
+        - generic "Disk Vault & Cloud Sync Active" [ref=f18e58]: PERSISTENT DB ACTIVE
+      - navigation [ref=f18e59]:
+        - button "🎨 Wallpapers" [ref=f18e60] [cursor=pointer]:
+          - generic [ref=f18e61]: 🎨
+          - generic [ref=f18e62]: Wallpapers
+        - button "👥 Directory & IDs" [ref=f18e63] [cursor=pointer]:
+          - generic [ref=f18e64]: 👥
+          - generic [ref=f18e65]: Directory & IDs
+        - button "⏱ Shifts" [ref=f18e66] [cursor=pointer]:
+          - generic [ref=f18e67]: ⏱
+          - generic [ref=f18e68]: Shifts
+        - button "📋 Tasks" [ref=f18e69] [cursor=pointer]:
+          - generic [ref=f18e70]: 📋
+          - generic [ref=f18e71]: Tasks
+        - button "💬 Team Chat" [ref=f18e72] [cursor=pointer]:
+          - generic [ref=f18e73]: 💬
+          - generic [ref=f18e74]: Team Chat
+        - button "🌐 Presence" [ref=f18e75] [cursor=pointer]:
+          - generic [ref=f18e76]: 🌐
+          - generic [ref=f18e77]: Presence
+        - button "🛡 Database & Storage" [ref=f18e78] [cursor=pointer]:
+          - generic [ref=f18e79]: 🛡
+          - generic [ref=f18e80]: Database & Storage
+      - generic [ref=f18e81]:
+        - button "📌 Pin Mode" [ref=f18e82] [cursor=pointer]:
+          - generic [ref=f18e83]: 📌
+          - generic [ref=f18e84]: Pin Mode
+        - button "⧢ Wallpaper Mode [Esc]" [ref=f18e85] [cursor=pointer]
+        - generic [ref=f18e87]:
+          - button "−" [ref=f18e88] [cursor=pointer]
+          - button "▢" [ref=f18e89] [cursor=pointer]
+          - button "×" [ref=f18e90] [cursor=pointer]
+    - main [ref=f18e91]:
+      - generic [ref=f18e909]:
+        - generic [ref=f18e910]:
+          - generic [ref=f18e911]:
+            - generic [ref=f18e912]: DUTY ON
+            - heading "00:00:00" [level=3] [ref=f18e913]
+            - paragraph [ref=f18e914]: Current active shift duration for authenticated user
+          - generic [ref=f18e915]:
+            - button "▶ Clock In" [disabled] [ref=f18e916]
+            - button "⏸ Take Break" [ref=f18e917] [cursor=pointer]
+            - button "⏹ Clock Out" [ref=f18e918] [cursor=pointer]
+        - generic [ref=f18e919]:
+          - heading "SHIFT PUNCH AUDIT TRAIL" [level=4] [ref=f18e920]
+          - table [ref=f18e922]:
+            - rowgroup [ref=f18e923]:
+              - row [ref=f18e924]:
+                - columnheader "Employee" [ref=f18e925]
+                - columnheader "Action" [ref=f18e926]
+                - columnheader "Timestamp" [ref=f18e927]
+                - columnheader "Date" [ref=f18e928]
+            - rowgroup [ref=f18e929]:
+              - row [ref=f18e932]:
+                - cell [ref=f18e933]:
+                  - strong [ref=f18e934]: JAGADISH K
+                - cell "▶ Clock In" [ref=f18e935]
+                - cell "06:58 AM" [ref=f18e936]
+                - cell "9/5/2026" [ref=f18e937]
+  - iframe [aria-hidden] [ref=f18e187]

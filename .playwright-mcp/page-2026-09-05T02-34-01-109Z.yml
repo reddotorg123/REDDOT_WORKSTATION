@@ -1,0 +1,367 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=e4] [cursor=pointer]':
+        - generic [ref=e5]: ⬢
+        - generic [ref=e7]:
+          - generic [ref=e8]: REDDOT.OS
+          - generic [ref=e9]: WORKSPACE
+      - generic [ref=e10]:
+        - button "📌 Pin Mode" [ref=e11] [cursor=pointer]:
+          - generic [ref=e12]: 📌
+          - generic [ref=e13]: Pin Mode
+        - button "−" [ref=e14] [cursor=pointer]
+        - button "▢" [ref=e16] [cursor=pointer]
+        - button "×" [ref=e18] [cursor=pointer]
+    - main [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]: (OWNER)
+        - generic [ref=e23]: HARDWARE ARCHITECTURE // RD-FOUNDER-001
+      - generic:
+        - heading "JAGADISH" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=e32]
+      - generic [ref=e33]:
+        - generic [ref=e34]: PERSISTENT WORKSPACE •
+        - generic [ref=e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=e38] [cursor=pointer]:
+        - generic [ref=e39]: ⧢
+        - generic [ref=e40]: COMMAND CENTER
+        - generic [ref=e41]: SPACE
+      - generic [ref=e43]:
+        - generic [ref=e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=e45]: JAGADISH K • 2026
+  - generic [ref=e47]:
+    - banner [ref=e48]:
+      - generic [ref=e49]:
+        - generic [ref=e50]: ◆
+        - generic [ref=e51]:
+          - heading "REDDOT WORKSPACE" [level=2] [ref=e52]
+          - paragraph [ref=e53]: "Enterprise Workforce Command • Org: reddot"
+        - generic "Switch User / View Profile" [ref=e54] [cursor=pointer]: JAGADISH K // FOUNDER & ADMIN
+        - generic "Disk Vault & Cloud Sync Active" [ref=e57]: PERSISTENT DB ACTIVE
+      - navigation [ref=e58]:
+        - button "🎨 Wallpapers" [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]: 🎨
+          - generic [ref=e61]: Wallpapers
+        - button "👥 Directory" [ref=e62] [cursor=pointer]:
+          - generic [ref=e63]: 👥
+          - generic [ref=e64]: Directory
+        - button "⏱ Shifts" [ref=e65] [cursor=pointer]:
+          - generic [ref=e66]: ⏱
+          - generic [ref=e67]: Shifts
+        - button "📋 Tasks" [ref=e68] [cursor=pointer]:
+          - generic [ref=e69]: 📋
+          - generic [ref=e70]: Tasks
+        - button "💬 Team Chat" [active] [ref=e71] [cursor=pointer]:
+          - generic [ref=e72]: 💬
+          - generic [ref=e73]: Team Chat
+        - button "🌐 Presence" [ref=e74] [cursor=pointer]:
+          - generic [ref=e75]: 🌐
+          - generic [ref=e76]: Presence
+        - button "🛡 Database" [ref=e77] [cursor=pointer]:
+          - generic [ref=e78]: 🛡
+          - generic [ref=e79]: Database
+      - generic [ref=e80]:
+        - button "📌 Pin Mode" [ref=e81] [cursor=pointer]:
+          - generic [ref=e82]: 📌
+          - generic [ref=e83]: Pin Mode
+        - button "⧢ Wallpaper Mode [Esc]" [ref=e84] [cursor=pointer]
+        - generic [ref=e86]:
+          - button "−" [ref=e87] [cursor=pointer]
+          - button "▢" [ref=e88] [cursor=pointer]
+          - button "×" [ref=e89] [cursor=pointer]
+    - main [ref=e90]:
+      - generic [ref=e183]:
+        - complementary [ref=e184]:
+          - generic [ref=e185]:
+            - button "🔔 Activity" [ref=e186] [cursor=pointer]:
+              - generic [ref=e187]: 🔔
+              - generic [ref=e188]: Activity
+            - button "💬 Chat" [ref=e189] [cursor=pointer]:
+              - generic [ref=e190]: 💬
+              - generic [ref=e191]: Chat
+            - button "📅 Calendar" [ref=e192] [cursor=pointer]:
+              - generic [ref=e193]: 📅
+              - generic [ref=e194]: Calendar
+            - button "📞 Calls" [ref=e195] [cursor=pointer]:
+              - generic [ref=e196]: 📞
+              - generic [ref=e197]: Calls
+            - button "📁 Files" [ref=e198] [cursor=pointer]:
+              - generic [ref=e199]: 📁
+              - generic [ref=e200]: Files
+            - button "🔖 Saved" [ref=e201] [cursor=pointer]:
+              - generic [ref=e202]: 🔖
+              - generic [ref=e203]: Saved
+          - button "📹 Meet" [ref=e205] [cursor=pointer]:
+            - generic [ref=e206]: 📹
+            - generic [ref=e207]: Meet
+        - generic [ref=e210]:
+          - generic [ref=e211]:
+            - textbox "Filter channels & DMs..." [ref=e213]
+            - generic [ref=e214]:
+              - generic [ref=e215]:
+                - generic [ref=e216]: TEAM CHANNELS
+                - button "+" [ref=e217] [cursor=pointer]
+              - generic [ref=e218]:
+                - button "# general2 ✏️" [ref=e219] [cursor=pointer]:
+                  - generic [ref=e220]:
+                    - generic [ref=e221]: "#"
+                    - generic [ref=e222]: general2
+                  - 'generic "Edit channel #general2" [ref=e223]': ✏️
+                - button "# announcements ✏️" [ref=e224] [cursor=pointer]:
+                  - generic [ref=e225]:
+                    - generic [ref=e226]: "#"
+                    - generic [ref=e227]: announcements
+                  - 'generic "Edit channel #announcements" [ref=e228]': ✏️
+                - button "# engineering ✏️" [ref=e229] [cursor=pointer]:
+                  - generic [ref=e230]:
+                    - generic [ref=e231]: "#"
+                    - generic [ref=e232]: engineering
+                  - 'generic "Edit channel #engineering" [ref=e233]': ✏️
+                - button "# projects ✏️" [ref=e234] [cursor=pointer]:
+                  - generic [ref=e235]:
+                    - generic [ref=e236]: "#"
+                    - generic [ref=e237]: projects
+                  - 'generic "Edit channel #projects" [ref=e238]': ✏️
+                - button "# watercooler ✏️" [ref=e239] [cursor=pointer]:
+                  - generic [ref=e240]:
+                    - generic [ref=e241]: "#"
+                    - generic [ref=e242]: watercooler
+                  - 'generic "Edit channel #watercooler" [ref=e243]': ✏️
+            - generic [ref=e244]:
+              - generic [ref=e245]: DIRECT MESSAGES
+              - button "Pavithra R [RD-EMP-002]" [ref=e247] [cursor=pointer]
+          - generic [ref=e250]:
+            - generic [ref=e251]:
+              - generic [ref=e252]:
+                - generic [ref=e253]:
+                  - heading "#general2" [level=4] [ref=e254]
+                  - button "✏️ Edit" [ref=e255] [cursor=pointer]
+                - paragraph [ref=e257]: Company-wide updates and collaboration
+              - generic [ref=e258]:
+                - button "🔍" [ref=e259] [cursor=pointer]
+                - button "📅 Schedule" [ref=e260] [cursor=pointer]
+                - button "📹 Meet Now" [ref=e261] [cursor=pointer]
+            - generic [ref=e262]:
+              - button "💬 Posts" [ref=e263] [cursor=pointer]
+              - button "📁 Files (0)" [ref=e265] [cursor=pointer]
+              - button "📌 Pinned (0)" [ref=e267] [cursor=pointer]
+              - button "ℹ️ About" [ref=e269] [cursor=pointer]
+            - generic [ref=e274]:
+              - generic [ref=e275]:
+                - generic [ref=e276]: JA
+                - generic [ref=e277]:
+                  - generic:
+                    - button "👍"
+                    - button "❤️"
+                    - button "😂"
+                    - button "😮"
+                    - button "🚀"
+                    - button "💬"
+                    - button "↩️"
+                    - button "🔖"
+                    - button "✏️"
+                    - button "📌"
+                    - button "📋"
+                    - button "🗑️"
+                  - generic [ref=e278]:
+                    - generic [ref=e279]:
+                      - text: JAGADISH K
+                      - generic [ref=e280]: "[RD-UVHR9]"
+                    - generic [ref=e281]: 12:05 AM
+                  - generic [ref=e282]: KVNBKNBXB
+                  - button "💬 Reply in thread" [ref=e283] [cursor=pointer]:
+                    - generic [ref=e284]: 💬
+                    - generic [ref=e285]: Reply in thread
+              - generic [ref=e286]:
+                - generic [ref=e287]: JA
+                - generic [ref=e288]:
+                  - generic:
+                    - button "👍"
+                    - button "❤️"
+                    - button "😂"
+                    - button "😮"
+                    - button "🚀"
+                    - button "💬"
+                    - button "↩️"
+                    - button "🔖"
+                    - button "✏️"
+                    - button "📌"
+                    - button "📋"
+                    - button "🗑️"
+                  - generic [ref=e289]:
+                    - generic [ref=e290]:
+                      - text: JAGADISH K
+                      - generic [ref=e291]: "[RD-UVHR9]"
+                    - generic [ref=e292]: 01:33 PM
+                  - generic [ref=e293]: jvknjjvj\
+                  - button "💬 Reply in thread" [ref=e294] [cursor=pointer]:
+                    - generic [ref=e295]: 💬
+                    - generic [ref=e296]: Reply in thread
+              - generic [ref=e297]:
+                - generic [ref=e298]: JA
+                - generic [ref=e299]:
+                  - generic:
+                    - button "👍"
+                    - button "❤️"
+                    - button "😂"
+                    - button "😮"
+                    - button "🚀"
+                    - button "💬"
+                    - button "↩️"
+                    - button "🔖"
+                    - button "✏️"
+                    - button "📌"
+                    - button "📋"
+                    - button "🗑️"
+                  - generic [ref=e300]:
+                    - generic [ref=e301]:
+                      - text: JAGADISH K
+                      - generic [ref=e302]: "[RD-UVHR9]"
+                    - generic [ref=e303]: 04:47 PM
+                  - generic [ref=e304]: gsdff
+                  - button "💬 Reply in thread" [ref=e305] [cursor=pointer]:
+                    - generic [ref=e306]: 💬
+                    - generic [ref=e307]: Reply in thread
+              - generic [ref=e308]:
+                - generic [ref=e309]: JA
+                - generic [ref=e310]:
+                  - generic:
+                    - button "👍"
+                    - button "❤️"
+                    - button "😂"
+                    - button "😮"
+                    - button "🚀"
+                    - button "💬"
+                    - button "↩️"
+                    - button "🔖"
+                    - button "✏️"
+                    - button "📌"
+                    - button "📋"
+                    - button "🗑️"
+                  - generic [ref=e311]:
+                    - generic [ref=e312]:
+                      - text: JAGADISH K
+                      - generic [ref=e313]: "[RD]"
+                    - generic [ref=e314]: 07:37 PM
+                  - generic [ref=e315]: "System check: Realtime communications active."
+                  - button "💬 Reply in thread" [ref=e316] [cursor=pointer]:
+                    - generic [ref=e317]: 💬
+                    - generic [ref=e318]: Reply in thread
+              - generic [ref=e319]:
+                - img "JAGADISH K" [ref=e321]
+                - generic [ref=e322]:
+                  - generic:
+                    - button "👍"
+                    - button "❤️"
+                    - button "😂"
+                    - button "😮"
+                    - button "🚀"
+                    - button "💬"
+                    - button "↩️"
+                    - button "🔖"
+                    - button "✏️"
+                    - button "📌"
+                    - button "📋"
+                    - button "🗑️"
+                  - generic [ref=e323]:
+                    - generic [ref=e324]:
+                      - text: JAGADISH K
+                      - generic [ref=e325]: "[RD-FOUNDER-001]"
+                    - generic [ref=e326]: 09:06 PM
+                  - generic [ref=e327]: hi dilip pondati'
+                  - button "💬 Reply in thread" [ref=e328] [cursor=pointer]:
+                    - generic [ref=e329]: 💬
+                    - generic [ref=e330]: Reply in thread
+              - generic [ref=e331]:
+                - img "Pavithra R" [ref=e333]
+                - generic [ref=e334]:
+                  - generic:
+                    - button "👍"
+                    - button "❤️"
+                    - button "😂"
+                    - button "😮"
+                    - button "🚀"
+                    - button "💬"
+                    - button "↩️"
+                    - button "🔖"
+                    - button "✏️"
+                    - button "📌"
+                    - button "📋"
+                    - button "🗑️"
+                  - generic [ref=e335]:
+                    - generic [ref=e336]:
+                      - text: Pavithra R
+                      - generic [ref=e337]: "[RD-EMP-002]"
+                    - generic [ref=e338]: 09:06 PM
+                  - generic [ref=e339]: hiii
+                  - button "💬 Reply in thread" [ref=e340] [cursor=pointer]:
+                    - generic [ref=e341]: 💬
+                    - generic [ref=e342]: Reply in thread
+              - generic [ref=e343]:
+                - img "JAGADISH K" [ref=e345]
+                - generic [ref=e346]:
+                  - generic:
+                    - button "👍"
+                    - button "❤️"
+                    - button "😂"
+                    - button "😮"
+                    - button "🚀"
+                    - button "💬"
+                    - button "↩️"
+                    - button "🔖"
+                    - button "✏️"
+                    - button "📌"
+                    - button "📋"
+                    - button "🗑️"
+                  - generic [ref=e347]:
+                    - generic [ref=e348]:
+                      - text: JAGADISH K
+                      - generic [ref=e349]: "[RD-FOUNDER-001]"
+                    - generic [ref=e350]: 06:46 PM
+                  - generic [ref=e351]:
+                    - text: 📹
+                    - strong [ref=e352]: INSTANT MEETING STARTED
+                    - text: ": Team video conference room is live!🔗"
+                    - link "Click to Join Jitsi Meeting" [ref=e353] [cursor=pointer]:
+                      - /url: https://meet.jit.si/reddot-team-1788527784703
+                  - button "💬 Reply in thread" [ref=e354] [cursor=pointer]:
+                    - generic [ref=e355]: 💬
+                    - generic [ref=e356]: Reply in thread
+              - generic [ref=e357]:
+                - img "JAGADISH K" [ref=e359]
+                - generic [ref=e360]:
+                  - generic:
+                    - button "👍"
+                    - button "❤️"
+                    - button "😂"
+                    - button "😮"
+                    - button "🚀"
+                    - button "💬"
+                    - button "↩️"
+                    - button "🔖"
+                    - button "✏️"
+                    - button "📌"
+                    - button "📋"
+                    - button "🗑️"
+                  - generic [ref=e361]:
+                    - generic [ref=e362]:
+                      - text: JAGADISH K
+                      - generic [ref=e363]: "[RD-FOUNDER-001]"
+                    - generic [ref=e364]: 06:49 AM
+                  - generic [ref=e365]: Chrome automated test message
+                  - button "💬 Reply in thread" [ref=e366] [cursor=pointer]:
+                    - generic [ref=e367]: 💬
+                    - generic [ref=e368]: Reply in thread
+            - generic [ref=e370]:
+              - textbox "Type a message... (Enter to send, Shift+Enter for newline)" [ref=e371]
+              - generic [ref=e372]:
+                - generic [ref=e373]:
+                  - button "Aa" [ref=e374] [cursor=pointer]
+                  - button "📎" [ref=e376] [cursor=pointer]
+                  - button "🖼️" [ref=e378] [cursor=pointer]
+                  - button "🎙️" [ref=e380] [cursor=pointer]
+                  - button "😀" [ref=e382] [cursor=pointer]
+                - button "Send →" [ref=e385] [cursor=pointer]

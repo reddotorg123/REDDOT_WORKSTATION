@@ -1,0 +1,125 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=e4] [cursor=pointer]':
+        - generic [ref=e5]: ⬢
+        - generic [ref=e7]:
+          - generic [ref=e8]: REDDOT.OS
+          - generic [ref=e9]: WORKSPACE
+      - generic [ref=e10]:
+        - button "📌 Pin Mode" [ref=e11] [cursor=pointer]:
+          - generic [ref=e12]: 📌
+          - generic [ref=e13]: Pin Mode
+        - button "−" [ref=e14] [cursor=pointer]
+        - button "▢" [ref=e16] [cursor=pointer]
+        - button "×" [ref=e18] [cursor=pointer]
+    - main [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]: (OWNER)
+        - generic [ref=e23]: HARDWARE ARCHITECTURE // RD-FOUNDER-001
+      - generic:
+        - heading "JAGADISH" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=e32]
+      - generic [ref=e33]:
+        - generic [ref=e34]: PERSISTENT WORKSPACE •
+        - generic [ref=e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=e38] [cursor=pointer]:
+        - generic [ref=e39]: ⧢
+        - generic [ref=e40]: COMMAND CENTER
+        - generic [ref=e41]: SPACE
+      - generic [ref=e43]:
+        - generic [ref=e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=e45]: JAGADISH K • 2026
+  - generic [ref=e47]:
+    - banner [ref=e48]:
+      - generic [ref=e49]:
+        - generic [ref=e50]: ◆
+        - heading "REDDOT WORKSPACE" [level=2] [ref=e52]
+        - generic "Switch User / View Profile" [ref=e53] [cursor=pointer]: JAGADISH K // FOUNDER & ADMIN
+      - navigation [ref=e56]:
+        - button "🎨 Wallpapers" [active] [ref=e57] [cursor=pointer]:
+          - generic [ref=e58]: 🎨
+          - generic [ref=e59]: Wallpapers
+        - button "👥 Directory" [ref=e60] [cursor=pointer]:
+          - generic [ref=e61]: 👥
+          - generic [ref=e62]: Directory
+        - button "⏱ Shifts" [ref=e63] [cursor=pointer]:
+          - generic [ref=e64]: ⏱
+          - generic [ref=e65]: Shifts
+        - button "📋 Tasks" [ref=e66] [cursor=pointer]:
+          - generic [ref=e67]: 📋
+          - generic [ref=e68]: Tasks
+        - button "💬 Team Chat" [ref=e69] [cursor=pointer]:
+          - generic [ref=e70]: 💬
+          - generic [ref=e71]: Team Chat
+        - button "🌐 Presence" [ref=e72] [cursor=pointer]:
+          - generic [ref=e73]: 🌐
+          - generic [ref=e74]: Presence
+        - button "🛡 Database" [ref=e75] [cursor=pointer]:
+          - generic [ref=e76]: 🛡
+          - generic [ref=e77]: Database
+      - generic [ref=e78]:
+        - button "📌 Pin Mode" [ref=e79] [cursor=pointer]:
+          - generic [ref=e80]: 📌
+          - generic [ref=e81]: Pin Mode
+        - button "⧢ Wallpaper Mode [Esc]" [ref=e82] [cursor=pointer]
+        - generic [ref=e84]:
+          - button "−" [ref=e85] [cursor=pointer]
+          - button "▢" [ref=e86] [cursor=pointer]
+          - button "×" [ref=e87] [cursor=pointer]
+    - main [ref=e88]:
+      - generic [ref=e89]:
+        - generic [ref=e91]:
+          - heading "HARDWARE ARCHITECTURE WALLPAPER MATRIX" [level=3] [ref=e92]
+          - paragraph [ref=e93]: Select your workstation aesthetic preset or customize hardware telemetry overlays.
+        - generic [ref=e94]:
+          - generic [ref=e152]:
+            - img "Obsidian Cyber (Cyan)" [ref=e154]
+            - generic [ref=e155]:
+              - generic [ref=e156]:
+                - generic [ref=e157]: Obsidian Cyber (Cyan)
+                - generic [ref=e158]: SIGNATURE 60FPS
+              - paragraph [ref=e159]: Pixel-perfect symmetrical hardware architecture matrix with cyan circuit traces.
+              - button "✓ Active Preset" [ref=e161] [cursor=pointer]
+          - generic [ref=e162]:
+            - img "Crimson REDDOT Executive" [ref=e164]
+            - generic [ref=e165]:
+              - generic [ref=e166]:
+                - generic [ref=e167]: Crimson REDDOT Executive
+                - generic [ref=e168]: REDDOT OFFICIAL
+              - paragraph [ref=e169]: Executive command workstation palette with crimson laser telemetry and carbon mesh.
+              - button "Apply Wallpaper" [ref=e171] [cursor=pointer]
+          - generic [ref=e172]:
+            - img "Soft Emerald Firmware" [ref=e174]
+            - generic [ref=e175]:
+              - generic [ref=e176]:
+                - generic [ref=e177]: Soft Emerald Firmware
+                - generic [ref=e178]: FIRMWARE LAB
+              - paragraph [ref=e179]: Bio-synthetic glowing emerald traces designed for late-night firmware architecture.
+              - button "Apply Wallpaper" [ref=e181] [cursor=pointer]
+          - generic [ref=e182]:
+            - img "Sunset Amber Hardware" [ref=e184]
+            - generic [ref=e185]:
+              - generic [ref=e186]:
+                - generic [ref=e187]: Sunset Amber Hardware
+                - generic [ref=e188]: CAD TELEMETRY
+              - paragraph [ref=e189]: Warm glowing amber gold hardware blueprint with pulse frequency lines.
+              - button "Apply Wallpaper" [ref=e191] [cursor=pointer]
+          - generic [ref=e192]:
+            - img "Deep Nebula Quantum" [ref=e194]
+            - generic [ref=e195]:
+              - generic [ref=e196]:
+                - generic [ref=e197]: Deep Nebula Quantum
+                - generic [ref=e198]: AI / ML SYSTEMS
+              - paragraph [ref=e199]: Cosmic purple aurora with neural network nodes and dark obsidian background.
+              - button "Apply Wallpaper" [ref=e201] [cursor=pointer]
+          - generic [ref=e202]:
+            - img "Nordic Minimalist Slate" [ref=e204]
+            - generic [ref=e205]:
+              - generic [ref=e206]:
+                - generic [ref=e207]: Nordic Minimalist Slate
+                - generic [ref=e208]: DISTRACTION FREE
+              - paragraph [ref=e209]: Ultra-clean Scandinavian matte obsidian slate for distraction-free coding.
+              - button "Apply Wallpaper" [ref=e211] [cursor=pointer]

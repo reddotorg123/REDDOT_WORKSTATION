@@ -1,0 +1,14 @@
+{
+  "version": "3.0.1",
+  "releaseDate": "2026-09-13",
+  "minRequiredVersion": "2.0.0",
+  "changelog": [
+    "Enterprise Boot Screen: High-tech bootloader HUD with real-time initialization telemetry, shimmer progress bar, and smooth fade-out transition.",
+    "Unified Dual-Theme Engine: Pristine Carbon Light and Obsidian Crimson Dark parity across all 7 workspace modules, Teams chat, sub-rails, and modals.",
+    "Eliminated Theme Mismatch: Unified color tokens for chat feed, composer, channel navigation, and card decks with zero pitch-black islands in light mode.",
+    "Navigation & Active State Standard: Resolved dual active tab collision and standardized 7-module workspace sidebar with high-contrast active indicator.",
+    "Hotpatch & Development Dual-Sync: Instantaneous live reload sync between workspace repository and %APPDATA% hotpatch cache."
+  ],
+  "downloadUrl": "https://github.com/reddotorg123/REDDOT_WORKSTATION/releases/download/v3.0.1/REDDOT-Workstation-OS-Setup.exe",
+  "mandatory": false
+}

@@ -1,0 +1,36 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=e4] [cursor=pointer]':
+        - generic [ref=e5]: ⬢
+        - generic [ref=e7]:
+          - generic [ref=e8]: REDDOT.OS
+          - generic [ref=e9]: WORKSPACE
+      - generic [ref=e10]:
+        - button "⚡ UPDATE READY [v2.5.2]" [ref=e95] [cursor=pointer]
+        - button "📌 Pin Mode" [ref=e11] [cursor=pointer]:
+          - generic [ref=e12]: 📌
+          - generic [ref=e13]: Pin Mode
+        - button "−" [ref=e14] [cursor=pointer]
+        - button "▢" [ref=e16] [cursor=pointer]
+        - button "×" [ref=e18] [cursor=pointer]
+    - main [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]: (OWNER)
+        - generic [ref=e23]: HARDWARE ARCHITECTURE // RD-FOUNDER-001
+      - generic:
+        - heading "JAGADISH" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=e32]
+      - generic [ref=e33]:
+        - generic [ref=e34]: PERSISTENT WORKSPACE •
+        - generic [ref=e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=e38] [cursor=pointer]:
+        - generic [ref=e39]: ⧢
+        - generic [ref=e40]: COMMAND CENTER
+        - generic [ref=e41]: SPACE
+      - generic [ref=e43]:
+        - generic [ref=e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=e45]: JAGADISH K • 2026
+  - text: ▸ ▸ ▸ ▸ ▸

@@ -1,0 +1,46 @@
+[20940:0913/143651.848:WARNING:notify_icon.cc(60)] Unable to create status tray icon.
+[20940:0913/143651.849:WARNING:notify_icon.cc(141)] Error setting status tray icon image
+[20940:0913/143651.850:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143652.765:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143653.082:INFO:CONSOLE(306)] "[DB] Loaded persistent workspace database from disk.", source: http://localhost:54366/wallpaper.js?v=2.5.2-teams (306)
+[20940:0913/143654.277:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143654.426:INFO:CONSOLE(1)] "[2026-09-13T09:06:54.425Z]  @firebase/firestore: Firestore (10.8.0): enableMultiTabIndexedDbPersistence() will be deprecated in the future, you can use `FirestoreSettings.cache` instead.", source: https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js (1)
+[20940:0913/143654.429:INFO:CONSOLE(71)] "[FIREBASE] Production Firebase initialized for organization: reddot", source: http://localhost:54366/firebase-service.js?v=2.5.2-teams (71)
+[20940:0913/143654.517:INFO:CONSOLE(8177)] "[FIREBASE] Establishing active multi-device real-time cloud subscriptions...", source: http://localhost:54366/wallpaper.js?v=2.5.2-teams (8177)
+[20940:0913/143655.775:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143657.288:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143658.802:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143700.310:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143701.824:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143703.338:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143704.847:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143706.362:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143707.862:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143709.377:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143710.884:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143712.382:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143713.897:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143715.412:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143716.913:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143718.427:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143719.945:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143721.457:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143722.967:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143724.470:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143725.976:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143727.476:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143728.984:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143730.496:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143732.010:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143733.522:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143735.036:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143736.535:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143738.050:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143739.549:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143741.064:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143742.583:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143744.100:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143745.601:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143747.106:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143748.611:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[20940:0913/143750.120:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon

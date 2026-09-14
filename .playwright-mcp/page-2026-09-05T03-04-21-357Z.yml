@@ -1,0 +1,145 @@
+- generic [ref=f2e1]:
+  - generic [ref=f2e2]:
+    - banner [ref=f2e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=f2e4] [cursor=pointer]':
+        - generic [ref=f2e5]: ⬢
+        - generic [ref=f2e7]:
+          - generic [ref=f2e8]: REDDOT.OS
+          - generic [ref=f2e9]: WORKSPACE
+      - generic [ref=f2e10]:
+        - button "📌 Pin Mode" [ref=f2e11] [cursor=pointer]:
+          - generic [ref=f2e12]: 📌
+          - generic [ref=f2e13]: Pin Mode
+        - button "−" [ref=f2e14] [cursor=pointer]
+        - button "▢" [ref=f2e16] [cursor=pointer]
+        - button "×" [ref=f2e18] [cursor=pointer]
+    - main [ref=f2e20]:
+      - generic [ref=f2e21]:
+        - generic [ref=f2e22]: (OWNER)
+        - generic [ref=f2e23]: HARDWARE ARCHITECTURE // RD-FOUNDER-001
+      - generic:
+        - heading "JAGADISH" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=f2e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=f2e32]
+      - generic [ref=f2e33]:
+        - generic [ref=f2e34]: PERSISTENT WORKSPACE •
+        - generic [ref=f2e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=f2e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=f2e38] [cursor=pointer]:
+        - generic [ref=f2e39]: ⧢
+        - generic [ref=f2e40]: COMMAND CENTER
+        - generic [ref=f2e41]: SPACE
+      - generic [ref=f2e43]:
+        - generic [ref=f2e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=f2e45]: JAGADISH K • 2026
+  - generic [ref=f2e47]:
+    - banner [ref=f2e48]:
+      - generic [ref=f2e49]:
+        - generic [ref=f2e50]: ◆
+        - heading "REDDOT WORKSPACE" [level=2] [ref=f2e52]
+        - generic "Switch User / View Profile" [ref=f2e53] [cursor=pointer]: JAGADISH K // FOUNDER & ADMIN
+      - navigation [ref=f2e56]:
+        - button "🎨 Wallpapers" [ref=f2e57] [cursor=pointer]:
+          - generic [ref=f2e58]: 🎨
+          - generic [ref=f2e59]: Wallpapers
+        - button "👥 Directory" [ref=f2e60] [cursor=pointer]:
+          - generic [ref=f2e61]: 👥
+          - generic [ref=f2e62]: Directory
+        - button "⏱ Shifts" [ref=f2e63] [cursor=pointer]:
+          - generic [ref=f2e64]: ⏱
+          - generic [ref=f2e65]: Shifts
+        - button "📋 Tasks" [ref=f2e66] [cursor=pointer]:
+          - generic [ref=f2e67]: 📋
+          - generic [ref=f2e68]: Tasks
+        - button "💬 Team Chat" [ref=f2e69] [cursor=pointer]:
+          - generic [ref=f2e70]: 💬
+          - generic [ref=f2e71]: Team Chat
+        - button "🌐 Presence" [active] [ref=f2e72] [cursor=pointer]:
+          - generic [ref=f2e73]: 🌐
+          - generic [ref=f2e74]: Presence
+        - button "🛡 Database" [ref=f2e75] [cursor=pointer]:
+          - generic [ref=f2e76]: 🛡
+          - generic [ref=f2e77]: Database
+      - generic [ref=f2e78]:
+        - button "📌 Pin Mode" [ref=f2e79] [cursor=pointer]:
+          - generic [ref=f2e80]: 📌
+          - generic [ref=f2e81]: Pin Mode
+        - button "⧢ Wallpaper Mode [Esc]" [ref=f2e82] [cursor=pointer]
+        - generic [ref=f2e84]:
+          - button "−" [ref=f2e85] [cursor=pointer]
+          - button "▢" [ref=f2e86] [cursor=pointer]
+          - button "×" [ref=f2e87] [cursor=pointer]
+    - main [ref=f2e88]:
+      - generic [ref=f2e563]:
+        - generic [ref=f2e564]:
+          - generic [ref=f2e565]:
+            - heading "🌐 TEAM PRESENCE & AVAILABILITY DASHBOARD" [level=3] [ref=f2e566]
+            - paragraph [ref=f2e567]: "Transparent, minimal status indicators: App online/away/offline, active focus task, and system uptime. (Zero-surveillance guarantee)."
+          - generic [ref=f2e568]:
+            - generic [ref=f2e569]: 1 / 2 Online Workstations
+            - button "🛡 Privacy & Disclosure" [ref=f2e571] [cursor=pointer]
+        - generic [ref=f2e572]:
+          - generic [ref=f2e573]:
+            - generic [ref=f2e574]:
+              - generic [ref=f2e575]:
+                - generic [ref=f2e576]: JA
+                - generic [ref=f2e577]:
+                  - generic [ref=f2e578]: JAGADISH K
+                  - generic [ref=f2e579]: RD-FOUNDER-001 • Hardware Architecture
+              - generic [ref=f2e580]: 🟢 Online
+            - generic [ref=f2e581]:
+              - generic [ref=f2e582]:
+                - generic [ref=f2e583]: Status
+                - generic [ref=f2e584]: ONLINE
+              - generic [ref=f2e585]:
+                - generic [ref=f2e586]: App Build
+                - generic [ref=f2e587]: v2.6 Windows
+              - generic [ref=f2e588]:
+                - generic [ref=f2e589]: Hours Today
+                - generic [ref=f2e590]: 7.5h
+            - generic [ref=f2e591]:
+              - strong [ref=f2e592]: "Active Focus:"
+              - text: General System Architecture
+            - generic [ref=f2e593]:
+              - button "💬 Message" [ref=f2e594] [cursor=pointer]
+              - button "📹 Meeting" [ref=f2e595] [cursor=pointer]
+          - generic [ref=f2e596]:
+            - generic [ref=f2e597]:
+              - generic [ref=f2e598]:
+                - generic [ref=f2e599]: PA
+                - generic [ref=f2e600]:
+                  - generic [ref=f2e601]: Pavithra R
+                  - generic [ref=f2e602]: RD-EMP-002 • Engineering & Development
+              - generic [ref=f2e603]: 🔴 Offline
+            - generic [ref=f2e604]:
+              - generic [ref=f2e605]:
+                - generic [ref=f2e606]: Status
+                - generic [ref=f2e607]: OFFLINE
+              - generic [ref=f2e608]:
+                - generic [ref=f2e609]: App Build
+                - generic [ref=f2e610]: v2.6 Windows
+              - generic [ref=f2e611]:
+                - generic [ref=f2e612]: Hours Today
+                - generic [ref=f2e613]: 7.5h
+            - generic [ref=f2e614]:
+              - strong [ref=f2e615]: "Active Focus:"
+              - text: General System Architecture
+            - generic [ref=f2e616]:
+              - button "💬 Message" [ref=f2e617] [cursor=pointer]
+              - button "📹 Meeting" [ref=f2e618] [cursor=pointer]
+        - generic [ref=f2e619]:
+          - heading "📜 WORKSPACE AUDIT LOG" [level=4] [ref=f2e620]
+          - table [ref=f2e622]:
+            - rowgroup [ref=f2e623]:
+              - row [ref=f2e624]:
+                - columnheader "Action" [ref=f2e625]
+                - columnheader "Performed By" [ref=f2e626]
+                - columnheader "Details" [ref=f2e627]
+                - columnheader "Time" [ref=f2e628]
+            - rowgroup [ref=f2e629]:
+              - row [ref=f2e630]:
+                - cell [ref=f2e631]:
+                  - strong [ref=f2e632]: WORKSPACE_INIT
+                - cell "SYSTEM" [ref=f2e633]
+                - cell "Native persistent storage initialized." [ref=f2e634]
+                - cell "9/5/2026, 6:38:50 AM" [ref=f2e635]

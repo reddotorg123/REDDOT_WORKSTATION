@@ -1,18 +1,14 @@
 {
-  "version": "3.0.0",
-  "releaseDate": "2026-09-12",
+  "version": "3.0.2",
+  "releaseDate": "2026-09-14",
   "minRequiredVersion": "2.0.0",
   "changelog": [
-    "REDDOT Workstation v3.0 UI/UX Architecture: Complete industrial redesign inspired by IBM Carbon and high-performance mission control systems.",
-    "Executive Daily Pulse Dashboard: Circular live SVG gauge ring, 4 executive KPI metric cards, priority objectives, and real-time team activity stream.",
-    "Iconic Left Navigation Rail: High-density workspace navigation with live CPU allocation telemetry.",
-    "Precision Attendance Log & Hero Card: Massive clock display, 8-hour shift quota progress bar, and one-click cryptographically auditable CSV export.",
-    "Engineering Nodes Matrix: Deep personnel telemetry, target architecture badges, active directives, and instant node provisioning.",
-    "Sprint 14 Execution Cycle: Sprint progress banner, prioritized work streams, and interactive slide-out task detail drawer with subtasks checklist.",
-    "Dual-Theme Engine: Seamless switching between Clean Carbon Light Mode and Obsidian Crimson Dark Mode (Alt+T shortcut).",
-    "Universal Omnibox Search: Global shortcut (Ctrl+K) for instant keyboard-driven search across tasks, engineering nodes, and system commands.",
-    "Hardware Function Keys: Instant F7 (Take Break) and F8 (Clock Out) desktop shortcut bindings."
+    "Fixed WhatsApp-Style Call Screen: Resolved CSS flex override so Accept and Cut/Decline immediately dismiss the overlay and stop ringtone.",
+    "Auto-Expiring Stale Call Signaling: Incoming calls older than 45s are ignored automatically, completely preventing ghost ringing on launch.",
+    "Employee Directory & Kanban Filters: Restored search text, department pills, and status dropdown filtering across workers and task boards.",
+    "Central Files Support: Expanded document filtering to recognize .pdf, .docx, .xlsx, .pptx, .csv, .zip, .md, and code files.",
+    "Optimized Voice & Image Sync: Added client-side image canvas compression (<120KB) and Opus voice memos for instant cloud transfers."
   ],
-  "downloadUrl": "https://github.com/reddotorg123/REDDOT_WORKSTATION/releases/download/v3.0.0/REDDOT-Workstation-OS-Setup.exe",
+  "downloadUrl": "https://github.com/reddotorg123/REDDOT_WORKSTATION/releases/download/v3.0.2/REDDOT-Workstation-OS-Setup.exe",
   "mandatory": false
 }

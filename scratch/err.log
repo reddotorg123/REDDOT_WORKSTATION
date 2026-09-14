@@ -1,0 +1,9 @@
+[12352:0913/144015.482:WARNING:notify_icon.cc(60)] Unable to create status tray icon.
+[12352:0913/144015.482:WARNING:notify_icon.cc(141)] Error setting status tray icon image
+[12352:0913/144015.482:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[12352:0913/144016.430:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[12352:0913/144016.758:INFO:CONSOLE(306)] "[DB] Loaded persistent workspace database from disk.", source: http://localhost:60325/wallpaper.js?v=2.5.2-teams (306)
+[12352:0913/144017.941:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[12352:0913/144018.053:INFO:CONSOLE(1)] "[2026-09-13T09:10:18.052Z]  @firebase/firestore: Firestore (10.8.0): enableMultiTabIndexedDbPersistence() will be deprecated in the future, you can use `FirestoreSettings.cache` instead.", source: https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js (1)
+[12352:0913/144018.055:INFO:CONSOLE(71)] "[FIREBASE] Production Firebase initialized for organization: reddot", source: http://localhost:60325/firebase-service.js?v=2.5.2-teams (71)
+[12352:0913/144018.139:INFO:CONSOLE(8177)] "[FIREBASE] Establishing active multi-device real-time cloud subscriptions...", source: http://localhost:60325/wallpaper.js?v=2.5.2-teams (8177)

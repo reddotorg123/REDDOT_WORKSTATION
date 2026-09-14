@@ -1,0 +1,82 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=e4] [cursor=pointer]':
+        - generic [ref=e5]: ⬢
+        - generic [ref=e7]:
+          - generic [ref=e8]: REDDOT.OS
+          - generic [ref=e9]: WORKSPACE
+      - generic [ref=e10]:
+        - button "📌 Pin Mode" [ref=e11] [cursor=pointer]:
+          - generic [ref=e12]: 📌
+          - generic [ref=e13]: Pin Mode
+        - button "−" [ref=e14] [cursor=pointer]
+        - button "▢" [ref=e16] [cursor=pointer]
+        - button "×" [ref=e18] [cursor=pointer]
+    - main [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]: (TECHNICAL WORKSPACE)
+        - generic [ref=e23]: ORGANIZATION // REDDOT
+      - generic:
+        - heading "REDDOT" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=e32]
+      - generic [ref=e33]:
+        - generic [ref=e34]: PERSISTENT WORKSPACE •
+        - generic [ref=e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=e38] [cursor=pointer]:
+        - generic [ref=e39]: ⧢
+        - generic [ref=e40]: COMMAND CENTER
+        - generic [ref=e41]: SPACE
+      - generic [ref=e43]:
+        - generic [ref=e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=e45]: REDDOT • 2026
+  - generic [ref=e47]:
+    - banner [ref=e48]:
+      - generic [ref=e49]:
+        - generic [ref=e50]: ◆
+        - heading "REDDOT WORKSPACE" [level=2] [ref=e52]
+        - generic "Switch User / View Profile" [ref=e53] [cursor=pointer]: JAGADISH K // FOUNDER & ADMIN
+      - navigation [ref=e56]:
+        - button "🎨 Wallpapers" [ref=e57] [cursor=pointer]:
+          - generic [ref=e58]: 🎨
+          - generic [ref=e59]: Wallpapers
+        - button "👥 Directory" [ref=e60] [cursor=pointer]:
+          - generic [ref=e61]: 👥
+          - generic [ref=e62]: Directory
+        - button "⏱ Shifts" [ref=e63] [cursor=pointer]:
+          - generic [ref=e64]: ⏱
+          - generic [ref=e65]: Shifts
+        - button "📋 Tasks" [ref=e66] [cursor=pointer]:
+          - generic [ref=e67]: 📋
+          - generic [ref=e68]: Tasks
+        - button "💬 Team Chat" [ref=e69] [cursor=pointer]:
+          - generic [ref=e70]: 💬
+          - generic [ref=e71]: Team Chat
+        - button "🌐 Presence" [ref=e72] [cursor=pointer]:
+          - generic [ref=e73]: 🌐
+          - generic [ref=e74]: Presence
+        - button "🛡 Database" [ref=e75] [cursor=pointer]:
+          - generic [ref=e76]: 🛡
+          - generic [ref=e77]: Database
+      - generic [ref=e78]:
+        - button "📌 Pin Mode" [ref=e79] [cursor=pointer]:
+          - generic [ref=e80]: 📌
+          - generic [ref=e81]: Pin Mode
+        - button "⧢ Wallpaper Mode [Esc]" [ref=e82] [cursor=pointer]
+        - generic [ref=e84]:
+          - button "−" [ref=e85] [cursor=pointer]
+          - button "▢" [ref=e86] [cursor=pointer]
+          - button "×" [ref=e87] [cursor=pointer]
+    - main [ref=e88]:
+      - generic [ref=e95]:
+        - generic [ref=e96]:
+          - textbox "Search team members by name, role, ID, department..." [ref=e98]
+          - button "➕ Create Member & ID Card" [ref=e100] [cursor=pointer]
+        - generic [ref=e102]:
+          - paragraph [ref=e103]: No team members registered yet.
+          - paragraph [ref=e104]:
+            - text: Click
+            - strong [ref=e105]: + Create Member & ID Card
+            - text: to onboard colleagues or invite them to sign in.

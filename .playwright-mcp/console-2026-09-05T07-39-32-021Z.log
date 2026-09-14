@@ -1,0 +1,5 @@
+[     346ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://127.0.0.1:58991/:0
+[     347ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://127.0.0.1:58991/:0
+[    1286ms] [WARNING] [2026-09-05T07:39:33.306Z]  @firebase/firestore: Firestore (10.8.0): enableMultiTabIndexedDbPersistence() will be deprecated in the future, you can use `FirestoreSettings.cache` instead. @ https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js:0
+[    1286ms] [LOG] [FIREBASE] Production Firebase initialized for organization: reddot @ http://127.0.0.1:58991/firebase-service.js?v=2.5.2-teams:70
+[    1336ms] [LOG] [FIREBASE] Establishing active multi-device real-time cloud subscriptions... @ http://127.0.0.1:58991/wallpaper.js?v=2.5.2-teams:6631

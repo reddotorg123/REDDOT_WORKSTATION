@@ -1,0 +1,147 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - banner [ref=f1e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=f1e4] [cursor=pointer]':
+        - generic [ref=f1e5]: ⬢
+        - generic [ref=f1e7]:
+          - generic [ref=f1e8]: REDDOT.OS
+          - generic [ref=f1e9]: WORKSPACE
+      - generic [ref=f1e10]:
+        - button "⚡ UPDATE READY [v2.5.2]" [ref=f1e131] [cursor=pointer]
+        - button "📌 Pin Mode" [ref=f1e11] [cursor=pointer]:
+          - generic [ref=f1e12]: 📌
+          - generic [ref=f1e13]: Pin Mode
+        - button "−" [ref=f1e14] [cursor=pointer]
+        - button "▢" [ref=f1e16] [cursor=pointer]
+        - button "×" [ref=f1e18] [cursor=pointer]
+    - main [ref=f1e20]:
+      - generic [ref=f1e21]:
+        - generic [ref=f1e22]: (OWNER)
+        - generic [ref=f1e23]: HARDWARE ARCHITECTURE // RD-FOUNDER-001
+      - generic:
+        - heading "JAGADISH" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=f1e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=f1e32]
+      - generic [ref=f1e33]:
+        - generic [ref=f1e34]: PERSISTENT WORKSPACE •
+        - generic [ref=f1e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=f1e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=f1e38] [cursor=pointer]:
+        - generic [ref=f1e39]: ⧢
+        - generic [ref=f1e40]: COMMAND CENTER
+        - generic [ref=f1e41]: SPACE
+      - generic [ref=f1e43]:
+        - generic [ref=f1e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=f1e45]: JAGADISH K • 2026
+  - generic [ref=f1e47]:
+    - banner [ref=f1e48]:
+      - generic [ref=f1e49]:
+        - generic [ref=f1e50]: ◆
+        - generic [ref=f1e51]:
+          - heading "REDDOT WORKSPACE" [level=2] [ref=f1e52]
+          - paragraph [ref=f1e174]: "Enterprise Workforce Command • Org: reddot"
+        - generic "Switch User / View Profile" [ref=f1e53] [cursor=pointer]:
+          - generic [ref=f1e55]: JAGADISH K // FOUNDER & ADMIN
+          - generic [ref=f1e56]: RD-FOUNDER-001
+        - generic "Disk Vault & Cloud Sync Active" [ref=f1e175]: PERSISTENT DB ACTIVE
+      - navigation [ref=f1e57]:
+        - button "🎨 Wallpapers" [ref=f1e58] [cursor=pointer]:
+          - generic [ref=f1e59]: 🎨
+          - generic [ref=f1e60]: Wallpapers
+        - button "👥 Directory" [ref=f1e61] [cursor=pointer]:
+          - generic [ref=f1e62]: 👥
+          - generic [ref=f1e63]: Directory
+        - button "⏱ Shifts" [ref=f1e64] [cursor=pointer]:
+          - generic [ref=f1e65]: ⏱
+          - generic [ref=f1e66]: Shifts
+        - button "📋 Tasks" [ref=f1e67] [cursor=pointer]:
+          - generic [ref=f1e68]: 📋
+          - generic [ref=f1e69]: Tasks
+        - button "💬 Team Chat" [ref=f1e70] [cursor=pointer]:
+          - generic [ref=f1e71]: 💬
+          - generic [ref=f1e72]: Team Chat
+        - button "🌐 Presence" [ref=f1e73] [cursor=pointer]:
+          - generic [ref=f1e74]: 🌐
+          - generic [ref=f1e75]: Presence
+        - button "🛡 Database" [ref=f1e76] [cursor=pointer]:
+          - generic [ref=f1e77]: 🛡
+          - generic [ref=f1e78]: Database
+      - generic [ref=f1e79]:
+        - button "⚡ UPDATE AVAILABLE [v2.5.2]" [active] [ref=f1e134] [cursor=pointer]
+        - button "📌 Pin Mode" [ref=f1e80] [cursor=pointer]
+        - button "⧢ Wallpaper Mode [Esc]" [ref=f1e81] [cursor=pointer]
+        - generic [ref=f1e82]:
+          - button "−" [ref=f1e83] [cursor=pointer]
+          - button "▢" [ref=f1e84] [cursor=pointer]
+          - button "×" [ref=f1e85] [cursor=pointer]
+    - main [ref=f1e86]:
+      - generic [ref=f1e87]:
+        - generic [ref=f1e88]:
+          - textbox "Search team members by name, role, ID, department..." [ref=f1e90]
+          - button "➕ Create Member & ID Card" [ref=f1e92] [cursor=pointer]
+        - generic [ref=f1e93]:
+          - generic [ref=f1e176]:
+            - generic [ref=f1e177]:
+              - generic "🟢 Online" [ref=f1e179]
+              - generic [ref=f1e180]:
+                - heading "JAGADISH K" [level=4] [ref=f1e181]
+                - paragraph [ref=f1e182]: RD-FOUNDER-001 • Hardware Architecture
+                - generic "Click to edit designation & department" [ref=f1e184]: owner ✎
+            - generic [ref=f1e185]:
+              - generic [ref=f1e186]:
+                - button "💬 Chat" [ref=f1e187] [cursor=pointer]
+                - button "📹 Meet" [ref=f1e188] [cursor=pointer]
+                - button "🪪 ID Card" [ref=f1e189] [cursor=pointer]
+                - button "🖼️ Mount" [ref=f1e190] [cursor=pointer]
+              - generic [ref=f1e191]:
+                - button "⭐ Role" [ref=f1e192] [cursor=pointer]
+                - generic [ref=f1e193]: 👑 Workspace Administrator
+          - generic [ref=f1e194]:
+            - generic [ref=f1e195]:
+              - generic "🔴 Offline" [ref=f1e197]
+              - generic [ref=f1e198]:
+                - heading "Pavithra R" [level=4] [ref=f1e199]
+                - paragraph [ref=f1e200]: RD-EMP-002 • Engineering & Development
+                - generic "Click to edit designation & department" [ref=f1e202]: UI/UX DESIGNER ✎
+            - generic [ref=f1e203]:
+              - generic [ref=f1e204]:
+                - button "💬 Chat" [ref=f1e205] [cursor=pointer]
+                - button "📹 Meet" [ref=f1e206] [cursor=pointer]
+                - button "🪪 ID Card" [ref=f1e207] [cursor=pointer]
+                - button "🖼️ Mount" [ref=f1e208] [cursor=pointer]
+              - generic [ref=f1e209]:
+                - button "⭐ Role" [ref=f1e210] [cursor=pointer]
+                - button "⛔ Suspend" [ref=f1e211] [cursor=pointer]
+                - button "🗑️ Delete" [ref=f1e212] [cursor=pointer]
+  - generic [ref=f1e215]:
+    - generic [ref=f1e216]:
+      - generic [ref=f1e217]:
+        - generic [ref=f1e218]: ⚡
+        - generic [ref=f1e219]: OVER-THE-AIR (OTA) SOFTWARE UPDATE
+      - button "×" [ref=f1e220] [cursor=pointer]
+    - generic [ref=f1e221]:
+      - generic [ref=f1e222]:
+        - generic [ref=f1e223]:
+          - generic [ref=f1e224]:
+            - generic [ref=f1e225]: INSTALLED
+            - generic [ref=f1e226]: v2.5.1
+          - generic [ref=f1e227]: ➔
+          - generic [ref=f1e228]:
+            - generic [ref=f1e229]: NEW RELEASE
+            - generic [ref=f1e230]: v2.5.2
+        - generic [ref=f1e231]:
+          - generic [ref=f1e232]: ✔ Zero-Reinstallation In-Place Update
+          - generic [ref=f1e233]: ✔ Multi-Device & Multi-Network Fastly CDN
+      - generic [ref=f1e234]:
+        - generic [ref=f1e235]:
+          - generic [ref=f1e236]: RELEASE NOTES & CHANGELOG
+          - generic [ref=f1e237]: "Released: 2026-09-03"
+        - list [ref=f1e239]:
+          - listitem [ref=f1e240]: "▸ Microsoft Teams Suite: Hover action bar, emoji reactions, quoted replies, file & voice notes"
+          - listitem [ref=f1e241]: "▸ Channel Hub Tabs: Dedicated Posts, Files repository, Pinned announcements, and About specs"
+          - listitem [ref=f1e242]: "▸ Channel & Message Editing: In-place message editing, Up-Arrow quick edit, full group channel management"
+          - listitem [ref=f1e243]: "▸ High-Performance Rendering: Keyed differential DOM updates preventing UI jump and scroll thrash"
+          - listitem [ref=f1e244]: "▸ Zero-Cache Architecture: Real-time cache busting preventing stale scripts"
+      - generic [ref=f1e245]:
+        - button "Remind Me Later" [ref=f1e246] [cursor=pointer]
+        - button "⚡ Update & Restart Now" [ref=f1e247] [cursor=pointer]

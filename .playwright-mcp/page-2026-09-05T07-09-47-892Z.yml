@@ -1,0 +1,174 @@
+- generic [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - banner [ref=f4e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=f4e4] [cursor=pointer]':
+        - generic [ref=f4e5]: ⬢
+        - generic [ref=f4e7]:
+          - generic [ref=f4e8]: REDDOT.OS
+          - generic [ref=f4e9]: WORKSPACE
+      - generic [ref=f4e10]:
+        - button "📌 Pin Mode" [ref=f4e11] [cursor=pointer]:
+          - generic [ref=f4e12]: 📌
+          - generic [ref=f4e13]: Pin Mode
+        - button "−" [ref=f4e14] [cursor=pointer]
+        - button "▢" [ref=f4e16] [cursor=pointer]
+        - button "×" [ref=f4e18] [cursor=pointer]
+    - main [ref=f4e20]:
+      - generic [ref=f4e21]:
+        - generic [ref=f4e22]: (TECHNICAL WORKSPACE)
+        - generic [ref=f4e23]: ORGANIZATION // REDDOT
+      - generic:
+        - heading "REDDOT" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=f4e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=f4e32]
+      - generic [ref=f4e33]:
+        - generic [ref=f4e34]: PERSISTENT WORKSPACE •
+        - generic [ref=f4e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=f4e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=f4e38] [cursor=pointer]:
+        - generic [ref=f4e39]: ⧢
+        - generic [ref=f4e40]: COMMAND CENTER
+        - generic [ref=f4e41]: SPACE
+      - generic [ref=f4e43]:
+        - generic [ref=f4e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=f4e45]: REDDOT • 2026
+  - generic [ref=f4e47]:
+    - banner [ref=f4e48]:
+      - generic [ref=f4e49]:
+        - generic [ref=f4e50]: ◆
+        - heading "REDDOT WORKSPACE" [level=2] [ref=f4e52]
+        - generic "Switch User / View Profile" [ref=f4e53] [cursor=pointer]: JAGADISH K // FOUNDER & ADMIN
+      - navigation [ref=f4e56]:
+        - button "🎨 Wallpapers" [ref=f4e57] [cursor=pointer]:
+          - generic [ref=f4e58]: 🎨
+          - generic [ref=f4e59]: Wallpapers
+        - button "👥 Directory" [ref=f4e60] [cursor=pointer]:
+          - generic [ref=f4e61]: 👥
+          - generic [ref=f4e62]: Directory
+        - button "⏱ Shifts" [ref=f4e63] [cursor=pointer]:
+          - generic [ref=f4e64]: ⏱
+          - generic [ref=f4e65]: Shifts
+        - button "📋 Tasks" [ref=f4e66] [cursor=pointer]:
+          - generic [ref=f4e67]: 📋
+          - generic [ref=f4e68]: Tasks
+        - button "💬 Team Chat" [ref=f4e69] [cursor=pointer]:
+          - generic [ref=f4e70]: 💬
+          - generic [ref=f4e71]: Team Chat
+        - button "🌐 Presence" [ref=f4e72] [cursor=pointer]:
+          - generic [ref=f4e73]: 🌐
+          - generic [ref=f4e74]: Presence
+        - button "🛡 Database" [ref=f4e75] [cursor=pointer]:
+          - generic [ref=f4e76]: 🛡
+          - generic [ref=f4e77]: Database
+      - generic [ref=f4e78]:
+        - button "📌 Pin Mode" [ref=f4e79] [cursor=pointer]:
+          - generic [ref=f4e80]: 📌
+          - generic [ref=f4e81]: Pin Mode
+        - button "⧢ Wallpaper Mode [Esc]" [ref=f4e82] [cursor=pointer]
+        - generic [ref=f4e84]:
+          - button "−" [ref=f4e85] [cursor=pointer]
+          - button "▢" [ref=f4e86] [cursor=pointer]
+          - button "×" [ref=f4e87] [cursor=pointer]
+    - main [ref=f4e88]:
+      - generic [ref=f4e233]:
+        - generic [ref=f4e234]:
+          - generic [ref=f4e235]:
+            - heading "➕ CREATE & ASSIGN TASK" [level=4] [ref=f4e236]
+            - paragraph [ref=f4e237]: Assign goals and deadlines with immediate disk persistence.
+            - generic [ref=f4e238]:
+              - generic [ref=f4e239]:
+                - generic [ref=f4e240]: Task Title
+                - textbox "e.g. Calibrate Ultrasonic Transducer" [ref=f4e241]
+              - generic [ref=f4e242]:
+                - generic [ref=f4e243]: Assignee
+                - combobox [ref=f4e244]:
+                  - option "Entire Team (ALL)" [selected]
+                  - option "JAGADISH K [RD-FOUNDER-001]"
+                  - option "Pavithra R [RD-EMP-002]"
+              - generic [ref=f4e245]:
+                - generic [ref=f4e246]: Priority
+                - combobox [ref=f4e247]:
+                  - option "Normal" [selected]
+                  - option "Medium"
+                  - option "High"
+                  - option "Urgent Priority"
+              - generic [ref=f4e248]:
+                - generic [ref=f4e249]: Due Date / Target
+                - textbox "Today 5:00 PM" [ref=f4e250]
+              - generic [ref=f4e251]:
+                - generic [ref=f4e252]: Task Description & Requirements
+                - textbox "Provide requirements or verification notes..." [ref=f4e253]
+              - button "📋 Save & Assign Task" [ref=f4e254] [cursor=pointer]
+          - generic [ref=f4e255]:
+            - text: Task Filter
+            - generic [ref=f4e256]:
+              - button "All Tasks" [ref=f4e257] [cursor=pointer]
+              - button "Assigned to Me" [ref=f4e258] [cursor=pointer]
+              - button "Assigned" [ref=f4e259] [cursor=pointer]
+              - button "In Progress" [ref=f4e260] [cursor=pointer]
+              - button "Completed" [ref=f4e261] [cursor=pointer]
+        - generic [ref=f4e262]:
+          - generic [ref=f4e263]:
+            - heading "WORKSPACE TASKS • PERSISTENT STORE" [level=4] [ref=f4e264]
+            - generic [ref=f4e265]: 1 Tasks
+          - generic [ref=f4e267]:
+            - generic [ref=f4e268]:
+              - generic [ref=f4e269]:
+                - generic [ref=f4e270]: HIGH
+                - heading "design" [level=4] [ref=f4e271]
+              - generic [ref=f4e272] [cursor=pointer]: REACHED
+            - paragraph [ref=f4e273]: csvsfvfsvsv
+            - generic [ref=f4e274]:
+              - generic [ref=f4e275]:
+                - text: 👤
+                - strong [ref=f4e276]: Pavithra R
+              - generic [ref=f4e277]: ⏰ 10:00 pm
+              - generic [ref=f4e278]: 📅 9/2/2026
+            - generic [ref=f4e279]:
+              - button "💬 Activity & Comments" [ref=f4e280] [cursor=pointer]
+              - button "✏️ Edit" [ref=f4e281] [cursor=pointer]
+              - combobox [ref=f4e282]:
+                - option "Assigned"
+                - option "In Progress" [selected]
+                - option "Completed"
+              - button "🗑️" [ref=f4e283] [cursor=pointer]
+  - generic [ref=f4e286]:
+    - generic [ref=f4e287]:
+      - generic [ref=f4e288]:
+        - generic [ref=f4e289]: ✏️
+        - generic [ref=f4e290]: "EDIT TASK: design"
+      - button "×" [ref=f4e291] [cursor=pointer]
+    - generic [ref=f4e292]:
+      - generic [ref=f4e293]:
+        - generic [ref=f4e294]: Task Title
+        - textbox "e.g. Calibrate Ultrasonic Transducer" [active] [ref=f4e295]: design
+      - generic [ref=f4e296]:
+        - generic [ref=f4e297]:
+          - generic [ref=f4e298]: Assignee
+          - combobox [ref=f4e299]:
+            - option "Entire Team (ALL)"
+            - option "JAGADISH K [RD-FOUNDER-001]"
+            - option "Pavithra R [RD-EMP-002]" [selected]
+        - generic [ref=f4e300]:
+          - generic [ref=f4e301]: Priority
+          - combobox [ref=f4e302]:
+            - option "Normal"
+            - option "Medium"
+            - option "High" [selected]
+            - option "Urgent Priority"
+      - generic [ref=f4e303]:
+        - generic [ref=f4e304]:
+          - generic [ref=f4e305]: Status
+          - combobox [ref=f4e306]:
+            - option "Assigned"
+            - option "In Progress" [selected]
+            - option "Completed"
+        - generic [ref=f4e307]:
+          - generic [ref=f4e308]: Target / Due Date
+          - textbox "e.g. Today 5:00 PM" [ref=f4e309]: 10:00 pm
+      - generic [ref=f4e310]:
+        - generic [ref=f4e311]: Task Description & Requirements
+        - textbox "Provide requirements or verification notes..." [ref=f4e312]: csvsfvfsvsv
+      - generic [ref=f4e313]:
+        - button "Cancel" [ref=f4e314] [cursor=pointer]
+        - button "💾 Save Task Changes" [ref=f4e315] [cursor=pointer]

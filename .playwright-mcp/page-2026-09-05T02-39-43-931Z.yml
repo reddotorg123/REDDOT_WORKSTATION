@@ -1,0 +1,123 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=e4] [cursor=pointer]':
+        - generic [ref=e5]: ⬢
+        - generic [ref=e7]:
+          - generic [ref=e8]: REDDOT.OS
+          - generic [ref=e9]: WORKSPACE
+      - generic [ref=e10]:
+        - button "📌 Pin Mode" [ref=e11] [cursor=pointer]:
+          - generic [ref=e12]: 📌
+          - generic [ref=e13]: Pin Mode
+        - button "−" [ref=e14] [cursor=pointer]
+        - button "▢" [ref=e16] [cursor=pointer]
+        - button "×" [ref=e18] [cursor=pointer]
+    - main [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]: (OWNER)
+        - generic [ref=e23]: HARDWARE ARCHITECTURE // RD-FOUNDER-001
+      - generic:
+        - heading "JAGADISH" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=e32]
+      - generic [ref=e33]:
+        - generic [ref=e34]: PERSISTENT WORKSPACE •
+        - generic [ref=e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=e38] [cursor=pointer]:
+        - generic [ref=e39]: ⧢
+        - generic [ref=e40]: COMMAND CENTER
+        - generic [ref=e41]: SPACE
+      - generic [ref=e43]:
+        - generic [ref=e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=e45]: JAGADISH K • 2026
+  - generic "Switch User / View Profile": JAGADISH K // FOUNDER & ADMIN
+  - button "🎨 Wallpapers":
+    - generic: 🎨
+    - generic: Wallpapers
+  - button "👥 Directory":
+    - generic: 👥
+    - generic: Directory
+  - button "⏱ Shifts":
+    - generic: ⏱
+    - generic: Shifts
+  - button "📋 Tasks":
+    - generic: 📋
+    - generic: Tasks
+  - button "💬 Team Chat":
+    - generic: 💬
+    - generic: Team Chat
+  - button "🌐 Presence":
+    - generic: 🌐
+    - generic: Presence
+  - button "🛡 Database":
+    - generic: 🛡
+    - generic: Database
+  - button "📌 Pin Mode":
+    - generic: 📌
+    - generic: Pin Mode
+  - button "⧢ Wallpaper Mode [Esc]" [active]
+  - button "−"
+  - button "▢"
+  - button "×"
+  - generic:
+    - generic:
+      - img "Obsidian Cyber (Cyan)"
+    - generic:
+      - generic:
+        - generic: Obsidian Cyber (Cyan)
+        - generic: SIGNATURE 60FPS
+      - paragraph: Pixel-perfect symmetrical hardware architecture matrix with cyan circuit traces.
+      - generic:
+        - button "Apply Wallpaper"
+  - generic:
+    - generic:
+      - img "Crimson REDDOT Executive"
+    - generic:
+      - generic:
+        - generic: Crimson REDDOT Executive
+        - generic: REDDOT OFFICIAL
+      - paragraph: Executive command workstation palette with crimson laser telemetry and carbon mesh.
+      - generic:
+        - button "✓ Active Preset"
+  - generic:
+    - generic:
+      - img "Soft Emerald Firmware"
+    - generic:
+      - generic:
+        - generic: Soft Emerald Firmware
+        - generic: FIRMWARE LAB
+      - paragraph: Bio-synthetic glowing emerald traces designed for late-night firmware architecture.
+      - generic:
+        - button "Apply Wallpaper"
+  - generic:
+    - generic:
+      - img "Sunset Amber Hardware"
+    - generic:
+      - generic:
+        - generic: Sunset Amber Hardware
+        - generic: CAD TELEMETRY
+      - paragraph: Warm glowing amber gold hardware blueprint with pulse frequency lines.
+      - generic:
+        - button "Apply Wallpaper"
+  - generic:
+    - generic:
+      - img "Deep Nebula Quantum"
+    - generic:
+      - generic:
+        - generic: Deep Nebula Quantum
+        - generic: AI / ML SYSTEMS
+      - paragraph: Cosmic purple aurora with neural network nodes and dark obsidian background.
+      - generic:
+        - button "Apply Wallpaper"
+  - generic:
+    - generic:
+      - img "Nordic Minimalist Slate"
+    - generic:
+      - generic:
+        - generic: Nordic Minimalist Slate
+        - generic: DISTRACTION FREE
+      - paragraph: Ultra-clean Scandinavian matte obsidian slate for distraction-free coding.
+      - generic:
+        - button "Apply Wallpaper"

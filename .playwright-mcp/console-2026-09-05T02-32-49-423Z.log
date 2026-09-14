@@ -1,0 +1,6 @@
+[     930ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8085/index.html:0
+[     931ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8085/index.html:0
+[    2355ms] [WARNING] [2026-09-05T02:32:51.774Z]  @firebase/firestore: Firestore (10.8.0): enableMultiTabIndexedDbPersistence() will be deprecated in the future, you can use `FirestoreSettings.cache` instead. @ https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js:0
+[    2355ms] [LOG] [FIREBASE] Production Firebase initialized for organization: reddot @ http://localhost:8085/firebase-service.js?v=2.5.2-teams:68
+[    6457ms] [LOG] [FIREBASE] Establishing active multi-device real-time cloud subscriptions... @ http://localhost:8085/wallpaper.js?v=2.5.2-teams:6243
+[    7262ms] [WARNING] [2026-09-05T02:32:56.683Z]  @firebase/database: FIREBASE WARNING: Firebase error. Please ensure that you have the URL of your Firebase Realtime Database instance configured correctly. (https://reddot-workspace-default-rtdb.firebaseio.com/)  @ https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js:0

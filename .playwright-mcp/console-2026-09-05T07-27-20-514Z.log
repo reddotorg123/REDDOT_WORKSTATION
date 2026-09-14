@@ -1,0 +1,7 @@
+[     449ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://127.0.0.1:8085/index.html:0
+[     450ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://127.0.0.1:8085/index.html:0
+[    1054ms] [WARNING] The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio @ http://127.0.0.1:8085/wallpaper.js?v=2.5.2-teams:837
+[    1057ms] [WARNING] The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio @ http://127.0.0.1:8085/wallpaper.js?v=2.5.2-teams:851
+[    1082ms] [WARNING] [2026-09-05T07:27:21.595Z]  @firebase/firestore: Firestore (10.8.0): enableMultiTabIndexedDbPersistence() will be deprecated in the future, you can use `FirestoreSettings.cache` instead. @ https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js:0
+[    1082ms] [LOG] [FIREBASE] Production Firebase initialized for organization: reddot @ http://127.0.0.1:8085/firebase-service.js?v=2.5.2-teams:70
+[    1316ms] [LOG] [FIREBASE] Establishing active multi-device real-time cloud subscriptions... @ http://127.0.0.1:8085/wallpaper.js?v=2.5.2-teams:6551

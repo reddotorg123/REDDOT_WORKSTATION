@@ -1,0 +1,6 @@
+
+[SERVER] Workstation UI loopback running on http://127.0.0.1:60325
+[RENDERER 1] [DB] Loaded persistent workspace database from disk. (http://localhost:60325/wallpaper.js?v=2.5.2-teams:306)
+[RENDERER 2] [2026-09-13T09:10:18.052Z]  @firebase/firestore: Firestore (10.8.0): enableMultiTabIndexedDbPersistence() will be deprecated in the future, you can use `FirestoreSettings.cache` instead. (https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js:1)
+[RENDERER 1] [FIREBASE] Production Firebase initialized for organization: reddot (http://localhost:60325/firebase-service.js?v=2.5.2-teams:71)
+[RENDERER 1] [FIREBASE] Establishing active multi-device real-time cloud subscriptions... (http://localhost:60325/wallpaper.js?v=2.5.2-teams:8177)

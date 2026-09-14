@@ -177,21 +177,21 @@
                 <span class="pulse-dot"></span> Connected
               </span>
             </div>
-            <p class="cmd-subtitle" id="cmdSubtitle">Cluster: primary-us-east &bull; Org: reddot</p>
+            <p class="cmd-subtitle" id="cmdSubtitle">Connected &bull; Workspace Ready</p>
           </div>
         </div>
 
         <!-- Universal Omnibox Search (Ctrl+K) -->
-        <div class="omnibox-search-bar" id="topOmniboxSearchTrigger" title="Search commands, tasks, resources (Ctrl+K)">
+        <div class="omnibox-search-bar" id="topOmniboxSearchTrigger" title="Search anything (Ctrl+K)">
           <span class="search-icon">&#x1F50D;</span>
-          <input type="text" id="globalOmniboxInput" class="omnibox-input" placeholder="Search commands, tasks, resources..." readonly>
+          <input type="text" id="globalOmniboxInput" class="omnibox-input" placeholder="Search anything (tasks, members, messages)..." readonly>
           <kbd class="omnibox-kbd">Ctrl+K</kbd>
         </div>
 
         <!-- Window Controls & User Profile -->
         <div class="header-right">
           <!-- Dual Theme Switcher (Light Enterprise vs Obsidian Crimson Dark) -->
-          <button type="button" id="btnThemeToggle" class="btn-header-tool" title="Toggle Light / Dark Workstation Theme (Alt+T)">
+          <button type="button" id="btnThemeToggle" class="btn-header-tool" title="Switch Theme (Alt+T)">
             <span id="themeToggleIcon">&#x2600;&#xFE0F;</span>
           </button>
 
@@ -202,10 +202,21 @@
           </button>
 
           <!-- Notification Bell -->
-          <button type="button" id="btnNotificationBell" class="btn-header-tool btn-notif-bell" title="System Alerts &amp; Directives">
-            <span class="bell-icon">&#x1F514;</span>
-            <span class="bell-badge" id="headerNotifBadge">3</span>
-          </button>
+          <div style="position: relative; display: inline-block;">
+            <button type="button" id="btnNotificationBell" class="btn-header-tool btn-notif-bell" title="Notifications">
+              <span class="bell-icon">&#x1F514;</span>
+              <span class="bell-badge" id="headerNotifBadge">3</span>
+            </button>
+            <div id="headerNotificationDropdown" class="header-notification-dropdown hidden" style="position: absolute; right: 0; top: calc(100% + 8px); width: 340px; background: var(--panel-bg, #181c24); border: 1px solid var(--card-border, #2a3040); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 10000; overflow: hidden;">
+              <div class="notif-head" style="padding: 12px 16px; border-bottom: 1px solid var(--card-border, #2a3040); display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.5px; color: var(--text-white, #fff);">SYSTEM NOTIFICATIONS</span>
+                <button type="button" id="btnMarkAllNotifsRead" style="background: none; border: none; font-size: 11px; color: var(--accent-cyan, #0284c7); cursor: pointer; font-weight: 600;">Mark all read</button>
+              </div>
+              <div class="notif-list" style="max-height: 320px; overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 8px;">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+          </div>
 
           <!-- User Profile Chip -->
           <div class="header-user-profile" id="btnAuthTrigger" title="Switch User / View Profile">
@@ -222,7 +233,7 @@
             <span id="cmdPinIcon">&#x1F4CC;</span> <span id="cmdPinText">Pin Mode</span>
           </button>
           <button id="btnToggleWallpaperMode" class="btn-outline-action" title="Return to Clean Live Wallpaper (Esc)">
-            <span>&#x29E2; Wallpaper Mode [Esc]</span>
+            <span>&#x29E2; Back to Desktop [Esc]</span>
           </button>
 
           <!-- Native Window Buttons -->
@@ -240,33 +251,33 @@
         <aside class="workstation-sidebar" id="workstationSidebar">
           <div class="sidebar-section-label">WORKSPACE</div>
           <nav class="sidebar-nav-list" id="cmdTabNav">
-            <button class="sidebar-nav-item cmd-tab-btn active" data-target="tabDashboardView" id="tabBtnDashboard" title="Daily Executive Pulse">
+            <button class="sidebar-nav-item cmd-tab-btn active" data-target="tabDashboardView" id="tabBtnDashboard" title="Dashboard">
               <span class="nav-icon">&#x229E;</span>
               <span class="nav-label">Dashboard</span>
             </button>
-            <button class="sidebar-nav-item cmd-tab-btn" data-target="tabTasksView" id="tabBtnTasks" title="Tasks &amp; Sprint Management">
+            <button class="sidebar-nav-item cmd-tab-btn" data-target="tabTasksView" id="tabBtnTasks" title="Tasks">
               <span class="nav-icon">&#x2611;</span>
-              <span class="nav-label">Tasks &amp; Projects</span>
+              <span class="nav-label">Tasks</span>
             </button>
-            <button class="sidebar-nav-item cmd-tab-btn" data-target="tabWorkersView" id="tabBtnWorkers" title="Team Directory &amp; Engineering Nodes">
+            <button class="sidebar-nav-item cmd-tab-btn" data-target="tabWorkersView" id="tabBtnWorkers" title="Team">
               <span class="nav-icon">&#x1F465;</span>
-              <span class="nav-label">Team &amp; Directory</span>
+              <span class="nav-label">Team</span>
             </button>
-            <button class="sidebar-nav-item cmd-tab-btn" data-target="tabTimesheetsView" id="tabBtnTimesheets" title="Time &amp; Shifts Attendance">
+            <button class="sidebar-nav-item cmd-tab-btn" data-target="tabTimesheetsView" id="tabBtnTimesheets" title="Attendance">
               <span class="nav-icon">&#x23F1;</span>
-              <span class="nav-label">Time &amp; Shifts</span>
+              <span class="nav-label">Attendance</span>
             </button>
             <button class="sidebar-nav-item cmd-tab-btn" data-target="tabChatView" id="tabBtnChat" title="Team Chat &amp; Meet">
               <span class="nav-icon">&#x1F4AC;</span>
-              <span class="nav-label">Team Chat</span>
+              <span class="nav-label">Messages</span>
             </button>
             <button class="sidebar-nav-item cmd-tab-btn" data-target="tabDatabaseView" id="tabBtnDatabase" title="Storage &amp; Cloud Hub">
               <span class="nav-icon">&#x2601;</span>
-              <span class="nav-label">Storage &amp; Cloud</span>
+              <span class="nav-label">Files &amp; Cloud</span>
             </button>
             <button class="sidebar-nav-item cmd-tab-btn" data-target="tabWallpapersView" id="tabBtnWallpapers" title="System Display &amp; Settings">
               <span class="nav-icon">&#x2699;</span>
-              <span class="nav-label">System &amp; Settings</span>
+              <span class="nav-label">Settings</span>
             </button>
           </nav>
 
@@ -274,8 +285,8 @@
           <div class="sidebar-footer-widget">
             <div class="sidebar-cpu-box">
               <div class="cpu-meta-row">
-                <span class="cpu-label">CPU Allocation</span>
-                <span class="cpu-val" id="sidebarCpuPercent">28%</span>
+                <span class="cpu-label">System Status</span>
+                <span class="cpu-val" id="sidebarCpuPercent" style="color:#10b981;">Online</span>
               </div>
               <div class="cpu-bar-track">
                 <div class="cpu-bar-fill" id="sidebarCpuFill" style="width: 28%;"></div>
@@ -292,12 +303,12 @@
             <div class="dash-exec-header">
               <div class="dash-exec-badge">
                 <span class="pulse-green"></span>
-                <span>DAILY EXECUTIVE PULSE &bull; All Systems Operational</span>
+                <span>Overview &bull; All Systems Ready</span>
               </div>
               <div class="dash-exec-main-row">
                 <div class="dash-exec-title-block">
                   <h1 class="dash-exec-greeting" id="dashGreeting">Good morning, Jagadish K</h1>
-                  <p class="dash-exec-sub" id="dashDateCluster">Saturday, September 12, 2026 &bull; Production Cluster 04a</p>
+                  <p class="dash-exec-sub" id="dashDateCluster">Sunday, September 13, 2026 &bull; Reddot Workstation</p>
                 </div>
                 <div class="dash-exec-actions">
                   <button type="button" id="dashBtnLogShift" class="btn-dash-action secondary" title="Log Shift / Time Management">
@@ -314,7 +325,7 @@
             <div class="dash-kpi-grid">
               <div class="dash-kpi-card" id="dashKpiEngineers">
                 <div class="dash-kpi-top">
-                  <span class="dash-kpi-label">ACTIVE ENGINEERS</span>
+                  <span class="dash-kpi-label">TEAM ONLINE</span>
                   <span class="dash-kpi-icon">&#x1F465;</span>
                 </div>
                 <div class="dash-kpi-value-row">
@@ -326,7 +337,7 @@
 
               <div class="dash-kpi-card" id="dashKpiShift">
                 <div class="dash-kpi-top">
-                  <span class="dash-kpi-label">TODAY'S WORK SHIFT</span>
+                  <span class="dash-kpi-label">TIME WORKED TODAY</span>
                   <span class="dash-kpi-icon">&#x23F1;</span>
                 </div>
                 <div class="dash-kpi-value-row">
@@ -340,7 +351,7 @@
 
               <div class="dash-kpi-card" id="dashKpiVelocity">
                 <div class="dash-kpi-top">
-                  <span class="dash-kpi-label">SPRINT VELOCITY</span>
+                  <span class="dash-kpi-label">TASKS DONE</span>
                   <span class="dash-kpi-icon">&#x26A1;</span>
                 </div>
                 <div class="dash-kpi-value-row">
@@ -352,7 +363,7 @@
 
               <div class="dash-kpi-card" id="dashKpiSync">
                 <div class="dash-kpi-top">
-                  <span class="dash-kpi-label">STORAGE &amp; NODE SYNC</span>
+                  <span class="dash-kpi-label">CLOUD STORAGE</span>
                   <span class="dash-kpi-icon">&#x2601;</span>
                 </div>
                 <div class="dash-kpi-value-row">
@@ -369,7 +380,7 @@
                 <div class="dash-panel">
                   <div class="dash-panel-header">
                     <div class="dash-panel-title-wrap">
-                      <h3 class="dash-panel-title">Priority Objectives for Today</h3>
+                      <h3 class="dash-panel-title">Today's Tasks</h3>
                       <span class="dash-panel-badge" id="dashPendingObjectivesCount">3 pending actions</span>
                     </div>
                   </div>
@@ -380,8 +391,8 @@
 
                 <div class="dash-panel mt-20">
                   <div class="dash-panel-header">
-                    <h3 class="dash-panel-title">Recent Team Activity Stream</h3>
-                    <button type="button" id="dashBtnViewFullAudit" class="dash-link-action">View full audit trail</button>
+                    <h3 class="dash-panel-title">Recent Activity</h3>
+                    <button type="button" id="dashBtnViewFullAudit" class="dash-link-action">View all history</button>
                   </div>
                   <div class="dash-activity-stream" id="dashActivityStream">
                     <!-- Dynamically populated from activity log -->
@@ -394,8 +405,8 @@
                 <div class="dash-panel">
                   <div class="dash-panel-header">
                     <div>
-                      <span class="dash-section-eyebrow">ACTIVE SESSION</span>
-                      <h3 class="dash-panel-title">Shift Status Summary</h3>
+                      <span class="dash-section-eyebrow">CURRENT STATUS</span>
+                      <h3 class="dash-panel-title">Work Timer</h3>
                     </div>
                     <span class="status-pill status-pill-active" id="dashShiftStatusPill">&bull; Active Duty</span>
                   </div>
@@ -456,15 +467,15 @@
                 <div class="dash-panel mt-20 dash-security-panel">
                   <div class="dash-security-row">
                     <span class="security-shield-icon">&#x1F6E1;</span>
-                    <span class="security-title">SECURITY POSTURE</span>
+                    <span class="security-title">SYSTEM STATUS</span>
                   </div>
                   <div class="dash-security-meta">
                     <span class="security-dot">&bull;</span>
                     <span>Latency: 12ms</span>
                     <span class="divider">|</span>
-                    <span>Secure Handshake TLS 1.3</span>
+                    <span>All Systems Connected</span>
                   </div>
-                  <div class="security-policy-sub">Strict enforcement for all regional nodes.</div>
+                  <div class="security-policy-sub">Local database synced and offline protection active.</div>
                 </div>
               </div>
             </div>
@@ -484,15 +495,15 @@
         <!-- TAB 2: EMPLOYEE DIRECTORY & ID BADGES -->
         <section id="tabWorkersView" class="cmd-tab-pane">
           <div class="personnel-header">
-            <div class="personnel-badge">PERSONNEL MATRIX SYS.DIR//v3.4.1</div>
+            <div class="personnel-badge">TEAM DIRECTORY</div>
             <div class="personnel-title-row">
               <div class="personnel-titles">
-                <h2 class="personnel-title">Team Directory &amp; Engineering Nodes</h2>
-                <p class="personnel-sub">Engineering staff, node telemetry, role assignments, and active work directives across distributed fabric clusters.</p>
+                <h2 class="personnel-title">Team Members</h2>
+                <p class="personnel-sub">View and manage team members, roles, and attendance status.</p>
               </div>
               <div class="personnel-telemetry-row">
                 <div class="telemetry-pill">
-                  <span class="telemetry-label">Active Nodes</span>
+                  <span class="telemetry-label">Online</span>
                   <span class="telemetry-val" id="activeNodesCount">24 <span class="telemetry-slash">/ 24</span></span>
                 </div>
                 <div class="telemetry-pill">
@@ -509,13 +520,13 @@
           <div class="workers-filter-bar">
             <div class="workers-search-wrap">
               <span class="search-icon">&#x1F50D;</span>
-              <input type="text" id="searchWorkerInput" class="workers-search-input" placeholder="Search by name, role, or cluster node...">
+              <input type="text" id="searchWorkerInput" class="workers-search-input" placeholder="Search team members...">
             </div>
             <div class="workers-dept-pills" id="workersDeptPills">
               <button type="button" class="dept-pill active" data-dept="ALL">All Depts</button>
               <button type="button" class="dept-pill" data-dept="Hardware">Hardware</button>
-              <button type="button" class="dept-pill" data-dept="Core Runtime">Core Runtime</button>
-              <button type="button" class="dept-pill" data-dept="SecOps">SecOps</button>
+              <button type="button" class="dept-pill" data-dept="Engineering">Engineering</button>
+              <button type="button" class="dept-pill" data-dept="Operations">Operations</button>
               <button type="button" class="dept-pill" data-dept="Design">Design</button>
             </div>
             <div class="workers-status-select-wrap">
@@ -538,11 +549,11 @@
         <section id="tabTimesheetsView" class="cmd-tab-pane">
           <div class="shift-view-header">
             <div class="shift-view-meta">
-              <span class="shift-header-tag">ATTENDANCE LOG &bull; NODE-US-04 &bull; Session #4882-TK</span>
+              <span class="shift-header-tag">ATTENDANCE &amp; WORK HOURS</span>
             </div>
             <div class="shift-header-sync">
               <span class="sync-dot">&bull;</span>
-              <span>NTP Time Synchronized (+0.04ms)</span>
+              <span>Real-Time Sync Active</span>
             </div>
           </div>
 
@@ -559,7 +570,7 @@
               <div class="attendance-clock-block">
                 <h1 class="attendance-huge-clock">
                   <span id="personalShiftTimer">06:11:24</span>
-                  <span class="clock-unit-label">HRS ACTIVE</span>
+                  <span class="clock-unit-label">Active Today</span>
                 </h1>
                 <div class="attendance-progress-meta">
                   <span>Target: 08:00:00</span>
@@ -573,8 +584,8 @@
                 </div>
                 <div class="attendance-track-markers">
                   <span>00:00:00</span>
-                  <span>04:00 (Half-Shift)</span>
-                  <span>08:00:00 Quota</span>
+                  <span>04:00 (Half Day)</span>
+                  <span>08:00:00 (Full Day)</span>
                 </div>
               </div>
               <div class="attendance-actions-block">
@@ -600,7 +611,7 @@
           <div class="attendance-kpi-grid">
             <div class="attendance-kpi-card">
               <div class="att-kpi-top">
-                <span class="att-kpi-label">WEEKLY LOAD</span>
+                <span class="att-kpi-label">THIS WEEK</span>
                 <span class="att-kpi-icon">&#x23F1;</span>
               </div>
               <div class="att-kpi-val-row">
@@ -609,14 +620,14 @@
               </div>
               <div class="att-kpi-bar-wrap">
                 <div class="att-kpi-bar" id="weeklyLoadBar" style="width: 86.2%;"></div>
-                <span class="att-kpi-target">Target: 40.0 hrs &bull; 86.2%</span>
+                <span class="att-kpi-target" id="weeklyLoadTargetText">Target: 40.0 hrs &bull; 86.2%</span>
               </div>
               <div class="att-kpi-sub text-green">&#x2197; Paced to fulfill weekly quota by Fri 17:00</div>
             </div>
 
             <div class="attendance-kpi-card">
               <div class="att-kpi-top">
-                <span class="att-kpi-label">DAILY MEAN WORK</span>
+                <span class="att-kpi-label">DAILY AVERAGE</span>
                 <span class="att-kpi-icon">&#x1F4CA;</span>
               </div>
               <div class="att-kpi-val-row">
@@ -637,30 +648,30 @@
 
             <div class="attendance-kpi-card">
               <div class="att-kpi-top">
-                <span class="att-kpi-label">COMPLIANCE RATING</span>
+                <span class="att-kpi-label">ON-TIME RATE</span>
                 <span class="att-kpi-icon">&#x2705;</span>
               </div>
               <div class="att-kpi-val-row">
                 <span class="att-kpi-val">100%</span>
               </div>
               <div class="att-kpi-sub text-green">&bull; On-Time Arrival: 5/5 shifts</div>
-              <div class="att-kpi-sub" style="margin-top: 6px;">&#x1F512; Cryptographically Signed Ledger (SHA-256)</div>
+              <div class="att-kpi-sub" style="margin-top: 6px;">&#x1F512; Verified Work Records</div>
             </div>
           </div>
 
-          <!-- Shift Punch Log & Audit Ledger -->
+          <!-- Attendance History -->
           <div class="punch-log-section">
             <div class="punch-log-header-row">
               <div>
-                <h4 class="section-title">Shift Punch Log &amp; Audit Ledger</h4>
-                <p class="section-sub">Direct hardware timestamps logged via local workstation agent</p>
+                <h4 class="section-title">Attendance History</h4>
+                <p class="section-sub">Daily clock-in, break, and clock-out history</p>
               </div>
               <div class="punch-log-actions">
                 <div id="punchFilterWrap" class="hidden">
                   <select id="punchLogMemberFilter" class="custom-select"></select>
                 </div>
                 <button type="button" id="btnDownloadCsvAudit" class="btn-secondary-action">
-                  <span>&#x2B07;&#xFE0F; Download CSV Audit</span>
+                  <span>&#x2B07;&#xFE0F; Export CSV Report</span>
                 </button>
               </div>
             </div>
@@ -673,7 +684,7 @@
                     <th>TIME</th>
                     <th>DATE</th>
                     <th>DURATION</th>
-                    <th>VERIFICATION STATUS</th>
+                    <th>STATUS</th>
                   </tr>
                 </thead>
                 <tbody id="punchLogTableBody"></tbody>
@@ -690,13 +701,13 @@
         <section id="tabTasksView" class="cmd-tab-pane">
           <div class="sprint-header">
             <div class="sprint-header-top">
-              <span class="sprint-tag">WORKSTREAM // SPRINT 14</span>
-              <span class="sprint-sync-pill"><span class="pulse-green"></span> System Sync Active</span>
+              <span class="sprint-tag">Sprint 14</span>
+              <span class="sprint-sync-pill"><span class="pulse-green"></span> Active</span>
             </div>
             <div class="sprint-title-row">
               <div class="sprint-titles">
-                <h2 class="sprint-title">Tasks &amp; Sprint Management</h2>
-                <p class="sprint-sub">Manage ongoing sprints, verify deliverables, and orchestrate work pipelines across autonomous cluster nodes.</p>
+                <h2 class="sprint-title">Tasks</h2>
+                <p class="sprint-sub">Keep track of your team's tasks, assignments, and daily deliverables.</p>
               </div>
               <div class="sprint-view-controls">
                 <div class="view-mode-toggle">
@@ -710,16 +721,16 @@
             </div>
           </div>
 
-          <!-- Sprint 14 Execution Cycle Banner (Image 4) -->
+          <!-- Current Sprint Banner (Image 4) -->
           <div class="sprint-cycle-banner">
             <div class="sprint-cycle-left">
               <div class="sprint-cycle-icon">&#x1F680;</div>
               <div class="sprint-cycle-info">
                 <div class="sprint-cycle-name-row">
-                  <span class="sprint-cycle-name">Sprint 14 Execution Cycle</span>
-                  <span class="sprint-phase-pill">PHASE 3 RUNNING</span>
+                  <span class="sprint-cycle-name">Current Sprint</span>
+                  <span class="sprint-phase-pill">In Progress</span>
                 </div>
-                <div class="sprint-cycle-date">Oct 20 &ndash; Nov 03, 2026 &bull; 4 days remaining</div>
+                <div class="sprint-cycle-date">Oct 20 &ndash; Nov 3, 2026 &bull; 4 days left</div>
                 <div class="sprint-cycle-bar-wrap">
                   <div class="sprint-cycle-bar" id="sprintExecutionProgressBar" style="width: 78%;"></div>
                 </div>
@@ -727,19 +738,19 @@
             </div>
             <div class="sprint-cycle-stats">
               <div class="sprint-stat-item">
-                <span class="sprint-stat-label">TOTAL TASKS</span>
+                <span class="sprint-stat-label">Total Tasks</span>
                 <span class="sprint-stat-val" id="sprintTotalTasks">28</span>
               </div>
               <div class="sprint-stat-item">
-                <span class="sprint-stat-label">COMPLETED</span>
+                <span class="sprint-stat-label">Completed</span>
                 <span class="sprint-stat-val text-green" id="sprintCompletedTasks">22</span>
               </div>
               <div class="sprint-stat-item">
-                <span class="sprint-stat-label">ACTIVE LOAD</span>
+                <span class="sprint-stat-label">In Progress</span>
                 <span class="sprint-stat-val text-blue" id="sprintActiveLoad">6</span>
               </div>
               <div class="sprint-stat-item">
-                <span class="sprint-stat-label">VELOCITY SCORE</span>
+                <span class="sprint-stat-label">Progress</span>
                 <span class="sprint-stat-val" id="sprintVelocityScore">78%</span>
               </div>
             </div>
@@ -749,13 +760,13 @@
           <div class="tasks-filter-bar">
             <div class="tasks-search-wrap">
               <span class="search-icon">&#x1F50D;</span>
-              <input type="text" id="filterTaskInput" class="tasks-search-input" placeholder="Filter by title, node, or engineer...">
+              <input type="text" id="filterTaskInput" class="tasks-search-input" placeholder="Search tasks...">
             </div>
             <div class="tasks-dropdown-group">
               <div class="tasks-filter-select-wrap">
                 <label>Category:</label>
                 <select id="taskFilterCategorySelect" class="tasks-filter-select">
-                  <option value="ALL">All Modules</option>
+                  <option value="ALL">All Categories</option>
                   <option value="FIRMWARE">Firmware</option>
                   <option value="UI ARCHITECTURE">UI Architecture</option>
                   <option value="CORE ARCHITECTURE">Core Architecture</option>
@@ -779,41 +790,92 @@
                   <option value="NORMAL">Normal</option>
                 </select>
               </div>
+              <div class="tasks-filter-select-wrap">
+                <label>Status:</label>
+                <select id="taskFilterStatusSelect" class="tasks-filter-select">
+                  <option value="ALL">All Tasks</option>
+                  <option value="ACTIVE">In Progress Only</option>
+                  <option value="COMPLETED">Completed / Past Tasks Only</option>
+                </select>
+              </div>
             </div>
           </div>
 
           <!-- Main Tasks Deck: In Progress + Completed Lists + Slide-Out Drawer -->
           <div class="tasks-main-deck-wrapper">
             <div class="tasks-deck-scroll-area">
-              <!-- IN PROGRESS SECTION -->
-              <div class="tasks-section-block">
-                <div class="tasks-section-header-row">
-                  <div class="section-title-dot-wrap">
-                    <span class="section-indicator-dot blue-dot"></span>
-                    <span class="tasks-section-title">IN PROGRESS</span>
-                    <span class="tasks-section-count-badge" id="tasksInProgressCount">3</span>
+              <div id="tasksListDeck">
+                <!-- IN PROGRESS SECTION -->
+                <div class="tasks-section-block" id="inProgressTasksSection">
+                  <div class="tasks-section-header-row">
+                    <div class="section-title-dot-wrap">
+                      <span class="section-indicator-dot blue-dot"></span>
+                      <span class="tasks-section-title">In Progress</span>
+                      <span class="tasks-section-count-badge" id="tasksInProgressCount">3</span>
+                    </div>
+                    <button type="button" class="btn-sort-tasks">
+                      <span>&#x21C5; Sort by Due Date</span>
+                    </button>
                   </div>
-                  <button type="button" class="btn-sort-tasks">
-                    <span>&#x21C5; Sort by Due Date</span>
-                  </button>
+                  <div class="task-cards-list" id="taskCardsList">
+                    <!-- Dynamically populated from Database -->
+                  </div>
                 </div>
-                <div class="task-cards-list" id="taskCardsList">
-                  <!-- Dynamically populated from Database -->
+
+                <!-- COMPLETED THIS WEEK SECTION -->
+                <div class="tasks-section-block mt-24" id="completedTasksSection">
+                  <div class="tasks-section-header-row">
+                    <div class="section-title-dot-wrap">
+                      <span class="section-indicator-dot green-dot"></span>
+                      <span class="tasks-section-title">Completed Tasks</span>
+                      <span class="tasks-section-count-badge green-badge" id="tasksCompletedCount">5 Total</span>
+                    </div>
+                    <button type="button" class="btn-archive-review">View Completed Tasks &rsaquo;</button>
+                  </div>
+                  <div class="completed-tasks-list" id="completedTasksList">
+                    <!-- Dynamically populated completed tasks -->
+                  </div>
                 </div>
               </div>
 
-              <!-- COMPLETED THIS WEEK SECTION -->
-              <div class="tasks-section-block mt-24">
-                <div class="tasks-section-header-row">
-                  <div class="section-title-dot-wrap">
-                    <span class="section-indicator-dot green-dot"></span>
-                    <span class="tasks-section-title">COMPLETED THIS WEEK</span>
-                    <span class="tasks-section-count-badge green-badge" id="tasksCompletedCount">5 Total</span>
+              <!-- KANBAN BOARD VIEW -->
+              <div id="tasksBoardDeck" class="hidden">
+                <div class="tasks-board-grid">
+                  <!-- To Do Column -->
+                  <div class="kanban-col">
+                    <div class="kanban-col-head">
+                      <div class="kanban-col-title-wrap">
+                        <span class="section-indicator-dot" style="background: #f59e0b;"></span>
+                        <span>TO DO</span>
+                      </div>
+                      <span class="kanban-col-count" id="kanbanTodoCount">0</span>
+                    </div>
+                    <div class="kanban-cards-container" id="kanbanCardsTodo"></div>
                   </div>
-                  <button type="button" class="btn-archive-review">Archive Review &rsaquo;</button>
-                </div>
-                <div class="completed-tasks-list" id="completedTasksList">
-                  <!-- Dynamically populated completed tasks -->
+
+                  <!-- In Progress Column -->
+                  <div class="kanban-col">
+                    <div class="kanban-col-head">
+                      <div class="kanban-col-title-wrap">
+                        <span class="section-indicator-dot blue-dot"></span>
+                        <span>IN PROGRESS</span>
+                      </div>
+                      <span class="kanban-col-count" id="kanbanInProgressCount">0</span>
+                    </div>
+                    <div class="kanban-cards-container" id="kanbanCardsInProgress"></div>
+                  </div>
+
+                  <!-- Completed Column -->
+                  <div class="kanban-col">
+                    <div class="kanban-col-head">
+                      <div class="kanban-col-title-wrap">
+                        <span class="section-indicator-dot green-dot"></span>
+                        <span>COMPLETED</span>
+                      </div>
+                      <span class="kanban-col-count" id="kanbanCompletedCount">0</span>
+                    </div>
+                    <div class="kanban-cards-container" id="kanbanCardsCompleted"></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -822,9 +884,10 @@
             <aside class="task-detail-drawer" id="taskDetailDrawer">
               <div class="task-drawer-header">
                 <div class="drawer-code-row">
-                  <span class="drawer-task-code" id="drawerTaskCode">TASK-4892 &bull; Sprint 14 Node</span>
+                  <span class="drawer-task-code" id="drawerTaskCode">Task Details</span>
                   <div class="drawer-window-tools">
                     <button type="button" class="btn-drawer-tool" id="btnDrawerExpand" title="Open Full View">&#x2197;</button>
+                    <button type="button" class="btn-drawer-tool text-red" id="btnDrawerDeleteHeader" title="Delete Task" style="color: #ef4444; font-size: 15px; margin-right: 4px; padding: 4px 8px; border-radius: 4px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); cursor: pointer;">🗑</button>
                     <button type="button" class="btn-drawer-tool" id="btnDrawerClose" title="Close Drawer">&times;</button>
                   </div>
                 </div>
@@ -834,21 +897,21 @@
               <div class="task-drawer-body">
                 <div class="drawer-meta-table">
                   <div class="drawer-meta-row">
-                    <span class="drawer-meta-label">Branch Pipeline:</span>
+                    <span class="drawer-meta-label">Category:</span>
                     <span class="drawer-meta-val link-val" id="drawerBranchPipeline">&#x2442; feat/carbon-v4</span>
                   </div>
                   <div class="drawer-meta-row">
-                    <span class="drawer-meta-label">Lead Engineer:</span>
+                    <span class="drawer-meta-label">Assigned To:</span>
                     <span class="drawer-meta-val" id="drawerLeadEngineer">Jagadish K (Founder)</span>
                   </div>
                   <div class="drawer-meta-row">
-                    <span class="drawer-meta-label">Sprint Timeline:</span>
+                    <span class="drawer-meta-label">Due Date:</span>
                     <span class="drawer-meta-val text-red" id="drawerSprintTimeline">&bull; Due Today, 17:00</span>
                   </div>
                 </div>
 
                 <div class="drawer-section mt-16">
-                  <span class="drawer-section-heading">SCOPE &amp; OBJECTIVE</span>
+                  <span class="drawer-section-heading">DESCRIPTION</span>
                   <p class="drawer-scope-text" id="drawerScopeText">
                     Refine the high-density workstation UI. Replace bulky UI matrices with clean micro-cards, zero decorative clutter, and absolute typographic rhythm aligned strictly with IBM Carbon principles.
                   </p>
@@ -865,7 +928,7 @@
                 </div>
 
                 <div class="drawer-section mt-16">
-                  <span class="drawer-section-heading">DELIVERABLE PROTOTYPE</span>
+                  <span class="drawer-section-heading">ATTACHMENTS</span>
                   <div class="drawer-prototype-card" id="drawerPrototypePreview">
                     <img id="drawerPrototypeImg" src="assets/id-card.png" alt="Prototype preview" onerror="this.style.display='none';">
                     <div class="prototype-overlay-tag" id="drawerPrototypeFilename">carbon-v4-spec-draft.fig</div>
@@ -884,6 +947,9 @@
                       <span>&#x23F0; Reschedule</span>
                     </button>
                   </div>
+                  <button type="button" id="btnDrawerDeleteAction" class="btn-drawer-action danger" style="margin-top: 10px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.28); border-radius: 6px; padding: 9px 14px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
+                    <span>🗑 Delete Task</span>
+                  </button>
                 </div>
               </div>
             </aside>
@@ -1008,8 +1074,14 @@
                         <button id="btnScheduleMeetingInChat" class="btn-secondary-action" title="Schedule Meeting in this Channel">
                           <span>📅 Schedule</span>
                         </button>
+                        <button type="button" id="btnChatAudioCall" class="btn-call-header btn-call-audio" title="Start Audio Call (📞)">
+                          <span>📞 Audio</span>
+                        </button>
+                        <button type="button" id="btnChatVideoCall" class="btn-call-header btn-call-video" title="Start Video Call (📹)">
+                          <span>📹 Video</span>
+                        </button>
                         <button id="btnStartMeeting" class="btn-primary-action" title="Start Instant Team Meeting">
-                          <span>📹 Meet Now</span>
+                          <span>🌐 Meeting Room</span>
                         </button>
                       </div>
                     </div>
@@ -1574,15 +1646,15 @@
       <!-- WORKSTATION SYSTEM STATUS FOOTER (Images 1-4) -->
       <footer class="workstation-system-footer">
         <div class="footer-left">
-          <span class="footer-engine-tag">REDDOT Engine v3.0.1</span>
+          <span class="footer-engine-tag">REDDOT Workstation v3.0</span>
           <span class="footer-divider">|</span>
-          <span class="footer-instance-tag">Instance: node-04a</span>
+          <span class="footer-instance-tag">Workspace Ready</span>
         </div>
         <div class="footer-right">
           <span class="latency-dot">&bull;</span>
           <span class="footer-latency-tag">Latency: 12ms</span>
           <span class="footer-divider">|</span>
-          <span class="footer-security-tag">Secure Handshake TLS 1.3</span>
+          <span class="footer-security-tag">All Systems Connected</span>
         </div>
       </footer>
     </div>
@@ -1748,8 +1820,8 @@
 
   <!-- EDIT TASK MODAL -->
   <div id="editTaskModal" class="modal-overlay hidden" style="z-index: 10005;">
-    <div class="modal-backdrop" id="editTaskBackdrop"></div>
-    <div class="modal-card modal-lg">
+    <div class="modal-backdrop" id="editTaskBackdrop" style="z-index: 0;"></div>
+    <div class="modal-card modal-lg" style="z-index: 10; position: relative;">
       <div class="modal-head">
         <div class="head-title-wrap">
           <span class="modal-icon">&#x270F;&#xFE0F;</span>
@@ -1808,10 +1880,11 @@
         </div>
 
         <div class="modal-foot" style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
-          <button type="button" id="btnCancelEditTask" class="btn-secondary-action">Cancel</button>
-          <button type="submit" id="btnSaveEditTask" class="btn-primary-action">
-            <span>💾 Save Task Changes</span>
-          </button>
+          
+          <button type="button" id="btnDeleteTaskFromModal" style="margin-right: auto; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 7px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 6px;">
+            <span>🗑 Delete Task</span>
+          </button><button type="button" id="btnCancelEditTask" class="btn-secondary-action">Cancel</button>
+          <button type="submit" id="btnSaveEditTask" class="btn-primary-action">💾 Save Task Changes</button>
         </div>
       </form>
     </div>
@@ -1870,23 +1943,67 @@
     </div>
   </div>
 
-  <!-- INCOMING REALTIME CALL SIGNALING MODAL -->
-  <div id="incomingCallModal" class="modal-overlay hidden" style="z-index: 10000;">
-    <div class="modal-backdrop" id="incomingCallBackdrop"></div>
-    <div class="modal-card modal-call-card text-center" style="max-width: 400px; padding: 32px 24px; background: rgba(12, 12, 20, 0.96); border: 1px solid var(--accent-cyan); box-shadow: 0 0 40px rgba(0, 229, 255, 0.25);">
-      <div class="call-avatar-wrapper" style="width: 80px; height: 80px; margin: 0 auto 16px auto; border-radius: 50%; border: 2px solid var(--accent-cyan); padding: 4px; box-shadow: 0 0 20px var(--accent-cyan);">
-        <div id="incomingCallAvatar" style="width: 100%; height: 100%; border-radius: 50%; background: var(--surface-card); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; color: #fff; overflow: hidden;">RD</div>
-      </div>
-      <h3 id="incomingCallCallerName" style="font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 4px;">Teammate Calling...</h3>
-      <p id="incomingCallSubtitle" style="font-size: 11px; color: var(--accent-cyan); margin-bottom: 24px; font-family: var(--font-mono); letter-spacing: 0.5px;">⚡ INCOMING REALTIME TEAM CALL</p>
-      
-      <div style="display: flex; gap: 12px; justify-content: center;">
-        <button id="btnDeclineIncomingCall" class="btn-secondary" style="flex: 1; justify-content: center; background: rgba(255, 59, 48, 0.15); border-color: rgba(255, 59, 48, 0.4); color: #ff453a;">
-          <span>❌ Decline</span>
-        </button>
-        <button id="btnAcceptIncomingCall" class="btn-primary" style="flex: 1; justify-content: center; background: var(--accent-green); border-color: var(--accent-green); color: #000;">
-          <span>📞 Accept Call</span>
-        </button>
+  <!-- WHATSAPP-STYLE INCOMING REALTIME CALL SCREEN -->
+  <div id="incomingCallModal" class="modal-overlay hidden whatsapp-call-screen-overlay" style="z-index: 99999; display: none;">
+    <div class="modal-backdrop whatsapp-call-backdrop" id="incomingCallBackdrop"></div>
+    <div class="whatsapp-call-container">
+      <div class="whatsapp-call-card">
+        <!-- Call Header Tag -->
+        <div class="whatsapp-call-badge-row">
+          <span class="whatsapp-call-badge" id="incomingCallTypeBadge">
+            <span class="call-badge-dot pulse-green"></span>
+            <span id="incomingCallTypeText">INCOMING VIDEO CALL</span>
+          </span>
+          <span class="whatsapp-call-encrypted-tag">🔒 End-to-End Encrypted</span>
+        </div>
+
+        <!-- Caller Avatar with WhatsApp-style pulsating ripple rings -->
+        <div class="whatsapp-call-avatar-outer">
+          <div class="call-ripple-ring ring-1"></div>
+          <div class="call-ripple-ring ring-2"></div>
+          <div class="call-ripple-ring ring-3"></div>
+          <div class="whatsapp-avatar-frame">
+            <div id="incomingCallAvatar" class="whatsapp-avatar-inner">RD</div>
+          </div>
+        </div>
+
+        <!-- Caller Identity -->
+        <h2 id="incomingCallCallerName" class="whatsapp-caller-name">Teammate Calling...</h2>
+        <div class="whatsapp-caller-meta">
+          <span id="incomingCallDept">Hardware Architecture</span>
+          <span class="dot-sep">&bull;</span>
+          <span id="incomingCallEmpId" class="caller-empid-pill">RD-EMP-001</span>
+        </div>
+        <p id="incomingCallSubtitle" class="whatsapp-call-status">Ringing...</p>
+
+        <!-- Quick Pre-Call Device Controls (Mute Mic, Camera Off) -->
+        <div class="whatsapp-precall-controls">
+          <button type="button" class="btn-precall-toggle" id="btnToggleIncomingCallMic" title="Mute/Unmute Mic">
+            <span class="icon">🎙️</span>
+            <span class="label" id="lblIncomingCallMic">Mic On</span>
+          </button>
+          <button type="button" class="btn-precall-toggle" id="btnToggleIncomingCallCam" title="Camera On/Off">
+            <span class="icon">📹</span>
+            <span class="label" id="lblIncomingCallCam">Video On</span>
+          </button>
+        </div>
+
+        <!-- WhatsApp Big Circular Accept / Decline Buttons -->
+        <div class="whatsapp-call-actions">
+          <div class="call-action-btn-wrap">
+            <button type="button" id="btnDeclineIncomingCall" class="whatsapp-btn-circle btn-call-decline" title="Decline Call">
+              <span class="btn-circle-icon">📴</span>
+            </button>
+            <span class="btn-circle-label">Decline</span>
+          </div>
+
+          <div class="call-action-btn-wrap">
+            <button type="button" id="btnAcceptIncomingCall" class="whatsapp-btn-circle btn-call-accept" title="Accept Call">
+              <span class="btn-circle-icon">📞</span>
+            </button>
+            <span class="btn-circle-label">Accept</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -2394,6 +2511,45 @@
         <span><kbd>&uarr;</kbd> <kbd>&darr;</kbd> Navigate</span>
         <span><kbd>&crarr;</kbd> Select</span>
         <span><kbd>Esc</kbd> Close</span>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ALL PAST & COMPLETED TASKS ARCHIVE MODAL -->
+  <div id="completedArchiveModal" class="modal-overlay hidden" style="z-index: 10010;">
+    <div class="modal-backdrop" id="completedArchiveBackdrop"></div>
+    <div class="modal-card modal-lg" style="max-width: 840px; width: 92%; max-height: 85vh; display: flex; flex-direction: column;">
+      <div class="modal-head" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding: 16px 20px;">
+        <div class="head-title-wrap" style="display: flex; align-items: center; gap: 10px;">
+          <span class="modal-icon" style="font-size: 20px;">📋</span>
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="modal-title" style="font-size: 15px; font-weight: 700;">ALL PAST &amp; COMPLETED TASKS</span>
+              <span id="archiveModalCountBadge" style="background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700;">0 Total</span>
+            </div>
+            <p style="font-size: 11.5px; color: var(--text-muted); margin: 2px 0 0 0;">Complete archive of all completed tasks, deliverables, and past assignments</p>
+          </div>
+        </div>
+        <button id="btnCloseCompletedArchive" class="modal-close-btn" style="background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer;">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+        <div style="display: flex; gap: 10px; margin-bottom: 14px;">
+          <div style="flex: 1; position: relative;">
+            <span style="position: absolute; left: 10px; top: 9px; font-size: 13px; color: var(--text-muted);">&#x1F50D;</span>
+            <input type="text" id="archiveSearchInput" class="custom-input" placeholder="Search past tasks by title, assignee, or description..." style="width: 100%; padding-left: 32px;">
+          </div>
+          <select id="archiveAssigneeFilter" class="custom-select" style="width: 200px;">
+            <option value="ALL">All Assignees</option>
+          </select>
+        </div>
+        <div id="archiveTasksListContainer" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- Dynamically populated from JS -->
+        </div>
+      </div>
+      <div class="modal-foot" style="padding: 12px 20px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 11.5px; color: var(--text-muted);">Tasks can be reopened back to In Progress at any time.</span>
+        <button type="button" id="btnCloseCompletedArchiveFoot" class="btn-secondary-action">Close Archive</button>
       </div>
     </div>
   </div>

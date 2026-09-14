@@ -10,6 +10,9 @@
   'use strict';
 
   const ORG_ID = window.REDDOT_ORG_ID || 'reddot';
+  if (!window.CLIENT_SESSION_ID) {
+    window.CLIENT_SESSION_ID = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+  }
 
   const FirebaseService = {
     app: null,
@@ -812,7 +815,14 @@
         .onSnapshot((snapshot) => {
           const msgs = [];
           snapshot.forEach(doc => {
-            msgs.push({ id: doc.id, ...doc.data() });
+            const data = doc.data() || {};
+            if (data.attachmentsJson && (!data.attachments || data.attachments.length === 0)) {
+              try { data.attachments = JSON.parse(data.attachmentsJson); } catch (_) {}
+            }
+            if (data.voiceNoteJson && !data.voiceNote) {
+              try { data.voiceNote = JSON.parse(data.voiceNoteJson); } catch (_) {}
+            }
+            msgs.push({ id: doc.id, ...data });
           });
           callback(msgs);
         }, (err) => {
@@ -887,21 +897,28 @@
       if (!sent) {
         try {
           const restUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/organizations/${ORG_ID}/channels/${cleanChannelId}/messages/${msgId}?key=${config.apiKey}`;
-          const bodyPayload = JSON.stringify({
-            fields: {
-              id: { stringValue: messageData.id },
-              senderId: { stringValue: messageData.senderId },
-              senderUid: { stringValue: messageData.senderUid },
-              senderEmpId: { stringValue: messageData.senderEmpId },
-              senderName: { stringValue: messageData.senderName },
-              senderEmail: { stringValue: messageData.senderEmail },
-              senderPhoto: { stringValue: messageData.senderPhoto },
-              text: { stringValue: messageData.text },
-              createdAt: { integerValue: String(messageData.createdAt) },
-              channelId: { stringValue: messageData.channelId },
-              isEdited: { booleanValue: false }
-            }
-          });
+          const fieldsObj = {
+            id: { stringValue: messageData.id },
+            senderId: { stringValue: messageData.senderId },
+            senderUid: { stringValue: messageData.senderUid },
+            senderEmpId: { stringValue: messageData.senderEmpId },
+            senderName: { stringValue: messageData.senderName },
+            senderEmail: { stringValue: messageData.senderEmail },
+            senderPhoto: { stringValue: messageData.senderPhoto },
+            text: { stringValue: messageData.text },
+            createdAt: { integerValue: String(messageData.createdAt) },
+            channelId: { stringValue: messageData.channelId },
+            isEdited: { booleanValue: false }
+          };
+
+          if (messageData.attachments && messageData.attachments.length > 0) {
+            fieldsObj.attachmentsJson = { stringValue: JSON.stringify(messageData.attachments) };
+          }
+          if (messageData.voiceNote) {
+            fieldsObj.voiceNoteJson = { stringValue: JSON.stringify(messageData.voiceNote) };
+          }
+
+          const bodyPayload = JSON.stringify({ fields: fieldsObj });
 
           const resp = await fetch(restUrl, {
             method: 'PATCH',
@@ -1143,30 +1160,41 @@
 
     // --- REALTIME CALL SIGNALING ENGINE ---
     async sendCallInvite(targetMember, roomUrl, callType = 'video') {
-      const curUid = String(this.currentUser ? this.currentUser.uid : 'RD-FOUNDER-001');
-      const curEmail = String(this.currentUser ? this.currentUser.email : 'jagadish2k2006@gmail.com').toLowerCase().trim();
-      const curName = String(this.currentMember?.displayName || this.currentMember?.name || (this.currentUser?.displayName || 'JAGADISH K'));
-      const curPhoto = String(this.currentMember?.photoURL || this.currentMember?.photoUrl || '');
+      const config = window.REDDOT_FIREBASE_CONFIG;
+      const callerSessionId = window.CLIENT_SESSION_ID || ('sess_' + Date.now());
+      const curUid = String(this.currentUser?.uid || window.state?.currentUser?.uid || this.currentMember?.uid || window.state?.currentMemberId || 'RD-FOUNDER-001');
+      const curEmail = String(this.currentUser?.email || window.state?.currentUser?.email || this.currentMember?.email || 'jagadish2k2006@gmail.com').toLowerCase().trim();
+      const curEmpId = String(this.currentMember?.id || window.state?.currentMemberId || (curUid ? `RD-${curUid.slice(0, 6).toUpperCase()}` : 'RD-001'));
+      const curName = String(this.currentMember?.displayName || this.currentMember?.name || window.state?.currentMember?.name || this.currentUser?.displayName || (curEmail ? curEmail.split('@')[0] : 'Teammate'));
+      const curPhoto = String(this.currentMember?.photoURL || this.currentMember?.photoUrl || window.state?.currentMember?.photoUrl || '');
+      const curDept = String(this.currentMember?.dept || window.state?.currentMember?.dept || 'Hardware Architecture');
 
       let targetUid = '';
+      let targetEmpId = '';
       let targetEmail = '';
       let targetName = 'Teammate';
+      let targetPhoto = '';
 
       if (typeof targetMember === 'object' && targetMember !== null) {
-        targetUid = String(targetMember.uid || targetMember.id || '');
+        targetUid = String(targetMember.uid || '');
+        targetEmpId = String(targetMember.id || '');
         targetEmail = String(targetMember.email || '').toLowerCase().trim();
         targetName = String(targetMember.name || targetMember.displayName || (targetEmail ? targetEmail.split('@')[0] : 'Teammate'));
+        targetPhoto = String(targetMember.photoUrl || targetMember.photoURL || '');
+        if (!targetUid && targetEmpId) targetUid = targetEmpId;
       } else if (typeof targetMember === 'string') {
         if (targetMember === 'ALL') {
           targetUid = 'ALL';
-          targetEmail = '';
+          targetEmpId = 'ALL';
           targetName = 'Entire Team';
         } else if (targetMember.includes('@')) {
           targetEmail = targetMember.toLowerCase().trim();
-          targetUid = targetEmail;
           targetName = targetEmail.split('@')[0].toUpperCase();
+          targetUid = targetEmail;
+          targetEmpId = targetEmail;
         } else {
           targetUid = targetMember;
+          targetEmpId = targetMember;
           targetName = targetMember;
         }
       }
@@ -1174,13 +1202,18 @@
       const callId = 'call_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
       const callData = {
         callId: String(callId),
+        callerSessionId: String(callerSessionId),
         callerUid: String(curUid),
+        callerEmpId: String(curEmpId),
         callerEmail: String(curEmail),
         callerName: String(curName),
         callerPhoto: String(curPhoto),
+        callerDept: String(curDept),
         targetUid: String(targetUid),
+        targetEmpId: String(targetEmpId),
         targetEmail: String(targetEmail),
         targetName: String(targetName),
+        targetPhoto: String(targetPhoto),
         roomUrl: String(roomUrl),
         callType: String(callType || 'video'),
         status: 'RINGING',
@@ -1204,19 +1237,24 @@
       }
 
       // 2. Direct Cloud REST Fallback
-      if (!sent) {
+      if (!sent && config) {
         try {
           const restUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/organizations/${ORG_ID}/calls/${callId}?key=${config.apiKey}`;
           const bodyPayload = JSON.stringify({
             fields: {
               callId: { stringValue: callData.callId },
+              callerSessionId: { stringValue: callData.callerSessionId },
               callerUid: { stringValue: callData.callerUid },
+              callerEmpId: { stringValue: callData.callerEmpId },
               callerEmail: { stringValue: callData.callerEmail },
               callerName: { stringValue: callData.callerName },
               callerPhoto: { stringValue: callData.callerPhoto },
+              callerDept: { stringValue: callData.callerDept },
               targetUid: { stringValue: callData.targetUid },
+              targetEmpId: { stringValue: callData.targetEmpId },
               targetEmail: { stringValue: callData.targetEmail },
               targetName: { stringValue: callData.targetName },
+              targetPhoto: { stringValue: callData.targetPhoto },
               roomUrl: { stringValue: callData.roomUrl },
               callType: { stringValue: callData.callType },
               status: { stringValue: 'RINGING' },
@@ -1244,26 +1282,58 @@
     },
 
     async respondToCall(callId, status = 'ACCEPTED') {
-      if (!this.db || !callId) return;
-      try {
-        await this.db.collection(`organizations/${ORG_ID}/calls`).doc(callId).set({
-          status: status,
-          updatedAt: Date.now()
-        }, { merge: true });
-      } catch (e) {
-        console.warn('[FIREBASE] Respond to call note:', e.message);
+      if (!callId) return;
+      const config = window.REDDOT_FIREBASE_CONFIG;
+      const updateData = { status: status, updatedAt: Date.now() };
+      if (this.db) {
+        try {
+          await this.db.collection(`organizations/${ORG_ID}/calls`).doc(callId).set(updateData, { merge: true });
+        } catch (e) {
+          console.warn('[FIREBASE] Respond to call note:', e.message);
+        }
+      }
+      if (config) {
+        try {
+          const restUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/organizations/${ORG_ID}/calls/${callId}?updateMask.fieldPaths=status&updateMask.fieldPaths=updatedAt&key=${config.apiKey}`;
+          await fetch(restUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fields: {
+                status: { stringValue: status },
+                updatedAt: { integerValue: String(Date.now()) }
+              }
+            })
+          });
+        } catch (_) {}
       }
     },
 
     async cancelCall(callId) {
-      if (!this.db || !callId) return;
-      try {
-        await this.db.collection(`organizations/${ORG_ID}/calls`).doc(callId).set({
-          status: 'CANCELLED',
-          updatedAt: Date.now()
-        }, { merge: true });
-      } catch (e) {
-        console.warn('[FIREBASE] Cancel call note:', e.message);
+      if (!callId) return;
+      const config = window.REDDOT_FIREBASE_CONFIG;
+      const updateData = { status: 'CANCELLED', updatedAt: Date.now() };
+      if (this.db) {
+        try {
+          await this.db.collection(`organizations/${ORG_ID}/calls`).doc(callId).set(updateData, { merge: true });
+        } catch (e) {
+          console.warn('[FIREBASE] Cancel call note:', e.message);
+        }
+      }
+      if (config) {
+        try {
+          const restUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/organizations/${ORG_ID}/calls/${callId}?updateMask.fieldPaths=status&updateMask.fieldPaths=updatedAt&key=${config.apiKey}`;
+          await fetch(restUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fields: {
+                status: { stringValue: 'CANCELLED' },
+                updatedAt: { integerValue: String(Date.now()) }
+              }
+            })
+          });
+        } catch (_) {}
       }
     },
 
@@ -1284,46 +1354,111 @@
     subscribeIncomingCalls(callback) {
       if (!this.db) return () => {};
 
+      const checkCallMatches = (data) => {
+        if (!data || data.status !== 'RINGING') return false;
+
+        // 1. Never ring on the exact client session that placed the call
+        const mySessionId = window.CLIENT_SESSION_ID;
+        if (mySessionId && data.callerSessionId && data.callerSessionId === mySessionId) {
+          return false;
+        }
+
+        // 2. Discard stale calls older than 45 seconds or missing timestamp
+        const callTime = Number(data.createdAt || data.updatedAt || 0);
+        if (!callTime || (Date.now() - callTime > 45000)) {
+          return false;
+        }
+
+        const myUids = [
+          this.currentUser?.uid,
+          window.state?.currentUser?.uid,
+          this.currentMember?.uid,
+          window.state?.currentMember?.uid
+        ].filter(Boolean).map(s => String(s).trim());
+
+        const myEmpIds = [
+          this.currentMember?.id,
+          window.state?.currentMemberId,
+          window.state?.currentMember?.id
+        ].filter(Boolean).map(s => String(s).trim().toLowerCase());
+
+        const myEmails = [
+          this.currentUser?.email,
+          window.state?.currentUser?.email,
+          this.currentMember?.email,
+          window.state?.currentMember?.email,
+          window.state?.personalShift?.email
+        ].filter(Boolean).map(s => String(s).trim().toLowerCase());
+
+        const myNames = [
+          this.currentMember?.displayName,
+          this.currentMember?.name,
+          window.state?.currentMember?.displayName,
+          window.state?.currentMember?.name,
+          this.currentUser?.displayName
+        ].filter(Boolean).map(s => String(s).trim().toLowerCase());
+
+        const tUid = String(data.targetUid || '').trim();
+        const tEmpId = String(data.targetEmpId || '').trim().toLowerCase();
+        const tEmail = String(data.targetEmail || '').trim().toLowerCase();
+        const tName = String(data.targetName || '').trim().toLowerCase();
+
+        // Broadcast to entire team
+        if (tUid === 'ALL' || tEmpId === 'all' || tName === 'entire team') return true;
+
+        // Target Email matches
+        if (tEmail && myEmails.some(e => e === tEmail || e.includes(tEmail) || tEmail.includes(e))) return true;
+
+        // Target UID matches
+        if (tUid && (myUids.includes(tUid) || myEmpIds.includes(tUid.toLowerCase()))) return true;
+
+        // Target Emp ID matches
+        if (tEmpId && (myEmpIds.includes(tEmpId) || myUids.map(u => u.toLowerCase()).includes(tEmpId))) return true;
+
+        // Target Name matches
+        if (tName && myNames.some(n => n.includes(tName) || tName.includes(n))) return true;
+
+        return false;
+      };
+
+      const processSnapshot = (snapshot) => {
+        const incoming = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (checkCallMatches(data)) {
+            incoming.push({ id: doc.id, ...data });
+          }
+        });
+        callback(incoming);
+      };
+
       const unsub = this.db.collection(`organizations/${ORG_ID}/calls`)
         .where('status', '==', 'RINGING')
         .onSnapshot((snapshot) => {
-          const curUid = String(this.currentUser?.uid || (window.state?.currentUser?.uid) || (this.currentMember?.uid) || '');
-          const curEmail = String(this.currentUser?.email || (window.state?.currentUser?.email) || (this.currentMember?.email) || '').toLowerCase().trim();
-          const curId = String(this.currentMember?.id || (window.state?.currentMemberId) || (window.state?.currentMember?.id) || '').trim();
-          const curName = String(this.currentMember?.displayName || this.currentMember?.name || (window.state?.currentMember?.name) || '').toLowerCase().trim();
-
-          const incoming = [];
-          snapshot.forEach(doc => {
-            const data = doc.data();
-            if (!data) return;
-
-            // Ignore calls initiated by myself
-            if ((curUid && data.callerUid === curUid) || (curEmail && data.callerEmail && data.callerEmail.toLowerCase() === curEmail)) return;
-
-            // Ignore calls that expired (older than 60 seconds)
-            if (data.createdAt && (Date.now() - data.createdAt > 60000)) return;
-
-            const tUid = String(data.targetUid || '').trim();
-            const tEmail = String(data.targetEmail || '').toLowerCase().trim();
-            const tName = String(data.targetName || '').toLowerCase().trim();
-
-            const isBroadcast = tUid === 'ALL' || tName === 'entire team';
-            const matchesEmail = Boolean(curEmail && tEmail && (tEmail === curEmail || curEmail.includes(tEmail) || tEmail.includes(curEmail)));
-            const matchesUid = Boolean(curUid && tUid && (tUid === curUid));
-            const matchesId = Boolean(curId && tUid && (tUid.toLowerCase() === curId.toLowerCase()));
-            const matchesName = Boolean(curName && tName && (curName.includes(tName) || tName.includes(curName)));
-
-            if (isBroadcast || matchesEmail || matchesUid || matchesId || matchesName) {
-              incoming.push({ id: doc.id, ...data });
-            }
-          });
-          callback(incoming);
+          processSnapshot(snapshot);
         }, (err) => {
           console.warn('[FIREBASE] Call signaling listener warning:', err.message);
         });
 
       this.listeners.push(unsub);
-      return unsub;
+
+      // Periodic safety poll every 3.5 seconds
+      const pollInterval = setInterval(async () => {
+        if (!this.db) return;
+        try {
+          const snap = await this.db.collection(`organizations/${ORG_ID}/calls`)
+            .where('status', '==', 'RINGING')
+            .get();
+          processSnapshot(snap);
+        } catch (_) {}
+      }, 3500);
+
+      const compositeUnsub = () => {
+        clearInterval(pollInterval);
+        unsub();
+      };
+      this.listeners.push(compositeUnsub);
+      return compositeUnsub;
     },
 
     async updateChannel(channelId, { name, topic }) {

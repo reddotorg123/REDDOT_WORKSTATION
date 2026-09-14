@@ -1,0 +1,12 @@
+[     394ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8085/index.html:0
+[     394ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8085/index.html:0
+[     982ms] [WARNING] The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio @ http://localhost:8085/wallpaper.js?v=2.5.2-teams:837
+[     983ms] [WARNING] The AudioContext was not allowed to start. It must be resumed (or created) after a user gesture on the page. https://developer.chrome.com/blog/autoplay/#web_audio @ http://localhost:8085/wallpaper.js?v=2.5.2-teams:851
+[     988ms] [WARNING] [2026-09-05T03:59:15.857Z]  @firebase/firestore: Firestore (10.8.0): enableMultiTabIndexedDbPersistence() will be deprecated in the future, you can use `FirestoreSettings.cache` instead. @ https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js:0
+[     988ms] [LOG] [FIREBASE] Production Firebase initialized for organization: reddot @ http://localhost:8085/firebase-service.js?v=2.5.2-teams:70
+[    3217ms] [LOG] [FIREBASE] Establishing active multi-device real-time cloud subscriptions... @ http://localhost:8085/wallpaper.js?v=2.5.2-teams:6250
+[  137655ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8085/index.html:0
+[  137656ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:8085/index.html:0
+[  138025ms] [WARNING] [2026-09-05T04:01:32.894Z]  @firebase/firestore: Firestore (10.8.0): enableMultiTabIndexedDbPersistence() will be deprecated in the future, you can use `FirestoreSettings.cache` instead. @ https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js:0
+[  138025ms] [LOG] [FIREBASE] Production Firebase initialized for organization: reddot @ http://localhost:8085/firebase-service.js?v=2.5.2-teams:70
+[  140280ms] [LOG] [FIREBASE] Establishing active multi-device real-time cloud subscriptions... @ http://localhost:8085/wallpaper.js?v=2.5.2-teams:6250

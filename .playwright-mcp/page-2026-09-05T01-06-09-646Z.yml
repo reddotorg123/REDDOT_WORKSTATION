@@ -1,0 +1,140 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=e4] [cursor=pointer]':
+        - generic [ref=e5]: ⬢
+        - generic [ref=e7]:
+          - generic [ref=e8]: REDDOT.OS
+          - generic [ref=e9]: WORKSPACE
+      - generic [ref=e10]:
+        - button "📌 Pin Mode" [ref=e11] [cursor=pointer]:
+          - generic [ref=e12]: 📌
+          - generic [ref=e13]: Pin Mode
+        - button "−" [ref=e14] [cursor=pointer]
+        - button "▢" [ref=e16] [cursor=pointer]
+        - button "×" [ref=e18] [cursor=pointer]
+    - main [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]: (TECHNICAL WORKSPACE)
+        - generic [ref=e23]: ORGANIZATION // REDDOT
+      - generic:
+        - heading "REDDOT" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=e32]
+      - generic [ref=e33]:
+        - generic [ref=e34]: PERSISTENT WORKSPACE •
+        - generic [ref=e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=e38] [cursor=pointer]:
+        - generic [ref=e39]: ⧢
+        - generic [ref=e40]: COMMAND CENTER
+        - generic [ref=e41]: SPACE
+      - generic [ref=e43]:
+        - generic [ref=e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=e45]: REDDOT • 2026
+  - generic [ref=e47]:
+    - banner [ref=e48]:
+      - generic [ref=e49]:
+        - generic [ref=e50]: ◆
+        - generic [ref=e51]:
+          - heading "REDDOT WORKSPACE" [level=2] [ref=e52]
+          - paragraph [ref=e53]: "Enterprise Workforce Command • Org: reddot"
+        - generic "Switch User / View Profile" [ref=e54] [cursor=pointer]:
+          - generic [ref=e56]: JAGADISH K // FOUNDER & ADMIN
+          - generic [ref=e57]: RD-FOUNDER-001
+        - generic "Disk Vault & Cloud Sync Active" [ref=e58]: PERSISTENT DB ACTIVE
+      - navigation [ref=e59]:
+        - button "🎨 Wallpapers" [ref=e60] [cursor=pointer]:
+          - generic [ref=e61]: 🎨
+          - generic [ref=e62]: Wallpapers
+        - button "👥 Directory & IDs" [ref=e63] [cursor=pointer]:
+          - generic [ref=e64]: 👥
+          - generic [ref=e65]: Directory & IDs
+        - button "⏱ Shifts" [ref=e66] [cursor=pointer]:
+          - generic [ref=e67]: ⏱
+          - generic [ref=e68]: Shifts
+        - button "📋 Tasks" [active] [ref=e69] [cursor=pointer]:
+          - generic [ref=e70]: 📋
+          - generic [ref=e71]: Tasks
+        - button "💬 Team Chat" [ref=e72] [cursor=pointer]:
+          - generic [ref=e73]: 💬
+          - generic [ref=e74]: Team Chat
+        - button "🌐 Presence" [ref=e75] [cursor=pointer]:
+          - generic [ref=e76]: 🌐
+          - generic [ref=e77]: Presence
+        - button "🛡 Database & Storage" [ref=e78] [cursor=pointer]:
+          - generic [ref=e79]: 🛡
+          - generic [ref=e80]: Database & Storage
+      - generic [ref=e81]:
+        - button "📌 Pin Mode" [ref=e82] [cursor=pointer]:
+          - generic [ref=e83]: 📌
+          - generic [ref=e84]: Pin Mode
+        - button "⧢ Wallpaper Mode [Esc]" [ref=e85] [cursor=pointer]
+        - generic [ref=e87]:
+          - button "−" [ref=e88] [cursor=pointer]
+          - button "▢" [ref=e89] [cursor=pointer]
+          - button "×" [ref=e90] [cursor=pointer]
+    - main [ref=e91]:
+      - generic [ref=e301]:
+        - generic [ref=e302]:
+          - generic [ref=e303]:
+            - heading "➕ CREATE & ASSIGN TASK" [level=4] [ref=e304]
+            - paragraph [ref=e305]: Assign goals and deadlines with immediate disk persistence.
+            - generic [ref=e306]:
+              - generic [ref=e307]:
+                - generic [ref=e308]: Task Title
+                - textbox "e.g. Calibrate Ultrasonic Transducer" [ref=e309]
+              - generic [ref=e310]:
+                - generic [ref=e311]: Assignee
+                - combobox [ref=e312]:
+                  - option "Entire Team (ALL)" [selected]
+                  - option "Team Member [RD-RD-FOU]"
+                  - option "JAGADISH K [RD-FOUNDER-001]"
+                  - option "Pavithra R [RD-EMP-002]"
+              - generic [ref=e313]:
+                - generic [ref=e314]: Priority
+                - combobox [ref=e315]:
+                  - option "Normal" [selected]
+                  - option "Medium"
+                  - option "High"
+                  - option "Urgent Priority"
+              - generic [ref=e316]:
+                - generic [ref=e317]: Due Date / Target
+                - textbox "Today 5:00 PM" [ref=e318]
+              - generic [ref=e319]:
+                - generic [ref=e320]: Task Description & Requirements
+                - textbox "Provide requirements or verification notes..." [ref=e321]
+              - button "📋 Save & Assign Task" [ref=e322] [cursor=pointer]
+          - generic [ref=e323]:
+            - text: Task Filter
+            - generic [ref=e324]:
+              - button "All Tasks" [ref=e325] [cursor=pointer]
+              - button "Assigned to Me" [ref=e326] [cursor=pointer]
+              - button "Assigned" [ref=e327] [cursor=pointer]
+              - button "In Progress" [ref=e328] [cursor=pointer]
+              - button "Completed" [ref=e329] [cursor=pointer]
+        - generic [ref=e330]:
+          - generic [ref=e331]:
+            - heading "WORKSPACE TASKS • PERSISTENT STORE" [level=4] [ref=e332]
+            - generic [ref=e333]: 1 Tasks
+          - generic [ref=e335]:
+            - generic [ref=e336]:
+              - generic [ref=e337]:
+                - generic [ref=e338]: HIGH
+                - heading "design" [level=4] [ref=e339]
+              - generic [ref=e340] [cursor=pointer]: ACCOMPLISHED
+            - paragraph [ref=e341]: csvsfvfsvsv
+            - generic [ref=e342]:
+              - generic [ref=e343]:
+                - text: 👤
+                - strong [ref=e344]: Pavithra R
+              - generic [ref=e345]: ⏰ 10:00 pm
+              - generic [ref=e346]: 📅 9/2/2026
+            - generic [ref=e347]:
+              - button "💬 Activity & Comments" [ref=e348] [cursor=pointer]
+              - combobox [ref=e349]:
+                - option "Assigned"
+                - option "In Progress"
+                - option "Completed" [selected]
+              - button "🗑️" [ref=e350] [cursor=pointer]
+  - iframe [aria-hidden] [ref=e215]

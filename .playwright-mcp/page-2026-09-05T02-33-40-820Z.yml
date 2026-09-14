@@ -1,0 +1,101 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=e4] [cursor=pointer]':
+        - generic [ref=e5]: ⬢
+        - generic [ref=e7]:
+          - generic [ref=e8]: REDDOT.OS
+          - generic [ref=e9]: WORKSPACE
+      - generic [ref=e10]:
+        - button "📌 Pin Mode" [ref=e11] [cursor=pointer]:
+          - generic [ref=e12]: 📌
+          - generic [ref=e13]: Pin Mode
+        - button "−" [ref=e14] [cursor=pointer]
+        - button "▢" [ref=e16] [cursor=pointer]
+        - button "×" [ref=e18] [cursor=pointer]
+    - main [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]: (OWNER)
+        - generic [ref=e23]: HARDWARE ARCHITECTURE // RD-FOUNDER-001
+      - generic:
+        - heading "JAGADISH" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=e32]
+      - generic [ref=e33]:
+        - generic [ref=e34]: PERSISTENT WORKSPACE •
+        - generic [ref=e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=e38] [cursor=pointer]:
+        - generic [ref=e39]: ⧢
+        - generic [ref=e40]: COMMAND CENTER
+        - generic [ref=e41]: SPACE
+      - generic [ref=e43]:
+        - generic [ref=e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=e45]: JAGADISH K • 2026
+  - generic [ref=e47]:
+    - banner [ref=e48]:
+      - generic [ref=e49]:
+        - generic [ref=e50]: ◆
+        - generic [ref=e51]:
+          - heading "REDDOT WORKSPACE" [level=2] [ref=e52]
+          - paragraph [ref=e53]: "Enterprise Workforce Command • Org: reddot"
+        - generic "Switch User / View Profile" [ref=e54] [cursor=pointer]: JAGADISH K // FOUNDER & ADMIN
+        - generic "Disk Vault & Cloud Sync Active" [ref=e57]: PERSISTENT DB ACTIVE
+      - navigation [ref=e58]:
+        - button "🎨 Wallpapers" [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]: 🎨
+          - generic [ref=e61]: Wallpapers
+        - button "👥 Directory" [ref=e62] [cursor=pointer]:
+          - generic [ref=e63]: 👥
+          - generic [ref=e64]: Directory
+        - button "⏱ Shifts" [active] [ref=e65] [cursor=pointer]:
+          - generic [ref=e66]: ⏱
+          - generic [ref=e67]: Shifts
+        - button "📋 Tasks" [ref=e68] [cursor=pointer]:
+          - generic [ref=e69]: 📋
+          - generic [ref=e70]: Tasks
+        - button "💬 Team Chat" [ref=e71] [cursor=pointer]:
+          - generic [ref=e72]: 💬
+          - generic [ref=e73]: Team Chat
+        - button "🌐 Presence" [ref=e74] [cursor=pointer]:
+          - generic [ref=e75]: 🌐
+          - generic [ref=e76]: Presence
+        - button "🛡 Database" [ref=e77] [cursor=pointer]:
+          - generic [ref=e78]: 🛡
+          - generic [ref=e79]: Database
+      - generic [ref=e80]:
+        - button "📌 Pin Mode" [ref=e81] [cursor=pointer]:
+          - generic [ref=e82]: 📌
+          - generic [ref=e83]: Pin Mode
+        - button "⧢ Wallpaper Mode [Esc]" [ref=e84] [cursor=pointer]
+        - generic [ref=e86]:
+          - button "−" [ref=e87] [cursor=pointer]
+          - button "▢" [ref=e88] [cursor=pointer]
+          - button "×" [ref=e89] [cursor=pointer]
+    - main [ref=e90]:
+      - generic [ref=e155]:
+        - generic [ref=e156]:
+          - generic [ref=e157]:
+            - generic [ref=e158]: DUTY ON
+            - heading "01:05:22" [level=3] [ref=e159]
+            - paragraph [ref=e160]: Current active shift duration for authenticated user
+          - generic [ref=e161]:
+            - button "▶ Clock In" [disabled] [ref=e162]
+            - button "⏸ Take Break" [ref=e163] [cursor=pointer]
+            - button "⏹ Clock Out" [ref=e164] [cursor=pointer]
+        - generic [ref=e165]:
+          - heading "SHIFT PUNCH AUDIT TRAIL" [level=4] [ref=e166]
+          - table [ref=e168]:
+            - rowgroup [ref=e169]:
+              - row [ref=e170]:
+                - columnheader "Employee" [ref=e171]
+                - columnheader "Action" [ref=e172]
+                - columnheader "Timestamp" [ref=e173]
+                - columnheader "Date" [ref=e174]
+            - rowgroup [ref=e175]:
+              - row [ref=e176]:
+                - cell [ref=e177]:
+                  - strong [ref=e178]: JAGADISH K
+                - cell "▶ Clock In" [ref=e179]
+                - cell "06:58 AM" [ref=e180]
+                - cell "9/5/2026" [ref=e181]

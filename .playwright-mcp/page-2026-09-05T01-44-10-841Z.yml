@@ -1,0 +1,153 @@
+- generic [ref=f26e1]:
+  - generic [ref=f26e2]:
+    - banner [ref=f26e3]:
+      - 'generic "Open Command Center (Key: Space)" [ref=f26e4] [cursor=pointer]':
+        - generic [ref=f26e5]: ⬢
+        - generic [ref=f26e7]:
+          - generic [ref=f26e8]: REDDOT.OS
+          - generic [ref=f26e9]: WORKSPACE
+      - generic [ref=f26e10]:
+        - button "📌 Pin Mode" [ref=f26e11] [cursor=pointer]:
+          - generic [ref=f26e12]: 📌
+          - generic [ref=f26e13]: Pin Mode
+        - button "−" [ref=f26e14] [cursor=pointer]
+        - button "▢" [ref=f26e16] [cursor=pointer]
+        - button "×" [ref=f26e18] [cursor=pointer]
+    - main [ref=f26e20]:
+      - generic [ref=f26e21]:
+        - generic [ref=f26e22]: (OWNER)
+        - generic [ref=f26e23]: HARDWARE ARCHITECTURE // RD-FOUNDER-001
+      - generic:
+        - heading "JAGADISH" [level=1]
+      - generic "Click to view Official Employee Badge or Change Photo" [ref=f26e30] [cursor=pointer]:
+        - img "REDDOT Identification Badge" [ref=f26e32]
+      - generic [ref=f26e33]:
+        - generic [ref=f26e34]: PERSISTENT WORKSPACE •
+        - generic [ref=f26e35]: LOCAL DISK & CLOUD DATABASE
+    - contentinfo [ref=f26e36]:
+      - button "⧢ COMMAND CENTER SPACE" [ref=f26e38] [cursor=pointer]:
+        - generic [ref=f26e39]: ⧢
+        - generic [ref=f26e40]: COMMAND CENTER
+        - generic [ref=f26e41]: SPACE
+      - generic [ref=f26e43]:
+        - generic [ref=f26e44]: PERSISTENT DISK VAULT ACTIVE
+        - generic [ref=f26e45]: JAGADISH K • 2026
+  - generic [ref=f26e47]:
+    - banner [ref=f26e48]:
+      - generic [ref=f26e49]:
+        - generic [ref=f26e50]: ◆
+        - generic [ref=f26e51]:
+          - heading "REDDOT WORKSPACE" [level=2] [ref=f26e52]
+          - paragraph [ref=f26e53]: "Enterprise Workforce Command • Org: reddot"
+        - generic "Switch User / View Profile" [ref=f26e54] [cursor=pointer]: JAGADISH K // FOUNDER & ADMIN
+        - generic "Disk Vault & Cloud Sync Active" [ref=f26e57]: PERSISTENT DB ACTIVE
+      - navigation [ref=f26e58]:
+        - button "🎨 Wallpapers" [ref=f26e59] [cursor=pointer]:
+          - generic [ref=f26e60]: 🎨
+          - generic [ref=f26e61]: Wallpapers
+        - button "👥 Directory & IDs" [ref=f26e62] [cursor=pointer]:
+          - generic [ref=f26e63]: 👥
+          - generic [ref=f26e64]: Directory & IDs
+        - button "⏱ Shifts" [ref=f26e65] [cursor=pointer]:
+          - generic [ref=f26e66]: ⏱
+          - generic [ref=f26e67]: Shifts
+        - button "📋 Tasks" [ref=f26e68] [cursor=pointer]:
+          - generic [ref=f26e69]: 📋
+          - generic [ref=f26e70]: Tasks
+        - button "💬 Team Chat" [ref=f26e71] [cursor=pointer]:
+          - generic [ref=f26e72]: 💬
+          - generic [ref=f26e73]: Team Chat
+        - button "🌐 Presence" [ref=f26e74] [cursor=pointer]:
+          - generic [ref=f26e75]: 🌐
+          - generic [ref=f26e76]: Presence
+        - button "🛡 Database & Storage" [ref=f26e77] [cursor=pointer]:
+          - generic [ref=f26e78]: 🛡
+          - generic [ref=f26e79]: Database & Storage
+      - generic [ref=f26e80]:
+        - button "📌 Pin Mode" [active] [ref=f26e81] [cursor=pointer]:
+          - generic [ref=f26e82]: 📌
+          - generic [ref=f26e83]: Pin Mode
+        - button "⧢ Wallpaper Mode [Esc]" [ref=f26e84] [cursor=pointer]
+        - generic [ref=f26e86]:
+          - button "−" [ref=f26e87] [cursor=pointer]
+          - button "▢" [ref=f26e88] [cursor=pointer]
+          - button "×" [ref=f26e89] [cursor=pointer]
+    - main [ref=f26e90]:
+      - generic [ref=f26e403]:
+        - generic [ref=f26e404]:
+          - generic [ref=f26e405]:
+            - generic [ref=f26e406]: 🛡
+            - generic [ref=f26e407]:
+              - heading "NATIVE PERSISTENT DATABASE & STORAGE HUB" [level=3] [ref=f26e408]
+              - paragraph [ref=f26e409]: Reliable local file storage on Windows disk with automated persistence, backup exports, and real-time CRUD benchmarks.
+            - generic [ref=f26e410]:
+              - generic [ref=f26e411]: CLOUD FIRESTORE & DISK VAULT CONNECTED (reddot-workspace)
+              - button "⚡ Sync Cloud Vault" [ref=f26e412]
+          - generic [ref=f26e414]:
+            - generic [ref=f26e415]:
+              - generic [ref=f26e416]: "1"
+              - generic [ref=f26e417]: Online Now
+            - generic [ref=f26e419]:
+              - generic [ref=f26e420]: "2"
+              - generic [ref=f26e421]: Total Members
+            - generic [ref=f26e422]:
+              - generic [ref=f26e423]: "2"
+              - generic [ref=f26e424]: Stored Tasks
+            - generic [ref=f26e425]:
+              - generic [ref=f26e426]: "19"
+              - generic [ref=f26e427]: Chat Messages
+            - generic [ref=f26e428]:
+              - generic [ref=f26e429]: "1"
+              - generic [ref=f26e430]: Shift Punches
+            - generic [ref=f26e431]:
+              - generic [ref=f26e432]: 0.4ms
+              - generic [ref=f26e433]: Disk Latency
+            - generic [ref=f26e434]:
+              - generic [ref=f26e435]: 14 KB
+              - generic [ref=f26e436]: Database Size
+        - generic [ref=f26e437]:
+          - generic [ref=f26e438]:
+            - generic [ref=f26e439]: ⚡ DATABASE DIAGNOSTICS & BENCHMARK
+            - generic [ref=f26e440]:
+              - paragraph [ref=f26e441]: Execute live INSERT, READ, UPDATE, and DELETE benchmark operations directly on the Windows disk store to verify integrity.
+              - generic [ref=f26e442]:
+                - generic [ref=f26e443]: "● DATABASE STORAGE: READY"
+                - generic [ref=f26e444]: "Location: appData/reddot_storage/reddot_database.json"
+                - generic [ref=f26e445]: "Last Test: Idle • Click \"Run Database Diagnostic\""
+              - generic [ref=f26e446]:
+                - button "⚡ Run Live Database Diagnostic" [ref=f26e447] [cursor=pointer]
+                - button "💾 Export Backup (.json)" [ref=f26e448] [cursor=pointer]
+          - generic [ref=f26e449]:
+            - generic [ref=f26e450]: ⚙️ SYSTEM & WALLPAPER CONFIGURATION
+            - generic [ref=f26e451]:
+              - generic [ref=f26e452]:
+                - generic [ref=f26e453]:
+                  - strong [ref=f26e454]: ⚡ Auto-Start on Windows Boot
+                  - paragraph [ref=f26e455]: Launch Workstation OS and set Live Wallpaper on Windows startup.
+                - generic [ref=f26e456]:
+                  - checkbox
+                  - generic [ref=f26e457] [cursor=pointer]
+              - generic [ref=f26e458]:
+                - button "📷 Select Custom ID Photo from PC & Mount" [ref=f26e459] [cursor=pointer]
+                - button "🔄 Reset Database to Clean Initial Fixtures" [ref=f26e460] [cursor=pointer]
+          - generic [ref=f26e461]:
+            - generic [ref=f26e462]:
+              - generic [ref=f26e463]: 🚀 OVER-THE-AIR (OTA) CLOUD SOFTWARE UPDATER
+              - generic [ref=f26e464]: VERSION 2.5.1 (PORTABLE)
+            - generic [ref=f26e465]:
+              - generic [ref=f26e466]:
+                - generic [ref=f26e467]:
+                  - heading "Automated Cloud Release Pipeline" [level=4] [ref=f26e468]
+                  - paragraph [ref=f26e469]: Direct over-the-air updates for REDDOT Workstation OS with zero-downtime installation.
+                - button "🔄 Check for Updates" [ref=f26e471] [cursor=pointer]
+              - generic [ref=f26e472]:
+                - generic [ref=f26e473]:
+                  - generic [ref=f26e474]: SYSTEM UP TO DATE • RUNNING WEB WORKSTATION v2.5.2
+                  - generic [ref=f26e476]: "Last checked: 07:11 AM"
+                - generic [ref=f26e477]:
+                  - generic [ref=f26e478]:
+                    - text: "🌐 Global GitHub Releases OTA Mirror:"
+                    - paragraph [ref=f26e479]: Worldwide Fastly CDN distribution for zero-latency team updates.
+                  - generic [ref=f26e480]:
+                    - textbox "reddotorg123/REDDOT_WORKSTATION" [ref=f26e481]
+                    - button "Save Repo" [ref=f26e482] [cursor=pointer]

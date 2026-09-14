@@ -1,0 +1,11 @@
+[11728:0904/163954.811:WARNING:notify_icon.cc(60)] Unable to create status tray icon.
+[11728:0904/163954.813:WARNING:notify_icon.cc(141)] Error setting status tray icon image
+[11728:0904/163954.813:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[11728:0904/163956.131:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[11728:0904/163956.703:INFO:CONSOLE(305)] "[DB] Loaded persistent workspace database from disk.", source: http://localhost:56419/wallpaper.js?v=2.5.2-teams (305)
+[11728:0904/163957.648:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
+[11728:0904/163958.112:INFO:CONSOLE(1)] "[2026-09-04T11:09:58.111Z]  @firebase/firestore: Firestore (10.8.0): enableMultiTabIndexedDbPersistence() will be deprecated in the future, you can use `FirestoreSettings.cache` instead.", source: https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js (1)
+[11728:0904/163958.112:INFO:CONSOLE(69)] "[FIREBASE] Production Firebase initialized for organization: reddot", source: http://localhost:56419/firebase-service.js?v=2.5.2-teams (69)
+[11728:0904/163958.225:INFO:CONSOLE(5948)] "[FIREBASE] Establishing active multi-device real-time cloud subscriptions...", source: http://localhost:56419/wallpaper.js?v=2.5.2-teams (5948)
+[11728:0904/163959.087:INFO:CONSOLE(1)] "[2026-09-04T11:09:59.085Z]  @firebase/database: FIREBASE WARNING: Firebase error. Please ensure that you have the URL of your Firebase Realtime Database instance configured correctly. (https://reddot-workspace-default-rtdb.firebaseio.com/) ", source: https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js (1)
+[11728:0904/163959.149:WARNING:notify_icon.cc(157)] Unable to set tooltip for status tray icon
