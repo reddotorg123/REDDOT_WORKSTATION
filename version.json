@@ -1,14 +1,16 @@
 {
-  "version": "3.0.2",
-  "releaseDate": "2026-09-14",
+  "version": "3.2.0",
+  "releaseDate": "2026-09-17",
   "minRequiredVersion": "2.0.0",
   "changelog": [
-    "Fixed WhatsApp-Style Call Screen: Resolved CSS flex override so Accept and Cut/Decline immediately dismiss the overlay and stop ringtone.",
-    "Auto-Expiring Stale Call Signaling: Incoming calls older than 45s are ignored automatically, completely preventing ghost ringing on launch.",
-    "Employee Directory & Kanban Filters: Restored search text, department pills, and status dropdown filtering across workers and task boards.",
-    "Central Files Support: Expanded document filtering to recognize .pdf, .docx, .xlsx, .pptx, .csv, .zip, .md, and code files.",
-    "Optimized Voice & Image Sync: Added client-side image canvas compression (<120KB) and Opus voice memos for instant cloud transfers."
+    "WhatsApp Status Ticks Overhaul: Past messages and answered conversation messages now accurately display WhatsApp Double Green Ticks (✓✓). Delivered cloud messages display Double Grey Ticks (✓✓).",
+    "Message Info & Read Receipts Audit: Message Info modal and direct tick clicks display full delivery receipts and read participants with exact timestamps.",
+    "Enterprise Role Standardization: Streamlined all company structures to 4 strict roles: Founder, CEO, Manager, and Employee.",
+    "Strict Attendance Access: Full attendance telemetry, member filtering, and ledger exports restricted strictly to CEO and Founder. Managers and Employees have access only to their own attendance.",
+    "Author-Only Message Deletion: Strict author validation ensures users can only delete their own chat messages across cloud and local storage.",
+    "Real-Time Online Presence Fixes: Seamless live presence synchronization across Direct Messages, Team Members, and Chat header.",
+    "Secure Boot Screen & Auth Guard: Shielded workstation startup with authenticated boot screen, preventing unauthenticated sessions or fake ID message broadcasting."
   ],
-  "downloadUrl": "https://github.com/reddotorg123/REDDOT_WORKSTATION/releases/download/v3.0.2/REDDOT-Workstation-OS-Setup.exe",
+  "downloadUrl": "https://github.com/reddotorg123/REDDOT_WORKSTATION/releases/download/v3.1.0/REDDOT-Workstation-OS-Setup.exe",
   "mandatory": false
 }

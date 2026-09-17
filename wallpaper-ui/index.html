@@ -26,6 +26,31 @@
   <script src="firebase-service.js?v=2.5.2-teams"></script>
 </head>
 <body class="theme-obsidian mode-command">
+  <!-- =========================================================================
+       APP OPENING & LOADING SCREEN (CYBER-EXECUTIVE SESSION INITIALIZER)
+       ========================================================================= -->
+  <div id="appLoadingScreen" class="app-loading-screen">
+    <div class="loading-backdrop"></div>
+    <div class="loading-content">
+      <div class="loading-brand-hex">&#x2B22;</div>
+      <h1 class="loading-title">REDDOT WORKSTATION OS</h1>
+      <p class="loading-subtitle">ARCHITECTURAL EXECUTIVE SUITE &bull; v3.0</p>
+      
+      <div class="loading-bar-wrap">
+        <div id="appLoadingBarFill" class="loading-bar-fill"></div>
+      </div>
+      
+      <div class="loading-status-row">
+        <span id="appLoadingStatusText" class="loading-status-text">Verifying security &amp; cloud authorization...</span>
+        <span id="appLoadingPercent" class="loading-percent">0%</span>
+      </div>
+
+      <div class="loading-feed-container" id="appLoadingFeed">
+        <div class="loading-feed-line active">&gt; Initializing encrypted local vault...</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Global Over-The-Air (OTA) Cloud Update Notification Banner -->
   <aside id="otaGlobalBanner" class="ota-global-banner hidden" role="alert" aria-live="assertive">
     <div class="ota-banner-inner">
@@ -609,7 +634,7 @@
 
           <!-- 3 KPI Cards (Weekly Load, Daily Mean, Compliance) -->
           <div class="attendance-kpi-grid">
-            <div class="attendance-kpi-card">
+            <div class="attendance-kpi-card interactive" id="cardAttendanceThisWeek" title="Click to view weekly trends and analytics">
               <div class="att-kpi-top">
                 <span class="att-kpi-label">THIS WEEK</span>
                 <span class="att-kpi-icon">&#x23F1;</span>
@@ -623,9 +648,10 @@
                 <span class="att-kpi-target" id="weeklyLoadTargetText">Target: 40.0 hrs &bull; 86.2%</span>
               </div>
               <div class="att-kpi-sub text-green">&#x2197; Paced to fulfill weekly quota by Fri 17:00</div>
+              <div class="att-kpi-click-hint"><span>📊 View Weekly History &amp; Analytics</span> &rarr;</div>
             </div>
 
-            <div class="attendance-kpi-card">
+            <div class="attendance-kpi-card interactive" id="cardAttendanceDailyAverage" title="Click to view daily averages, past averages &amp; records">
               <div class="att-kpi-top">
                 <span class="att-kpi-label">DAILY AVERAGE</span>
                 <span class="att-kpi-icon">&#x1F4CA;</span>
@@ -644,6 +670,7 @@
                 <div class="att-chart-col"><div class="att-chart-bar" style="height: 10%;"></div><span>S</span></div>
                 <div class="att-chart-col"><div class="att-chart-bar" style="height: 10%;"></div><span>S</span></div>
               </div>
+              <div class="att-kpi-click-hint"><span>🔍 View Past Averages &amp; Records</span> &rarr;</div>
             </div>
 
             <div class="attendance-kpi-card">
@@ -668,8 +695,18 @@
               </div>
               <div class="punch-log-actions">
                 <div id="punchFilterWrap" class="hidden">
-                  <select id="punchLogMemberFilter" class="custom-select"></select>
+                  <select id="punchLogMemberFilter" class="custom-select" title="Filter by Member"></select>
                 </div>
+                <select id="punchLogPeriodFilter" class="custom-select" title="Filter by Time Period">
+                  <option value="ALL">All Time (Full History)</option>
+                  <option value="TODAY">Today</option>
+                  <option value="THIS_WEEK" selected>This Week</option>
+                  <option value="LAST_WEEK">Last Week</option>
+                  <option value="PAST_30_DAYS">Past 30 Days</option>
+                </select>
+                <button type="button" id="btnOpenAttendanceAnalytics" class="btn-primary-action" title="Open Detailed Attendance Analytics">
+                  <span>📊 Past Averages &amp; Analytics</span>
+                </button>
                 <button type="button" id="btnDownloadCsvAudit" class="btn-secondary-action">
                   <span>&#x2B07;&#xFE0F; Export CSV Report</span>
                 </button>
@@ -1693,7 +1730,12 @@
         <div class="form-grid-2">
           <div class="form-group">
             <label>Designation / Role</label>
-            <input type="text" id="newWorkerRole" class="custom-input" placeholder="e.g. Senior Embedded &amp; IoT Architect" required>
+            <select id="newWorkerRole" class="custom-select" required>
+              <option value="Employee" selected>Employee</option>
+              <option value="Manager">Manager</option>
+              <option value="CEO">CEO</option>
+              <option value="Founder">Founder</option>
+            </select>
           </div>
           <div class="form-group">
             <label>Department</label>
@@ -2111,7 +2153,12 @@
             </div>
             <div class="form-group">
               <label for="inputSignUpRole">Role / Title</label>
-              <input type="text" id="inputSignUpRole" class="custom-input" placeholder="e.g. Founder & Technical Head" required>
+              <select id="inputSignUpRole" class="custom-select" required>
+                <option value="Employee" selected>Employee</option>
+                <option value="Manager">Manager</option>
+                <option value="CEO">CEO</option>
+                <option value="Founder">Founder</option>
+              </select>
             </div>
           </div>
 
@@ -2303,14 +2350,11 @@
         <div class="form-group mb-16">
           <label for="selectPresetRole">OFFICIAL ROLE PRESET</label>
           <select id="selectPresetRole" style="width: 100%;">
-            <option value="Lead Hardware Architect">Lead Hardware Architect</option>
-            <option value="Senior Hardware Engineer">Senior Hardware Engineer</option>
-            <option value="Firmware & Embedded Engineer">Firmware & Embedded Engineer</option>
-            <option value="AI / ML Systems Engineer">AI / ML Systems Engineer</option>
-            <option value="Team Lead & Project Manager">Team Lead & Project Manager</option>
-            <option value="Executive / Admin">Executive / Admin</option>
-            <option value="Employee / Associate">Employee / Associate</option>
-            <option value="__custom__">-- Custom Title --</option>
+            <option value="Founder">Founder</option>
+            <option value="CEO">CEO</option>
+            <option value="Manager">Manager</option>
+            <option value="Employee" selected>Employee</option>
+            <option value="__custom__">-- Custom Designation Title --</option>
           </select>
         </div>
 
@@ -2493,16 +2537,14 @@
   <!-- Global Toast Notification Container -->
   <div id="reddotGlobalToast" class="reddot-global-toast hidden"></div>
 
-  <!-- Main JavaScript Engine -->
-  <script src="wallpaper.js?v=2.5.2-teams"></script>
   <!-- UNIVERSAL OMNIBOX QUICK-SEARCH MODAL (Ctrl+K) -->
   <div id="globalOmniboxModal" class="omnibox-modal-overlay hidden">
-    <div class="omnibox-modal-backdrop" id="omniboxModalBackdrop"></div>
+    <div class="omnibox-modal-backdrop" id="omniboxModalBackdrop" onclick="typeof closeOmnibox === 'function' && closeOmnibox()"></div>
     <div class="omnibox-modal-card">
       <div class="omnibox-modal-search">
         <span class="omnibox-modal-icon">&#x1F50D;</span>
         <input type="text" id="omniboxModalInput" class="omnibox-modal-input" placeholder="Type a command, search tasks, members, or channels... (Esc to close)" autocomplete="off">
-        <kbd class="omnibox-modal-esc" id="btnOmniboxClose">ESC</kbd>
+        <kbd class="omnibox-modal-esc" id="btnOmniboxClose" onclick="typeof closeOmnibox === 'function' && closeOmnibox()">ESC</kbd>
       </div>
       <div class="omnibox-results-list" id="omniboxResultsList">
         <!-- Dynamically rendered search results -->
@@ -2518,7 +2560,7 @@
 
   <!-- ALL PAST & COMPLETED TASKS ARCHIVE MODAL -->
   <div id="completedArchiveModal" class="modal-overlay hidden" style="z-index: 10010;">
-    <div class="modal-backdrop" id="completedArchiveBackdrop"></div>
+    <div class="modal-backdrop" id="completedArchiveBackdrop" onclick="typeof closeCompletedArchiveModal === 'function' && closeCompletedArchiveModal()"></div>
     <div class="modal-card modal-lg" style="max-width: 840px; width: 92%; max-height: 85vh; display: flex; flex-direction: column;">
       <div class="modal-head" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding: 16px 20px;">
         <div class="head-title-wrap" style="display: flex; align-items: center; gap: 10px;">
@@ -2531,7 +2573,7 @@
             <p style="font-size: 11.5px; color: var(--text-muted); margin: 2px 0 0 0;">Complete archive of all completed tasks, deliverables, and past assignments</p>
           </div>
         </div>
-        <button id="btnCloseCompletedArchive" class="modal-close-btn" style="background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer;">&times;</button>
+        <button id="btnCloseCompletedArchive" class="modal-close-btn" onclick="typeof closeCompletedArchiveModal === 'function' && closeCompletedArchiveModal()" style="background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer;">&times;</button>
       </div>
       <div class="modal-body" style="padding: 16px 20px; overflow-y: auto; flex: 1;">
         <div style="display: flex; gap: 10px; margin-bottom: 14px;">
@@ -2549,11 +2591,222 @@
       </div>
       <div class="modal-foot" style="padding: 12px 20px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 11.5px; color: var(--text-muted);">Tasks can be reopened back to In Progress at any time.</span>
-        <button type="button" id="btnCloseCompletedArchiveFoot" class="btn-secondary-action">Close Archive</button>
+        <button type="button" id="btnCloseCompletedArchiveFoot" onclick="typeof closeCompletedArchiveModal === 'function' && closeCompletedArchiveModal()" class="btn-secondary-action">Close Archive</button>
       </div>
     </div>
   </div>
 
+  <!-- =========================================================================
+       WHATSAPP-STYLE MESSAGE INFO MODAL (SEEN / READ & DELIVERY AUDIT)
+       ========================================================================= -->
+  <div id="messageInfoModal" class="modal-overlay hidden" style="z-index: 10020;">
+    <div class="modal-backdrop" id="messageInfoBackdrop" onclick="typeof closeMessageInfoModal === 'function' && closeMessageInfoModal()"></div>
+    <div class="modal-card" style="max-width: 520px; width: 92%; max-height: 85vh; display: flex; flex-direction: column;">
+      <div class="modal-head" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding: 14px 18px;">
+        <div class="head-title-wrap" style="display: flex; align-items: center; gap: 8px;">
+          <span class="modal-icon" style="font-size: 18px;">ℹ️</span>
+          <span class="modal-title" style="font-size: 14px; font-weight: 700; letter-spacing: 0.5px;">MESSAGE INFO</span>
+        </div>
+        <button id="btnCloseMessageInfo" class="modal-close-btn" onclick="typeof closeMessageInfoModal === 'function' && closeMessageInfoModal()" style="background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+
+      <div class="modal-body" style="padding: 16px 18px; overflow-y: auto; flex: 1;">
+        <!-- Message snippet bubble preview -->
+        <div id="msgInfoPreviewBox" class="msg-info-preview-box">
+          <div id="msgInfoPreviewText" class="msg-info-preview-text"></div>
+          <div class="msg-info-preview-meta">
+            <span id="msgInfoPreviewTime"></span>
+            <span id="msgInfoPreviewTick"></span>
+          </div>
+        </div>
+
+        <!-- Read by section -->
+        <div class="msg-info-section">
+          <div class="msg-info-section-header">
+            <span class="msg-info-tick-double-green">✓✓</span>
+            <span class="msg-info-section-title">Read by</span>
+            <span id="msgInfoReadCount" class="msg-info-count-badge">0</span>
+          </div>
+          <div id="msgInfoReadList" class="msg-info-user-list">
+            <!-- Dynamically rendered readers -->
+          </div>
+        </div>
+
+        <!-- Delivered to section -->
+        <div class="msg-info-section" style="margin-top: 14px;">
+          <div class="msg-info-section-header">
+            <span class="msg-info-tick-double-grey">✓✓</span>
+            <span class="msg-info-section-title">Delivered to</span>
+            <span id="msgInfoDeliveredCount" class="msg-info-count-badge">0</span>
+          </div>
+          <div id="msgInfoDeliveredList" class="msg-info-user-list">
+            <!-- Dynamically rendered deliverees -->
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot" style="padding: 10px 18px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: flex-end;">
+        <button type="button" id="btnCloseMessageInfoFoot" onclick="typeof closeMessageInfoModal === 'function' && closeMessageInfoModal()" class="btn-secondary-action">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       ATTENDANCE ANALYTICS & HISTORICAL RECORDS MODAL
+       ========================================================================= -->
+  <div id="attendanceAnalyticsModal" class="modal-overlay hidden" style="z-index: 10025;">
+    <div class="modal-backdrop" id="attendanceAnalyticsBackdrop" onclick="typeof closeAttendanceAnalyticsModal === 'function' && closeAttendanceAnalyticsModal()"></div>
+    <div class="modal-card attendance-analytics-card" style="max-width: 920px; width: 95%; max-height: 88vh; display: flex; flex-direction: column;">
+      <!-- Modal Header -->
+      <div class="modal-head" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding: 16px 22px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 24px;">📊</span>
+          <div>
+            <h3 style="font-family: var(--font-display); font-size: 16px; font-weight: 800; color: #fff; margin: 0; letter-spacing: 0.5px;">ATTENDANCE ANALYTICS &amp; PAST AVERAGES</h3>
+            <p style="font-size: 11px; color: var(--text-muted); margin: 2px 0 0 0;">Comprehensive breakdown of daily work averages, weekly quotas, and verified punches</p>
+          </div>
+        </div>
+        <button id="btnCloseAttendanceAnalytics" class="modal-close-btn" onclick="typeof closeAttendanceAnalyticsModal === 'function' && closeAttendanceAnalyticsModal()" style="background: none; border: none; color: var(--text-muted); font-size: 24px; cursor: pointer; line-height: 1;">&times;</button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="modal-body" style="padding: 20px 22px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 18px;">
+        <!-- Top Controls: Member Filter & Period Pills -->
+        <div class="analytics-controls-bar" style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); padding: 12px 16px; border-radius: 8px;">
+          <!-- Member Selection (CEO/Founder) -->
+          <div id="analyticsMemberFilterWrap" style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">EMPLOYEE:</span>
+            <select id="analyticsMemberFilter" class="custom-select" style="min-width: 190px;"></select>
+          </div>
+
+          <!-- Timeframe Navigation Selector -->
+          <div class="analytics-period-pills" id="analyticsPeriodPills" style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" class="analytics-pill active" data-period="THIS_WEEK">This Week</button>
+            <button type="button" class="analytics-pill" data-period="LAST_WEEK">Last Week</button>
+            <button type="button" class="analytics-pill" data-period="PAST_2_WEEKS">Past 2 Weeks</button>
+            <button type="button" class="analytics-pill" data-period="PAST_30_DAYS">Past 30 Days</button>
+            <button type="button" class="analytics-pill" data-period="ALL_HISTORY">All History</button>
+          </div>
+        </div>
+
+        <!-- Summary Metric KPI Cards -->
+        <div class="analytics-kpi-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+          <div class="analytics-kpi-box">
+            <div class="analytics-kpi-title">PERIOD DAILY AVERAGE</div>
+            <div class="analytics-kpi-value-row">
+              <span class="analytics-kpi-number" id="analyticsKpiDailyAvg">0.0</span>
+              <span class="analytics-kpi-unit">hrs/day</span>
+            </div>
+            <div class="analytics-kpi-sub" id="analyticsKpiDailySub">Active work days mean</div>
+          </div>
+
+          <div class="analytics-kpi-box">
+            <div class="analytics-kpi-title">TOTAL PRODUCTIVE HOURS</div>
+            <div class="analytics-kpi-value-row">
+              <span class="analytics-kpi-number" id="analyticsKpiTotalHours">0.0</span>
+              <span class="analytics-kpi-unit">hrs</span>
+            </div>
+            <div class="analytics-kpi-sub" id="analyticsKpiTotalSub">Net verified duty duration</div>
+          </div>
+
+          <div class="analytics-kpi-box">
+            <div class="analytics-kpi-title">DAYS ACTIVE</div>
+            <div class="analytics-kpi-value-row">
+              <span class="analytics-kpi-number" id="analyticsKpiActiveDays">0</span>
+              <span class="analytics-kpi-unit">days</span>
+            </div>
+            <div class="analytics-kpi-sub" id="analyticsKpiActiveSub">Shifts punched on record</div>
+          </div>
+
+          <div class="analytics-kpi-box">
+            <div class="analytics-kpi-title">ON-TIME RATE</div>
+            <div class="analytics-kpi-value-row">
+              <span class="analytics-kpi-number" id="analyticsKpiOnTime">100%</span>
+            </div>
+            <div class="analytics-kpi-sub text-green">Shift punctuality rate</div>
+          </div>
+        </div>
+
+        <!-- Section 1: Daily Hours Chart -->
+        <div class="analytics-card-section" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div>
+              <h4 style="font-size: 13px; font-weight: 700; color: #fff; margin: 0;">📅 Day-by-Day Hours &amp; Shift Trend</h4>
+              <p style="font-size: 11px; color: var(--text-muted); margin: 2px 0 0 0;">Actual daily logged hours vs standard 8-hour target line</p>
+            </div>
+            <span id="analyticsChartRangeLabel" style="font-family: var(--font-mono); font-size: 11px; color: var(--accent-cyan);"></span>
+          </div>
+          <div class="analytics-day-chart-wrap" id="analyticsDayChartWrap">
+            <!-- Dynamically generated day bars -->
+          </div>
+        </div>
+
+        <!-- Section 2: Past Weeks Performance Comparison -->
+        <div class="analytics-card-section" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 14px 16px;">
+          <div style="margin-bottom: 12px;">
+            <h4 style="font-size: 13px; font-weight: 700; color: #fff; margin: 0;">📈 Past Weeks Performance Comparison</h4>
+            <p style="font-size: 11px; color: var(--text-muted); margin: 2px 0 0 0;">Historical weekly totals, daily averages, and quota fulfillments</p>
+          </div>
+          <div class="analytics-table-wrap">
+            <table class="analytics-table">
+              <thead>
+                <tr>
+                  <th>WEEK CYCLE</th>
+                  <th>TOTAL HOURS</th>
+                  <th>DAILY AVERAGE</th>
+                  <th>DAYS WORKED</th>
+                  <th>TARGET (40h)</th>
+                  <th>STATUS</th>
+                </tr>
+              </thead>
+              <tbody id="analyticsWeeksTableBody">
+                <!-- Dynamically populated rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section 3: Verified Punches Ledger -->
+        <div class="analytics-card-section" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 14px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div>
+              <h4 style="font-size: 13px; font-weight: 700; color: #fff; margin: 0;">📜 Detailed Verified Work Records</h4>
+              <p style="font-size: 11px; color: var(--text-muted); margin: 2px 0 0 0;">Chronological clock-in, break, and clock-out punch log with session durations</p>
+            </div>
+            <span id="analyticsPunchesCountLabel" style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">0 records</span>
+          </div>
+          <div class="analytics-table-wrap" style="max-height: 240px; overflow-y: auto;">
+            <table class="analytics-table">
+              <thead>
+                <tr>
+                  <th>EMPLOYEE</th>
+                  <th>ACTION</th>
+                  <th>TIME</th>
+                  <th>DATE</th>
+                  <th>SESSION DURATION</th>
+                  <th>STATUS</th>
+                </tr>
+              </thead>
+              <tbody id="analyticsPunchesTableBody">
+                <!-- Dynamically populated punches -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="modal-foot" style="padding: 12px 22px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" id="btnExportAnalyticsPeriodCsv" class="btn-secondary-action">
+          <span>⬇️ Export Period CSV</span>
+        </button>
+        <button type="button" id="btnCloseAttendanceAnalyticsFoot" onclick="typeof closeAttendanceAnalyticsModal === 'function' && closeAttendanceAnalyticsModal()" class="btn-primary-action">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript Engine (Loaded at the end of body so all DOM modal elements exist) -->
+  <script src="wallpaper.js?v=2.5.2-teams"></script>
 </body>
 </html>
 

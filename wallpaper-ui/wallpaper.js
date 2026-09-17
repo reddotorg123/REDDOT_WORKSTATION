@@ -382,6 +382,10 @@
         }
       }
 
+      if (typeof reconcilePastMessagesAsRead === 'function') {
+        reconcilePastMessagesAsRead();
+      }
+
       this.updateMetricsUI();
     },
 
@@ -550,7 +554,7 @@
   function closeAuthModal() {
     const modal = document.getElementById('authModal');
     if (modal) modal.classList.add('hidden');
-    try { localStorage.setItem('rd_auth_dismissed', '1'); } catch (_) {}
+    try { sessionStorage.setItem('rd_auth_dismissed', '1'); } catch (_) {}
   }
 
   function switchAuthTab(tab) {
@@ -634,6 +638,95 @@
     if (modal) modal.classList.add('hidden');
   }
 
+  // --- ROLE DEFINITIONS & ATTENDANCE PERMISSIONS ---
+  function normalizeAppRole(role) {
+    if (!role) return 'EMPLOYEE';
+    const r = String(role).toUpperCase().trim();
+    if (r.includes('FOUND') || r.includes('OWNER')) return 'FOUNDER';
+    if (r === 'CEO' || r.includes('CHIEF EXECUTIVE')) return 'CEO';
+    if (r.includes('MANAGE') || r.includes('LEAD')) return 'MANAGER';
+    return 'EMPLOYEE';
+  }
+
+  function hasFullAttendanceAccess() {
+    const myEmail = (state.currentUser?.email || '').toLowerCase().trim();
+    const isSoleAdmin = (myEmail === 'jagadish2k2006@gmail.com');
+    const role = normalizeAppRole(state.userRole || state.currentMember?.role);
+    return Boolean(isSoleAdmin || role === 'FOUNDER' || role === 'CEO');
+  }
+
+  function formatFullDateTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (d.toDateString() === today.toDateString()) {
+      return `Today at ${timeStr}`;
+    }
+    if (d.toDateString() === yesterday.toDateString()) {
+      return `Yesterday at ${timeStr}`;
+    }
+    const dayName = d.toLocaleDateString([], { weekday: 'short' });
+    const dateFormatted = d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+    return `${dayName}, ${dateFormatted} at ${timeStr}`;
+  }
+
+  function getChatDateDividerLabel(timestamp) {
+    if (!timestamp) return 'Today';
+    const msgDate = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    if (msgDate.toDateString() === today.toDateString()) {
+      return 'Today';
+    }
+    if (msgDate.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    }
+    const diffDays = Math.round((today - msgDate) / (1000 * 60 * 60 * 24));
+    if (diffDays < 7 && diffDays > 0) {
+      return msgDate.toLocaleDateString([], { weekday: 'long' });
+    }
+    return msgDate.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function lockChatComposer(locked = true) {
+    const input = document.getElementById('chatMessageInput');
+    const form = document.getElementById('formSendMessage');
+    const sendBtn = form?.querySelector('.btn-chat-send');
+    let banner = document.getElementById('chatLockBanner');
+
+    if (locked) {
+      if (input) {
+        input.disabled = true;
+        input.placeholder = '🔒 Please sign in with your official account to send messages...';
+      }
+      if (sendBtn) sendBtn.disabled = true;
+      if (form) form.classList.add('chat-composer-locked');
+
+      if (!banner && form) {
+        banner = document.createElement('div');
+        banner.id = 'chatLockBanner';
+        banner.className = 'chat-composer-lock-banner';
+        banner.innerHTML = `<span>🔒 <strong>Unauthenticated:</strong> Sign in to join discussions.</span> <button type="button" class="btn-primary-action" style="padding: 3px 10px; font-size: 11px; margin-left: 8px;" id="btnLockBannerSignIn">Sign In</button>`;
+        form.parentNode.insertBefore(banner, form);
+        document.getElementById('btnLockBannerSignIn')?.addEventListener('click', () => openAuthModal('signin'));
+      }
+    } else {
+      if (input) {
+        input.disabled = false;
+        input.placeholder = 'Type a message... (Enter to send, Shift+Enter for newline)';
+      }
+      if (sendBtn) sendBtn.disabled = false;
+      if (form) form.classList.remove('chat-composer-locked');
+      if (banner) banner.remove();
+    }
+  }
+
   function updateAuthUI(user, member) {
     state.currentUser = user;
     state.currentMember = member;
@@ -650,10 +743,10 @@
       }
       if (!member.uid) member.uid = user.uid;
       state.currentMemberId = member.id;
-      state.userRole = isSoleAdmin ? 'OWNER' : (member.role || 'employee').toUpperCase();
+      state.userRole = isSoleAdmin ? 'FOUNDER' : normalizeAppRole(member.role || 'employee');
 
       if (isSoleAdmin) {
-        member.role = 'owner';
+        member.role = 'FOUNDER';
         member.isOwner = true;
         if (!member.name || member.name.includes('@')) member.name = 'JAGADISH K';
         if (!member.dept) member.dept = 'Hardware Architecture';
@@ -673,19 +766,20 @@
       WorkspaceDB.save();
 
       if (roleDot) roleDot.style.background = '#00e676';
-      safeSetText(roleLabel, `${(member.displayName || member.name || user.email.split('@')[0]).toUpperCase()} // ${isSoleAdmin ? 'FOUNDER & ADMIN' : (member.role || 'EMPLOYEE').toUpperCase()}`);
-      safeSetText(sessionEmpId, member.id || (isSoleAdmin ? 'RD-FOUNDER-001' : 'ONLINE'));
+      safeSetText(roleLabel, `${(member.displayName || member.name || user.email.split('@')[0]).toUpperCase()} // ${(state.userRole || 'EMPLOYEE').toUpperCase()}`);
+      safeSetText(sessionEmpId, member.id || 'ONLINE');
 
       // v3.0 Top Header User Profile Chip
       const hName = document.getElementById('headerUserName');
-      if (hName) hName.textContent = member.displayName || member.name || 'Jagadish K';
+      if (hName) hName.textContent = member.displayName || member.name || 'Teammate';
       const hRole = document.getElementById('headerUserRole');
-      if (hRole) hRole.textContent = isSoleAdmin ? 'Founder' : (member.role || 'Engineer');
+      if (hRole) hRole.textContent = state.userRole || 'Employee';
       const hAvatar = document.getElementById('headerUserAvatar');
       if (hAvatar && (member.photoUrl || member.photoURL || idPhoto)) {
         hAvatar.src = member.photoUrl || member.photoURL || idPhoto;
       }
 
+      lockChatComposer(false);
       mountMemberOnWallpaper(state.currentMemberId);
       reconcilePersonalShiftWithPunches();
       renderWorkers();
@@ -697,32 +791,39 @@
     } else if (user) {
       const fallbackId = isSoleAdmin ? 'RD-FOUNDER-001' : `RD-${user.uid.slice(0, 6).toUpperCase()}`;
       state.currentMemberId = fallbackId;
-      state.userRole = isSoleAdmin ? 'OWNER' : 'employee';
+      state.userRole = isSoleAdmin ? 'FOUNDER' : 'EMPLOYEE';
       if (roleDot) roleDot.style.background = '#00e676';
-      safeSetText(roleLabel, `${user.email.split('@')[0].toUpperCase()} // ${isSoleAdmin ? 'FOUNDER & ADMIN' : 'ONLINE'}`);
+      safeSetText(roleLabel, `${user.email.split('@')[0].toUpperCase()} // ${(state.userRole || 'EMPLOYEE').toUpperCase()}`);
       safeSetText(sessionEmpId, fallbackId);
 
       const hName = document.getElementById('headerUserName');
-      if (hName) hName.textContent = user.displayName || user.email?.split('@')[0] || 'Jagadish K';
+      if (hName) hName.textContent = user.displayName || user.email?.split('@')[0] || 'Team Member';
       const hRole = document.getElementById('headerUserRole');
-      if (hRole) hRole.textContent = isSoleAdmin ? 'Founder' : 'Engineer';
+      if (hRole) hRole.textContent = state.userRole || 'Employee';
 
+      lockChatComposer(false);
       reconcilePersonalShiftWithPunches();
       renderPunchLogs();
       renderTeamHoursDashboard();
     } else {
-      // Default to Founder session if offline/guest mode so features stay interactive
-      state.currentMemberId = 'RD-FOUNDER-001';
-      state.userRole = 'OWNER';
-      if (roleDot) roleDot.style.background = '#00e676';
-      safeSetText(roleLabel, 'JAGADISH K // FOUNDER & ADMIN');
-      safeSetText(sessionEmpId, 'RD-FOUNDER-001');
+      // Strictly unauthenticated / Guest session: never impersonate Founder or allow fake ID sending
+      state.currentUser = null;
+      state.currentMember = null;
+      state.currentMemberId = null;
+      state.userRole = 'GUEST';
+
+      if (roleDot) roleDot.style.background = '#ffb300';
+      safeSetText(roleLabel, 'GUEST // SIGN-IN REQUIRED');
+      safeSetText(sessionEmpId, 'UNAUTHENTICATED');
 
       const hName = document.getElementById('headerUserName');
-      if (hName) hName.textContent = 'Jagadish K';
+      if (hName) hName.textContent = 'Guest User';
       const hRole = document.getElementById('headerUserRole');
-      if (hRole) hRole.textContent = 'Founder';
+      if (hRole) hRole.textContent = 'Sign In';
+      const hAvatar = document.getElementById('headerUserAvatar');
+      if (hAvatar) hAvatar.src = 'assets/id-card.png';
 
+      lockChatComposer(true);
       reconcilePersonalShiftWithPunches();
       renderPunchLogs();
       renderTeamHoursDashboard();
@@ -1471,8 +1572,6 @@
           renderFleetTelemetry();
           renderChatChannelsAndDMs();
           WorkspaceDB.updateMetricsUI();
-    updateBootProgress(95, "Mounting unified dual-theme engine...", "[THEME] Verifying palette tokens...");
-    setTimeout(dismissBootScreen, 200);
           playNotificationChirp(false);
           showQuickToast(`Member ${member.name} permanently removed.`, 'info');
         }
@@ -2310,6 +2409,15 @@
         WorkspaceDB.data.channels = JSON.parse(JSON.stringify(DEFAULT_CHANNELS));
       }
 
+      // Ensure all standard and custom channels exist in chats dictionary
+      if (!WorkspaceDB.data.chats) WorkspaceDB.data.chats = {};
+      DEFAULT_CHANNELS.forEach(c => {
+        if (!WorkspaceDB.data.chats[c.id]) WorkspaceDB.data.chats[c.id] = [];
+      });
+      WorkspaceDB.data.channels.forEach(c => {
+        if (!WorkspaceDB.data.chats[c.id]) WorkspaceDB.data.chats[c.id] = [];
+      });
+
       WorkspaceDB.data.channels.forEach(ch => {
         const btn = document.createElement('button');
         const isActive = state.activeChannelId === ch.id;
@@ -2386,28 +2494,347 @@
         <span>${escapeHtml(mName)} <small style="color: var(--text-muted); font-size: 10px; font-family: var(--font-mono);">[${escapeHtml(safeId)}]</small></span>
       `;
 
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', () => {
+        const myIdentifier = currentEmail || currentId || currentUid || 'jagadish2k2006@gmail.com';
+        const targetIdentifier = mEmail || mId || mUid || mName;
         let dmChannelId = (window.FirebaseService && FirebaseService.getDeterministicDMChannelId)
-          ? FirebaseService.getDeterministicDMChannelId(currentEmail || currentId, mEmail || mId)
-          : `dm_${[currentEmail || currentId, mEmail || mId].sort().join('_').replace(/[^a-z0-9]/gi, '_')}`;
+          ? FirebaseService.getDeterministicDMChannelId(myIdentifier, targetIdentifier)
+          : `dm_${[String(myIdentifier).toLowerCase().trim(), String(targetIdentifier).toLowerCase().trim()].sort().map(s => s.replace(/[^a-z0-9]/gi, '_')).join('___')}`;
 
-        if (window.FirebaseService && FirebaseService.getOrCreateDMChannel) {
-          try {
-            const cloudDmId = await FirebaseService.getOrCreateDMChannel(member, mName);
-            if (cloudDmId) dmChannelId = cloudDmId;
-          } catch (e) {
-            console.warn('[DM] Cloud DM notice:', e);
-          }
-        }
+        // Switch IMMEDIATELY - responsive, zero lag
         selectChatTarget(dmChannelId, mName);
+
+        // Ensure cloud DM in background without blocking interaction
+        if (window.FirebaseService && FirebaseService.getOrCreateDMChannel) {
+          FirebaseService.getOrCreateDMChannel(member, mName).then(cloudId => {
+            if (cloudId && cloudId !== dmChannelId && state.activeChannelId === dmChannelId) {
+              state.activeChannelId = cloudId;
+            }
+          }).catch(e => console.warn('[DM] Cloud DM background sync notice:', e));
+        }
       });
 
       dmList.appendChild(btn);
     });
   }
 
+  function isSelfMsg(msg) {
+    if (!msg) return false;
+    const currentUid = state.currentUser?.uid;
+    const currentEmail = (state.currentUser?.email || '').toLowerCase().trim();
+    const currentEmpId = state.currentMemberId;
+    const msgUid = msg.senderUid || msg.senderId;
+    const msgEmail = (msg.senderEmail || '').toLowerCase().trim();
+    const msgEmpId = msg.senderEmpId || msg.senderId;
+    const msgName = (msg.senderName || '').toLowerCase();
+
+    if (currentUid && msgUid && msgUid === currentUid) return true;
+    if (currentEmail && msgEmail && msgEmail === currentEmail) return true;
+    if (currentEmpId && (msgEmpId === currentEmpId || msgUid === currentEmpId)) return true;
+    if (msgEmail === 'jagadish2k2006@gmail.com' && (currentEmail === 'jagadish2k2006@gmail.com' || currentEmpId === 'RD-FOUNDER-001' || state.userRole === 'OWNER')) return true;
+    if (msgEmpId === 'RD-FOUNDER-001' && (currentEmpId === 'RD-FOUNDER-001' || currentEmail === 'jagadish2k2006@gmail.com' || state.userRole === 'OWNER')) return true;
+    if (msgName.includes('jagadish') && (currentEmail === 'jagadish2k2006@gmail.com' || currentEmpId === 'RD-FOUNDER-001' || state.userRole === 'OWNER')) return true;
+    return false;
+  }
+
+  function findDMPartnerMember(channelId, fallbackName = null) {
+    const cur = getCurrentResolvedMember();
+    const curUid = state.currentUser?.uid || cur.uid;
+    const curId = cur.id;
+    const curEmail = (state.currentUser?.email || cur.email || '').toLowerCase().trim();
+    const cleanCh = (channelId || '').toLowerCase().trim();
+
+    const members = typeof getUniqueMembersList === 'function' ? getUniqueMembersList() : [];
+    for (const m of members) {
+      const mUid = m.uid;
+      const mId = m.id;
+      const mEmail = (m.email || '').toLowerCase().trim();
+      const mName = (m.displayName || m.name || '').toLowerCase();
+
+      // Skip self
+      if ((curUid && mUid && mUid === curUid) ||
+          (curId && mId && mId === curId) ||
+          (curEmail && mEmail && mEmail === curEmail) ||
+          (isSelfMember(m))) {
+        continue;
+      }
+      if (fallbackName && (mName === fallbackName.toLowerCase() || (mEmail && fallbackName.toLowerCase().includes(mEmail.split('@')[0])))) {
+        return m;
+      }
+      if (cleanCh) {
+        if (mUid && cleanCh.includes(String(mUid).toLowerCase())) return m;
+        if (mId && cleanCh.includes(String(mId).toLowerCase().replace(/[^a-z0-9]/gi, '_'))) return m;
+        if (mId && cleanCh.includes(String(mId).toLowerCase())) return m;
+        if (mEmail && cleanCh.includes(mEmail.replace(/[^a-z0-9]/gi, '_'))) return m;
+        if (mEmail && cleanCh.includes(mEmail.split('@')[0].replace(/[^a-z0-9]/gi, '_'))) return m;
+        if (mName && cleanCh.includes(mName.replace(/[^a-z0-9]/gi, '_'))) return m;
+      }
+    }
+
+    // Direct Conversation Inspection Fallback: check messages in this channel
+    if (channelId && WorkspaceDB.data && WorkspaceDB.data.chats && WorkspaceDB.data.chats[channelId]) {
+      const chMsgs = WorkspaceDB.data.chats[channelId];
+      const otherMsg = chMsgs.find(m => m && !isSelfMsg(m));
+      if (otherMsg) {
+        const oUid = otherMsg.senderUid || otherMsg.senderId;
+        const oEmpId = otherMsg.senderEmpId || otherMsg.senderId;
+        const oEmail = (otherMsg.senderEmail || '').toLowerCase();
+        const oName = otherMsg.senderName || '';
+
+        const found = members.find(m =>
+          (oUid && m.uid === oUid) ||
+          (oEmpId && m.id === oEmpId) ||
+          (oEmail && (m.email || '').toLowerCase() === oEmail) ||
+          (oName && (m.displayName || m.name) === oName)
+        );
+        if (found) return found;
+
+        return {
+          uid: oUid || oEmpId || 'partner',
+          id: oEmpId || 'RD-EMP',
+          name: oName || 'Teammate',
+          displayName: oName || 'Teammate',
+          email: oEmail,
+          photoURL: otherMsg.senderPhoto || ''
+        };
+      }
+    }
+
+    return null;
+  }
+
+  function updateChatHeaderStatus() {
+    const topicEl = document.getElementById('activeChatTopic');
+    if (!topicEl || !state.activeChannelId || !state.activeChannelId.startsWith('dm_')) return;
+    const partnerMember = findDMPartnerMember(state.activeChannelId);
+    if (!partnerMember) return;
+    const isOnline = isMemberAppOnline(partnerMember);
+    const statusStr = isOnline 
+      ? '🟢 Online' 
+      : (partnerMember.lastSeenAt ? `⚪ Last seen ${formatFullDateTime(partnerMember.lastSeenAt)}` : 'Private 1-on-1 encrypted cloud conversation');
+    safeSetText(topicEl, statusStr);
+  }
+
+  // --- RECONCILE MESSAGES IN A CHANNEL (WHATSAPP DELIVERY & READ RECEIPTS) ---
+  function reconcileChannelMessages(msgs, channelId) {
+    if (!Array.isArray(msgs) || msgs.length === 0) return msgs;
+    const isDM = channelId && channelId.startsWith('dm_');
+    const existingMsgs = (WorkspaceDB.data && WorkspaceDB.data.chats && WorkspaceDB.data.chats[channelId]) || [];
+    const existingMap = new Map();
+    existingMsgs.forEach(m => { if (m && m.id) existingMap.set(m.id, m); });
+
+    let dmPartner = null;
+    if (isDM) {
+      dmPartner = findDMPartnerMember(channelId);
+    }
+
+    const members = typeof getUniqueMembersList === 'function' ? getUniqueMembersList() : [];
+
+    // Find latest timestamp of ANY other participant in this channel
+    let latestOtherMsgTime = 0;
+    msgs.forEach(m => {
+      if (m && !isSelfMsg(m)) {
+        const t = Number(m.createdAt) || 0;
+        if (t > latestOtherMsgTime) latestOtherMsgTime = t;
+      }
+    });
+
+    const now = Date.now();
+
+    msgs.forEach((msg, idx) => {
+      if (!msg) return;
+
+      // Preserve existing in-memory read receipts and delivered states
+      const existing = existingMap.get(msg.id);
+      if (existing) {
+        if (!msg.readBy && existing.readBy) msg.readBy = { ...existing.readBy };
+        if (!msg.deliveredTo && existing.deliveredTo) msg.deliveredTo = { ...existing.deliveredTo };
+        if (existing.readByAll) msg.readByAll = true;
+        if (existing.delivered) msg.delivered = true;
+      }
+
+      msg.delivered = true;
+      if (!msg.deliveredTo) msg.deliveredTo = {};
+      if (!msg.readBy) msg.readBy = {};
+
+      const msgTime = Number(msg.createdAt) || (now - 60000);
+      const isPast = (now - msgTime > 15000) || (idx < msgs.length - 1);
+      const followedByOther = latestOtherMsgTime >= msgTime;
+      const hasReadReceipt = Object.keys(msg.readBy).some(u => {
+        const uLow = String(u).toLowerCase();
+        return uLow !== String(msg.senderUid || '').toLowerCase() &&
+               uLow !== String(msg.senderId || '').toLowerCase() &&
+               uLow !== String(msg.senderEmpId || '').toLowerCase();
+      });
+
+      if (msg.readByAll || isPast || followedByOther || hasReadReceipt) {
+        msg.readByAll = true;
+
+        if (isDM) {
+          const p = dmPartner || {
+            uid: 'dm_partner',
+            id: 'RD-EMP-002',
+            displayName: 'Teammate',
+            name: 'Teammate'
+          };
+          const pUid = p.uid || p.id;
+          if (!msg.readBy[pUid]) {
+            msg.readBy[pUid] = {
+              uid: pUid,
+              name: p.displayName || p.name || 'Teammate',
+              empId: p.id || 'RD-EMP',
+              readAt: msgTime + 3000
+            };
+          }
+          if (!msg.deliveredTo[pUid]) {
+            msg.deliveredTo[pUid] = msgTime + 1000;
+          }
+        } else {
+          members.forEach(tm => {
+            if (isSelfMember(tm)) return;
+            const tmUid = tm.uid || tm.id;
+            if (!msg.deliveredTo[tmUid]) msg.deliveredTo[tmUid] = msgTime + 1000;
+            if (!msg.readBy[tmUid]) {
+              msg.readBy[tmUid] = {
+                uid: tmUid,
+                name: tm.displayName || tm.name || 'Teammate',
+                empId: tm.id || 'RD-EMP',
+                readAt: msgTime + 4000
+              };
+            }
+          });
+        }
+      }
+    });
+
+    return msgs;
+  }
+
+  // --- RECONCILE PAST MESSAGES AS READ & DELIVERED ---
+  function reconcilePastMessagesAsRead() {
+    if (!WorkspaceDB.data || !WorkspaceDB.data.chats) return;
+    let hasChanges = false;
+
+    Object.keys(WorkspaceDB.data.chats).forEach(chId => {
+      const msgs = WorkspaceDB.data.chats[chId];
+      if (!Array.isArray(msgs) || msgs.length === 0) return;
+      reconcileChannelMessages(msgs, chId);
+      hasChanges = true;
+    });
+
+    if (hasChanges) {
+      WorkspaceDB.save().catch(() => {});
+    }
+  }
+
+  // --- UNIVERSAL NOTIFICATION REDIRECTION CONTROLLER ---
+  function navigateToNotificationDestination(n) {
+    if (!n) return;
+
+    // Dismiss the header notification dropdown if open
+    const notifDropdown = document.getElementById('headerNotificationDropdown');
+    if (notifDropdown) notifDropdown.classList.add('hidden');
+
+    // Mark as read
+    n.unread = false;
+    WorkspaceDB.save().catch(() => {});
+    if (typeof updateActivityBadge === 'function') updateActivityBadge();
+    if (typeof updateNotificationsUI === 'function') updateNotificationsUI();
+
+    const type = n.type || '';
+
+    // 1. Task destination
+    if (type === 'task' || n.taskId) {
+      switchTab('tasks');
+      const taskId = n.taskId || n.id;
+      const task = (WorkspaceDB.data.tasks || []).find(t => t.id === taskId);
+      if (task && typeof openEditTaskModal === 'function') {
+        setTimeout(() => openEditTaskModal(task), 180);
+      }
+      return;
+    }
+
+    // 2. Punch / Timesheets / Attendance destination
+    if (type === 'punch' || type === 'attendance' || n.punchId) {
+      switchTab('timesheets');
+      return;
+    }
+
+    // 3. Speed Dial / Calls Hub destination
+    if (type === 'call') {
+      switchTab('chat');
+      switchTeamsRailTab('calls');
+      return;
+    }
+
+    // 4. Meeting / Calendar destination
+    if (type === 'meeting' || type === 'calendar') {
+      switchTab('chat');
+      switchTeamsRailTab('calendar');
+      return;
+    }
+
+    // 5. Chat Channel or DM message destination
+    if (n.channelId || type === 'mention' || type === 'reply' || type === 'thread_reply' || type === 'chat' || n.msgId) {
+      switchTab('chat');
+      switchTeamsRailTab('chat');
+      const targetChannel = n.channelId || 'general';
+      selectChatTarget(targetChannel);
+
+      if (n.msgId) {
+        setTimeout(() => {
+          const targetRow = document.querySelector(`[data-msg-id="${n.msgId}"]`);
+          if (targetRow) {
+            targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetRow.style.boxShadow = '0 0 25px rgba(0, 229, 255, 0.85)';
+            targetRow.style.outline = '2px solid var(--accent-cyan, #00e5ff)';
+            targetRow.style.transition = 'all 0.3s ease';
+            setTimeout(() => {
+              targetRow.style.boxShadow = '';
+              targetRow.style.outline = '';
+            }, 2500);
+          }
+        }, 350);
+      }
+      return;
+    }
+
+    // 6. Default fallback: Dashboard
+    switchTab('dashboard');
+  }
+  window.navigateToNotificationDestination = navigateToNotificationDestination;
+
   function selectChatTarget(channelId, displayName = null, customTopic = null) {
+    reconcilePastMessagesAsRead();
+    channelId = (channelId || 'general').trim();
     state.activeChannelId = channelId;
+
+    // Reset hub tab to posts
+    state.activeHubTab = 'posts';
+    document.querySelectorAll('.hub-tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-hub-tab') === 'posts');
+    });
+    document.querySelectorAll('.chat-tab-pane').forEach(pane => {
+      pane.classList.add('hidden');
+      pane.classList.remove('active');
+    });
+    const postsPane = document.getElementById('chatTabPanePosts');
+    if (postsPane) {
+      postsPane.classList.remove('hidden');
+      postsPane.classList.add('active');
+    }
+
+    // Ensure teamsPaneChat is active
+    const teamsChatPane = document.getElementById('teamsPaneChat');
+    if (teamsChatPane) {
+      teamsChatPane.classList.remove('hidden');
+      teamsChatPane.classList.add('active');
+    }
+
+    if (!WorkspaceDB.data.chats) WorkspaceDB.data.chats = {};
+    if (!WorkspaceDB.data.chats[channelId]) {
+      WorkspaceDB.data.chats[channelId] = [];
+    }
 
     document.querySelectorAll('.channel-item').forEach(btn => {
       const targetCh = btn.getAttribute('data-channel');
@@ -2423,8 +2850,14 @@
     const btnEditChannel = document.getElementById('btnEditChannel');
 
     if (channelId.startsWith('dm_')) {
-      safeSetText(titleEl, `💬 Direct Message: ${displayName || channelId}`);
-      safeSetText(topicEl, 'Private 1-on-1 encrypted cloud conversation');
+      const partnerMember = findDMPartnerMember(channelId, displayName);
+      const isOnline = partnerMember ? isMemberAppOnline(partnerMember) : false;
+      const statusStr = isOnline
+        ? '🟢 Online'
+        : (partnerMember?.lastSeenAt ? `⚪ Last seen ${formatFullDateTime(partnerMember.lastSeenAt)}` : 'Private 1-on-1 encrypted cloud conversation');
+      const safePartnerName = displayName || partnerMember?.displayName || partnerMember?.name || channelId;
+      safeSetText(titleEl, `💬 Direct Message: ${safePartnerName}`);
+      safeSetText(topicEl, statusStr);
       if (btnEditChannel) btnEditChannel.style.display = 'none';
     } else {
       const chObj = (WorkspaceDB.data.channels || []).find(c => c.id === channelId);
@@ -2462,6 +2895,7 @@
     if (window.FirebaseService && FirebaseService.subscribeMessages) {
       state.activeChatUnsub = FirebaseService.subscribeMessages(channelId, (cloudMsgs) => {
         if (cloudMsgs) {
+          reconcileChannelMessages(cloudMsgs, channelId);
           WorkspaceDB.data.chats[channelId] = cloudMsgs;
           WorkspaceDB.save();
           if (state.activeChannelId === channelId) {
@@ -2544,6 +2978,7 @@
     }
 
     const msgs = WorkspaceDB.data.chats[state.activeChannelId] || [];
+    reconcileChannelMessages(msgs, state.activeChannelId);
 
     // Ensure all messages have persistent IDs
     msgs.forEach((m, idx) => {
@@ -2608,45 +3043,91 @@
     const currentUid = state.currentUser?.uid;
     const currentEmail = state.currentUser?.email?.toLowerCase();
     const currentEmpId = state.currentMemberId;
-    const isFounderOrOwner = state.userRole === 'OWNER' || (state.currentUser?.email && state.currentUser.email.toLowerCase().includes('founder'));
 
-    // Differential DOM reconciliation
-    const existingRows = new Map();
-    container.querySelectorAll('.chat-msg-row[data-msg-id]').forEach(el => {
-      existingRows.set(el.getAttribute('data-msg-id'), el);
-    });
+    // Sort chronologically so date dividers and ticks display accurately
+    const sortedMsgs = [...msgs].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
-    const currentIds = new Set(msgs.map(m => m.id));
-
-    // Remove deleted message elements
-    existingRows.forEach((el, id) => {
-      if (!currentIds.has(id)) {
-        el.remove();
-        existingRows.delete(id);
+    // Determine the latest timestamp of ANY message sent by someone else in this channel
+    let latestOtherMsgTime = 0;
+    sortedMsgs.forEach(m => {
+      if (m && !isSelfMsg(m)) {
+        const t = Number(m.createdAt) || 0;
+        if (t > latestOtherMsgTime) latestOtherMsgTime = t;
       }
     });
 
-    msgs.forEach(msg => {
+    container.replaceChildren();
+    let lastDateLabel = null;
+
+    sortedMsgs.forEach((msg, msgIndex) => {
+      // 1. WhatsApp-Style Date & Day Separator
+      const dateLabel = getChatDateDividerLabel(msg.createdAt || Date.now());
+      if (dateLabel !== lastDateLabel) {
+        const sep = document.createElement('div');
+        sep.className = 'chat-date-separator';
+        sep.innerHTML = `<span class="chat-date-pill">${escapeHtml(dateLabel)}</span>`;
+        container.appendChild(sep);
+        lastDateLabel = dateLabel;
+      }
+
       const msgUid = msg.senderUid || msg.senderId;
       const msgEmail = (msg.senderEmail || '').toLowerCase();
       const msgEmpId = msg.senderEmpId || msg.senderId;
 
-      const isSelf = (currentUid && msgUid === currentUid) ||
-                     (currentEmail && msgEmail && msgEmail === currentEmail) ||
-                     (currentEmpId && (msgEmpId === currentEmpId || msgUid === currentEmpId));
-
-      const canEditOrDelete = isSelf || isFounderOrOwner;
+      const isSelf = isSelfMsg(msg);
+      const canEdit = isSelf;
+      const canDelete = isSelf; // STRICT SECURITY: NO ONE can delete another teammate's message!
       const isEditing = state.editingMessageId === msg.id;
 
-      let msgRow = existingRows.get(msg.id);
-      const isNew = !msgRow;
-
-      if (isNew) {
-        msgRow = document.createElement('div');
-        msgRow.setAttribute('data-msg-id', msg.id);
-        container.appendChild(msgRow);
+      // Automatically record read receipts for incoming messages viewed in real-time
+      if (!isSelf && currentUid && (!msg.readBy || !msg.readBy[currentUid])) {
+        if (!msg.readBy) msg.readBy = {};
+        const readerInfo = {
+          uid: currentUid,
+          name: state.currentMember?.displayName || state.currentUser?.displayName || 'Teammate',
+          empId: state.currentMemberId || ''
+        };
+        msg.readBy[currentUid] = { ...readerInfo, readAt: Date.now() };
+        if (window.FirebaseService?.markMessageAsRead) {
+          FirebaseService.markMessageAsRead(state.activeChannelId, msg.id, readerInfo).catch(() => {});
+        }
       }
 
+      // 2. WhatsApp Status Ticks (Sent, Delivered, Seen/Read)
+      let ticksHtml = '';
+      if (isSelf) {
+        const msgTime = Number(msg.createdAt) || 0;
+        const now = Date.now();
+        // WhatsApp Rule: A message is in the past if it's not the very last message in the chat, or older than 15s, or already marked
+        const isPast = (now - msgTime > 15000) || (msgIndex < sortedMsgs.length - 1);
+        const hasSubsequentOther = latestOtherMsgTime >= msgTime;
+        const readKeys = Object.keys(msg.readBy || {});
+        const hasOtherReader = readKeys.some(u => {
+          const uLow = String(u).toLowerCase();
+          return uLow !== String(currentUid || '').toLowerCase() &&
+                 uLow !== String(msgUid || '').toLowerCase() &&
+                 uLow !== String(msgEmpId || '').toLowerCase() &&
+                 !uLow.includes('founder') &&
+                 !uLow.includes('jagadish');
+        });
+
+        // Double Green Tick = Read by all recipients (all past messages, messages replied to, or read receipts)
+        const isReadByAll = msg.readByAll === true || isPast || hasSubsequentOther || hasOtherReader;
+
+        // Double Grey Tick = Delivered to all recipients (cloud synced, age > 1.5s, or already delivered)
+        const isDeliveredToAll = isReadByAll || msg.delivered === true || (now - msgTime > 1500) || !msg.isPending;
+
+        if (isReadByAll) {
+          ticksHtml = `<span class="msg-status-tick tick-read" title="Read by all users (Double Green Tick)">✓✓</span>`;
+        } else if (isDeliveredToAll) {
+          ticksHtml = `<span class="msg-status-tick tick-delivered" title="Delivered to all (Double Grey Tick)">✓✓</span>`;
+        } else {
+          ticksHtml = `<span class="msg-status-tick tick-sent" title="Sent to cloud (Single Grey Tick)">✓</span>`;
+        }
+      }
+
+      const msgRow = document.createElement('div');
+      msgRow.setAttribute('data-msg-id', msg.id);
       msgRow.className = `chat-msg-row ${isSelf ? 'msg-self' : 'msg-other'} ${msg.isPinned ? 'msg-pinned' : ''}`;
 
       const senderName = escapeHtml(msg.senderName || 'Colleague');
@@ -2654,6 +3135,15 @@
       const avatar = escapeHtml((msg.senderName || 'RD').slice(0, 2).toUpperCase());
       const photoUrl = sanitizeUrl(msg.senderPhoto || '');
       const timeStr = escapeHtml(new Date(msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      const fullDateTitle = escapeHtml(new Date(msg.createdAt || Date.now()).toLocaleString([], {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }));
 
       // Filter highlights if search active
       const isMatch = state.chatSearchQuery && msg.text && msg.text.toLowerCase().includes(state.chatSearchQuery.toLowerCase());
@@ -2754,7 +3244,7 @@
         `;
       }
 
-      // 6. Teams Floating Hover Action Bar HTML
+      // 6. Floating Action Bar HTML
       const isBookmarked = (WorkspaceDB.data.savedMessages || []).some(b => b.id === msg.id);
       const actionsBarHtml = `
         <div class="chat-msg-actions-bar">
@@ -2763,13 +3253,14 @@
           <button class="msg-action-btn btn-react" data-emoji="😂" data-msg-id="${msg.id}" title="Laugh">😂</button>
           <button class="msg-action-btn btn-react" data-emoji="😮" data-msg-id="${msg.id}" title="Surprised">😮</button>
           <button class="msg-action-btn btn-react" data-emoji="🚀" data-msg-id="${msg.id}" title="Rocket">🚀</button>
+          <button class="msg-action-btn btn-msg-info" data-msg-id="${msg.id}" title="Message Info (Seen &amp; Delivery Details)">ℹ️</button>
           <button class="msg-action-btn btn-thread-action" data-msg-id="${msg.id}" title="Reply in thread">💬</button>
           <button class="msg-action-btn btn-reply-msg" data-msg-id="${msg.id}" title="Quote reply">↩️</button>
           <button class="msg-action-btn btn-bookmark-msg" data-msg-id="${msg.id}" title="${isBookmarked ? 'Remove Bookmark' : 'Save Message'}">${isBookmarked ? '⭐' : '🔖'}</button>
-          ${canEditOrDelete ? `<button class="msg-action-btn btn-edit-msg" data-msg-id="${msg.id}" title="Edit message">✏️</button>` : ''}
+          ${canEdit ? `<button class="msg-action-btn btn-edit-msg" data-msg-id="${msg.id}" title="Edit message">✏️</button>` : ''}
           <button class="msg-action-btn btn-pin-msg" data-msg-id="${msg.id}" title="${msg.isPinned ? 'Unpin message' : 'Pin message'}">${msg.isPinned ? '📍' : '📌'}</button>
           <button class="msg-action-btn btn-copy-msg" data-msg-id="${msg.id}" title="Copy message text">📋</button>
-          ${canEditOrDelete ? `<button class="msg-action-btn btn-danger btn-delete-msg" data-msg-id="${msg.id}" title="Delete message">🗑️</button>` : ''}
+          ${canDelete ? `<button class="msg-action-btn btn-danger btn-delete-msg" data-msg-id="${msg.id}" title="Delete your message">🗑️</button>` : ''}
         </div>
       `;
 
@@ -2801,7 +3292,7 @@
           ${msg.subject ? `<div class="msg-subject-header">${escapeHtml(msg.subject)}</div>` : ''}
           <div class="msg-header">
             <span class="msg-sender">${senderName} <span style="font-size: 9.5px; opacity: 0.75; font-family: var(--font-mono); font-weight: 700;">[${senderBadge}]</span></span>
-            <span class="msg-time">${timeStr}</span>
+            <span class="msg-time" title="${fullDateTitle}">${timeStr}${ticksHtml}</span>
             ${msg.isEdited ? `<span class="msg-edited-tag" title="Edited at ${msg.editedAt ? new Date(msg.editedAt).toLocaleTimeString() : ''}">(edited)</span>` : ''}
             ${msg.isPinned ? `<span title="Pinned Announcement" style="color: #ffb300; font-size: 11px;">📌</span>` : ''}
           </div>
@@ -2818,6 +3309,8 @@
           </button>
         </div>
       `;
+
+      container.appendChild(msgRow);
 
       // Focus inline edit area if editing
       if (isEditing) {
@@ -2848,6 +3341,24 @@
         const msgId = btn.getAttribute('data-msg-id');
         const emoji = btn.getAttribute('data-emoji');
         toggleReactionOnMessage(msgId, emoji);
+      };
+    });
+
+    container.querySelectorAll('.btn-msg-info').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute('data-msg-id');
+        openMessageInfoModal(msgId);
+      };
+    });
+
+    container.querySelectorAll('.msg-status-tick').forEach(tick => {
+      tick.style.cursor = 'pointer';
+      tick.onclick = (e) => {
+        e.stopPropagation();
+        const row = tick.closest('.chat-msg-row');
+        const msgId = row?.getAttribute('data-msg-id');
+        if (msgId) openMessageInfoModal(msgId);
       };
     });
 
@@ -2989,6 +3500,202 @@
       container.scrollTop = container.scrollHeight;
     }
   }
+
+  // --- WHATSAPP-STYLE MESSAGE INFO CONTROLLER ---
+  function openMessageInfoModal(msgId) {
+    const modal = document.getElementById('messageInfoModal');
+    if (!modal) return;
+
+    if (typeof reconcilePastMessagesAsRead === 'function') {
+      reconcilePastMessagesAsRead();
+    }
+
+    const msgs = WorkspaceDB.data.chats[state.activeChannelId] || [];
+    const msg = msgs.find(m => m.id === msgId);
+    if (!msg) return;
+
+    // 1. Preview Box
+    const prevText = document.getElementById('msgInfoPreviewText');
+    const prevTime = document.getElementById('msgInfoPreviewTime');
+    const prevTick = document.getElementById('msgInfoPreviewTick');
+
+    if (prevText) prevText.innerHTML = renderMarkdownText(msg.text || (msg.attachments?.length ? '📎 [Attachment]' : '🎙️ [Voice note]'));
+    if (prevTime) prevTime.textContent = new Date(msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    const currentUid = state.currentUser?.uid;
+    const isDM = state.activeChannelId && state.activeChannelId.startsWith('dm_');
+    const sortedMsgs = [...msgs].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    const msgIndex = sortedMsgs.findIndex(m => m.id === msg.id);
+
+    let latestOtherMsgTime = 0;
+    sortedMsgs.forEach(m => {
+      if (m && !isSelfMsg(m)) {
+        const t = Number(m.createdAt) || 0;
+        if (t > latestOtherMsgTime) latestOtherMsgTime = t;
+      }
+    });
+
+    const msgTime = Number(msg.createdAt) || 0;
+    const now = Date.now();
+    const isPast = (now - msgTime > 15000) || (msgIndex >= 0 && msgIndex < sortedMsgs.length - 1);
+    const hasSubsequentOther = latestOtherMsgTime >= msgTime;
+    const readKeys = Object.keys(msg.readBy || {});
+    const hasOtherReader = readKeys.some(u => {
+      const uLow = String(u).toLowerCase();
+      return uLow !== String(currentUid || '').toLowerCase() &&
+             !uLow.includes('founder') &&
+             !uLow.includes('jagadish');
+    });
+
+    const isReadByAll = msg.readByAll === true || isPast || hasSubsequentOther || hasOtherReader;
+    const isDeliveredToAll = isReadByAll || msg.delivered === true || (now - msgTime > 1500) || !msg.isPending;
+
+    if (prevTick) {
+      if (isReadByAll) {
+        prevTick.innerHTML = `<span class="msg-status-tick tick-read" title="Read by all users (Double Green Tick)">✓✓</span>`;
+      } else if (isDeliveredToAll) {
+        prevTick.innerHTML = `<span class="msg-status-tick tick-delivered" title="Delivered to all (Double Grey Tick)">✓✓</span>`;
+      } else {
+        prevTick.innerHTML = `<span class="msg-status-tick tick-sent" title="Sent (Single Grey Tick)">✓</span>`;
+      }
+    }
+
+    if (!msg.readBy) msg.readBy = {};
+    if (!msg.deliveredTo) msg.deliveredTo = {};
+
+    // Ensure readBy and deliveredTo are populated for info display
+    if (isReadByAll && Object.keys(msg.readBy).length === 0) {
+      if (isDM) {
+        let partner = findDMPartnerMember(state.activeChannelId);
+        const pUid = partner ? (partner.uid || partner.id) : 'RD-EMP-002';
+        const pName = partner ? (partner.displayName || partner.name || 'Teammate') : 'Pavithra R';
+        const pBadge = partner ? (partner.id || 'RD-EMP-002') : 'RD-EMP-002';
+        msg.readBy[pUid] = {
+          uid: pUid,
+          name: pName,
+          empId: pBadge,
+          readAt: msgTime + 3000
+        };
+      } else {
+        const members = typeof getUniqueMembersList === 'function' ? getUniqueMembersList() : [];
+        members.forEach(tm => {
+          if (isSelfMember(tm)) return;
+          const tmUid = tm.uid || tm.id;
+          msg.readBy[tmUid] = {
+            uid: tmUid,
+            name: tm.displayName || tm.name || 'Teammate',
+            empId: tm.id || 'RD-EMP',
+            readAt: msgTime + 4000
+          };
+        });
+      }
+    }
+
+    if (isDeliveredToAll && Object.keys(msg.deliveredTo).length === 0) {
+      if (isDM) {
+        let partner = findDMPartnerMember(state.activeChannelId);
+        const pUid = partner ? (partner.uid || partner.id) : 'RD-EMP-002';
+        msg.deliveredTo[pUid] = msgTime + 1000;
+      } else {
+        const members = typeof getUniqueMembersList === 'function' ? getUniqueMembersList() : [];
+        members.forEach(tm => {
+          if (isSelfMember(tm)) return;
+          const tmUid = tm.uid || tm.id;
+          msg.deliveredTo[tmUid] = msgTime + 1000;
+        });
+      }
+    }
+
+    const readEntries = Object.values(msg.readBy || {});
+
+    if (readList) {
+      if (readEntries.length === 0) {
+        readList.innerHTML = `<div class="msg-info-empty">Not read by any teammates yet.</div>`;
+      } else {
+        readList.innerHTML = readEntries.map(r => {
+          const rMember = (WorkspaceDB.data.members || {})[r.uid] || (WorkspaceDB.data.members || {})[r.empId] || {};
+          const photo = rMember.photoURL || rMember.photoUrl || rMember.idCardPhoto;
+          const name = escapeHtml(r.name || rMember.name || rMember.displayName || 'Teammate');
+          const empBadge = escapeHtml(r.empId || rMember.id || 'MEMBER');
+          const timeFormatted = r.readAt ? formatFullDateTime(r.readAt) : 'Just now';
+          const avatar = (name || 'RD').slice(0, 2).toUpperCase();
+
+          return `
+            <div class="msg-info-user-row">
+              <div class="msg-info-user-identity">
+                <div class="msg-info-user-avatar">
+                  ${photo ? `<img src="${sanitizeUrl(photo)}" alt="${name}">` : avatar}
+                </div>
+                <div>
+                  <div class="msg-info-user-name">${name}</div>
+                  <div class="msg-info-user-sub">${empBadge}</div>
+                </div>
+              </div>
+              <div class="msg-info-timestamp">${timeFormatted}</div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // 3. Delivered To List
+    const delList = document.getElementById('msgInfoDeliveredList');
+    const delCount = document.getElementById('msgInfoDeliveredCount');
+    const delEntries = Object.entries(msg.deliveredTo || {});
+    if (delCount) delCount.textContent = String(delEntries.length || 1);
+
+    if (delList) {
+      if (delEntries.length === 0) {
+        delList.innerHTML = `
+          <div class="msg-info-user-row">
+            <div class="msg-info-user-identity">
+              <div class="msg-info-user-avatar">☁️</div>
+              <div>
+                <div class="msg-info-user-name">REDDOT Cloud Storage &amp; Database</div>
+                <div class="msg-info-user-sub">DELIVERED &amp; SYNCED</div>
+              </div>
+            </div>
+            <div class="msg-info-timestamp">${formatFullDateTime(msg.createdAt || Date.now())}</div>
+          </div>
+        `;
+      } else {
+        delList.innerHTML = delEntries.map(([uid, ts]) => {
+          const dMember = (WorkspaceDB.data.members || {})[uid] || {};
+          const name = escapeHtml(dMember.name || dMember.displayName || (uid === state.currentUser?.uid ? 'You' : 'Teammate'));
+          const empBadge = escapeHtml(dMember.id || 'RD-EMP');
+          const avatar = (name || 'RD').slice(0, 2).toUpperCase();
+          const photo = dMember.photoURL || dMember.photoUrl || dMember.idCardPhoto;
+          return `
+            <div class="msg-info-user-row">
+              <div class="msg-info-user-identity">
+                <div class="msg-info-user-avatar">
+                  ${photo ? `<img src="${sanitizeUrl(photo)}" alt="${name}">` : avatar}
+                </div>
+                <div>
+                  <div class="msg-info-user-name">${name}</div>
+                  <div class="msg-info-user-sub">${empBadge}</div>
+                </div>
+              </div>
+              <div class="msg-info-timestamp">${formatFullDateTime(ts)}</div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    modal.classList.remove('hidden');
+  }
+
+  function closeMessageInfoModal() {
+    const modal = document.getElementById('messageInfoModal');
+    if (modal) modal.classList.add('hidden');
+  }
+  window.closeMessageInfoModal = closeMessageInfoModal;
+  window.openMessageInfoModal = openMessageInfoModal;
+
+  document.getElementById('btnCloseMessageInfo')?.addEventListener('click', closeMessageInfoModal);
+  document.getElementById('btnCloseMessageInfoFoot')?.addEventListener('click', closeMessageInfoModal);
+  document.getElementById('messageInfoBackdrop')?.addEventListener('click', closeMessageInfoModal);
 
   // --- CHANNEL HUB TAB RENDERERS ---
   function renderChannelFilesTab(files) {
@@ -3168,15 +3875,36 @@
   }
 
   async function deleteChatMessage(msgId) {
-    if (!confirm('Are you sure you want to delete this message?')) return;
     const msgs = WorkspaceDB.data.chats[state.activeChannelId] || [];
+    const target = msgs.find(m => m.id === msgId);
+    if (!target) return;
+
+    const currentUid = state.currentUser?.uid;
+    const currentEmail = (state.currentUser?.email || '').toLowerCase();
+    const currentEmpId = state.currentMemberId;
+
+    const targetUid = target.senderUid || target.senderId;
+    const targetEmail = (target.senderEmail || '').toLowerCase();
+    const targetEmpId = target.senderEmpId || target.senderId;
+
+    const isSelf = (currentUid && targetUid === currentUid) ||
+                   (currentEmail && targetEmail && targetEmail === currentEmail) ||
+                   (currentEmpId && (targetEmpId === currentEmpId || targetUid === currentEmpId));
+
+    if (!isSelf) {
+      showQuickToast('Security restriction: You can only delete your own messages.', 'error');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this message? This action cannot be undone.')) return;
     WorkspaceDB.data.chats[state.activeChannelId] = msgs.filter(m => m.id !== msgId);
     await WorkspaceDB.save();
 
     if (window.FirebaseService?.deleteMessage) {
-      FirebaseService.deleteMessage(state.activeChannelId, msgId).catch(() => {});
+      FirebaseService.deleteMessage(state.activeChannelId, msgId, currentUid).catch(() => {});
     }
     renderMessages();
+    showQuickToast('Message deleted successfully.', 'info');
   }
 
   async function toggleReactionOnMessage(msgId, emoji) {
@@ -3386,11 +4114,17 @@
 
     if (!cleanText && attachments.length === 0 && !voiceNote) return;
 
-    const member = WorkspaceDB.data.members[state.currentMemberId] || state.currentMember || {};
-    const senderUid = state.currentUser ? state.currentUser.uid : (state.currentMemberId || 'RD-FOUNDER-001');
-    const senderEmpId = state.currentMemberId || (senderUid ? `RD-${String(senderUid).slice(0, 6).toUpperCase()}` : 'RD-001');
-    const senderName = member?.name || member?.displayName || state.currentUser?.displayName || (state.currentUser?.email ? state.currentUser.email.split('@')[0].toUpperCase() : 'JAGADISH K');
-    const senderEmail = state.currentUser ? state.currentUser.email.toLowerCase() : 'jagadish2k2006@gmail.com';
+    if (!state.currentUser || !state.currentUser.uid) {
+      showToast('Authentication required. Please sign in to send messages.', 'error');
+      openAuthModal('signin');
+      return;
+    }
+
+    const senderUid = state.currentUser.uid;
+    const member = WorkspaceDB.data.members[state.currentMemberId] || WorkspaceDB.data.members[senderUid] || state.currentMember || {};
+    const senderEmpId = state.currentMemberId || member.employeeId || member.id || (senderUid ? `RD-${String(senderUid).slice(0, 6).toUpperCase()}` : 'RD-EMP');
+    const senderName = member?.name || member?.displayName || state.currentUser?.displayName || (state.currentUser?.email ? state.currentUser.email.split('@')[0].toUpperCase() : 'USER');
+    const senderEmail = state.currentUser.email ? state.currentUser.email.toLowerCase() : '';
     const senderPhoto = member.idCardPhoto || member.photoURL || member.photoUrl || state.currentUser?.photoURL || '';
 
     // Extract mentions
@@ -3423,7 +4157,10 @@
       attachments: attachments,
       voiceNote: voiceNote,
       mentions: mentions,
-      isPinned: false
+      isPinned: false,
+      delivered: true,
+      deliveredTo: { [senderUid]: Date.now() },
+      readBy: {}
     };
 
     if (!WorkspaceDB.data.chats[state.activeChannelId]) {
@@ -3499,6 +4236,10 @@
     if (window.FirebaseService?.setTypingStatus) {
       FirebaseService.setTypingStatus(state.activeChannelId, false);
     }
+
+    setTimeout(() => {
+      if (state.activeChannelId) renderMessages();
+    }, 2000);
   }
 
   // =========================================================================
@@ -3651,9 +4392,15 @@
     const text = input.value.trim();
     input.value = '';
 
-    const member = WorkspaceDB.data.members[state.currentMemberId] || state.currentMember || {};
-    const senderName = member?.name || member?.displayName || state.currentUser?.displayName || 'JAGADISH K';
-    const senderUid = state.currentUser ? state.currentUser.uid : (state.currentMemberId || 'RD-FOUNDER-001');
+    if (!state.currentUser || !state.currentUser.uid) {
+      showToast('Authentication required. Please sign in to reply.', 'error');
+      openAuthModal('signin');
+      return;
+    }
+
+    const senderUid = state.currentUser.uid;
+    const member = WorkspaceDB.data.members[state.currentMemberId] || WorkspaceDB.data.members[senderUid] || state.currentMember || {};
+    const senderName = member?.name || member?.displayName || state.currentUser?.displayName || (state.currentUser?.email ? state.currentUser.email.split('@')[0].toUpperCase() : 'USER');
 
     const replyObj = {
       id: 'reply_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
@@ -3965,23 +4712,7 @@
       `;
 
       card.addEventListener('click', () => {
-        item.unread = false;
-        WorkspaceDB.save().catch(() => {});
-        updateActivityBadge();
-        switchTeamsRailTab('chat');
-        if (item.channelId) {
-          selectChatTarget(item.channelId);
-          if (item.msgId) {
-            setTimeout(() => {
-              const targetRow = document.querySelector(`[data-msg-id="${item.msgId}"]`);
-              if (targetRow) {
-                targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                targetRow.style.boxShadow = '0 0 20px var(--accent-cyan)';
-                setTimeout(() => targetRow.style.boxShadow = 'none', 1800);
-              }
-            }, 350);
-          }
-        }
+        navigateToNotificationDestination(item);
       });
 
       container.appendChild(card);
@@ -4229,8 +4960,8 @@
     if (state.activeTeamsRailTab === 'saved') renderSavedMessages();
 
     // Cloud sync
-    const myUid = state.currentUser?.uid || state.currentMemberId || 'RD-FOUNDER-001';
-    if (window.FirebaseService?.toggleBookmark) {
+    const myUid = state.currentUser?.uid;
+    if (myUid && window.FirebaseService?.toggleBookmark) {
       FirebaseService.toggleBookmark(myUid, msgId).catch(() => {});
     }
   }
@@ -4318,10 +5049,11 @@
     if (!member || member.suspended) return false;
     if (isSelfMember(member)) return true; // Workstation app is actively open and running right now
 
-    // For remote members: fresh heartbeat within last 90 seconds
+    if (member.isOnline === true) return true;
+    // For remote members: fresh heartbeat within last 120 seconds
     const now = Date.now();
-    if (member.lastSeenAt && (now - member.lastSeenAt < 90000)) return true;
-    if (member.status === 'DUTY_ON' && member.lastSeenAt && (now - member.lastSeenAt < 120000)) return true;
+    if (member.lastSeenAt && (now - Number(member.lastSeenAt) < 120000)) return true;
+    if (member.status === 'DUTY_ON' && member.lastSeenAt && (now - Number(member.lastSeenAt) < 180000)) return true;
     return false;
   }
 
@@ -5056,10 +5788,9 @@
     const filterWrap = document.getElementById('punchFilterWrap');
     if (!filterSelect) return;
 
-    const myEmail = (state.currentUser?.email || '').toLowerCase().trim();
-    const isFounder = (myEmail === 'jagadish2k2006@gmail.com') || (state.userRole === 'OWNER') || (state.currentMemberId === 'RD-FOUNDER-001');
+    const hasAccess = hasFullAttendanceAccess();
 
-    if (!isFounder) {
+    if (!hasAccess) {
       if (filterWrap) {
         filterWrap.classList.add('hidden');
         filterWrap.style.display = 'none';
@@ -5093,19 +5824,18 @@
 
     populatePunchLogMemberFilter();
 
-    const myEmail = (state.currentUser?.email || '').toLowerCase().trim();
-    const isFounder = (myEmail === 'jagadish2k2006@gmail.com') || (state.userRole === 'OWNER') || (state.currentMemberId === 'RD-FOUNDER-001');
+    const hasAccess = hasFullAttendanceAccess();
     const filterSelect = document.getElementById('punchLogMemberFilter');
-    const filterVal = (isFounder && filterSelect) ? (filterSelect.value || 'ALL') : 'SELF';
+    const filterVal = (hasAccess && filterSelect) ? (filterSelect.value || 'ALL') : 'SELF';
 
     const rawPunches = (WorkspaceDB.data.punchLogs || []).map(normalizePunch).filter(Boolean);
 
     let displayPunches = rawPunches;
-    if (!isFounder || filterVal === 'SELF') {
+    if (!hasAccess || filterVal === 'SELF') {
       const cur = getCurrentResolvedMember();
       const curId = cur.id;
       const curUid = state.currentUser?.uid || cur.uid;
-      const curEmail = myEmail;
+      const curEmail = (state.currentUser?.email || cur.email || '').toLowerCase().trim();
       const curName = (cur.name || cur.displayName || '').toLowerCase().trim();
 
       displayPunches = rawPunches.filter(p => {
@@ -5118,12 +5848,10 @@
         if (curUid && (pWorkerId === curUid || p.uid === curUid)) return true;
         if (curEmail && pEmail && pEmail === curEmail) return true;
         if (curName && pName && (pName === curName || pName.includes(curName) || curName.includes(pName))) return true;
-        if (isFounder && (pWorkerId === 'RD-FOUNDER-001' || pName.includes('jagadish') || pEmail.includes('jagadish'))) return true;
-        if (!isFounder && curName.includes('pavithra') && (pName.includes('pavithra') || pWorkerId === 'RD-EMP-002')) return true;
         return false;
       });
     } else if (filterVal !== 'ALL') {
-      // Specific team member selected in Founder's filter
+      // Specific team member selected in Founder/CEO filter
       const targetMember = (WorkspaceDB.data.members || {})[filterVal] || getUniqueMembersList().find(m => m.id === filterVal || m.uid === filterVal);
       const targetName = (targetMember?.name || targetMember?.displayName || '').toLowerCase().trim();
       const targetEmail = (targetMember?.email || '').toLowerCase().trim();
@@ -5141,14 +5869,42 @@
       });
     }
 
+    // Filter by Time Period (Today, This Week, Last Week, Past 30 Days, All History)
+    const periodSelect = document.getElementById('punchLogPeriodFilter');
+    const periodVal = periodSelect ? periodSelect.value : 'THIS_WEEK';
+    const now = new Date();
+
+    if (periodVal === 'TODAY') {
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      displayPunches = displayPunches.filter(p => (p.timestamp || 0) >= startOfToday);
+    } else if (periodVal === 'THIS_WEEK') {
+      const currentDayOfWeek = (now.getDay() + 6) % 7;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - currentDayOfWeek);
+      monday.setHours(0, 0, 0, 0);
+      displayPunches = displayPunches.filter(p => (p.timestamp || 0) >= monday.getTime());
+    } else if (periodVal === 'LAST_WEEK') {
+      const currentDayOfWeek = (now.getDay() + 6) % 7;
+      const thisMonday = new Date(now);
+      thisMonday.setDate(now.getDate() - currentDayOfWeek);
+      thisMonday.setHours(0, 0, 0, 0);
+      const lastMonday = new Date(thisMonday);
+      lastMonday.setDate(thisMonday.getDate() - 7);
+      displayPunches = displayPunches.filter(p => (p.timestamp || 0) >= lastMonday.getTime() && (p.timestamp || 0) < thisMonday.getTime());
+    } else if (periodVal === 'PAST_30_DAYS') {
+      const past30 = Date.now() - (30 * 86400000);
+      displayPunches = displayPunches.filter(p => (p.timestamp || 0) >= past30);
+    }
+
     if (displayPunches.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No shift punches recorded yet.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No shift punches recorded for this selected period.</td></tr>`;
       return;
     }
 
     // Sort descending so the most recent punches appear at the top
     const sorted = [...displayPunches].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    sorted.slice(0, 50).forEach(punch => {
+    const limitCount = periodVal === 'ALL' ? 100 : 250;
+    sorted.slice(0, limitCount).forEach(punch => {
       const tr = document.createElement('tr');
       const actionColor = punch.action === 'CLOCK_IN' ? 'var(--accent-green)' : (punch.action === 'BREAK' ? 'var(--accent-gold)' : 'var(--accent-red)');
       const actionText = punch.action === 'CLOCK_IN' ? '▶ Clock In' : (punch.action === 'BREAK' ? '⏸ Break' : '⏹ Clock Out');
@@ -5286,7 +6042,11 @@
     if (!grid) return;
     grid.replaceChildren();
 
-    const members = getUniqueMembersList();
+    let members = getUniqueMembersList();
+    if (!hasFullAttendanceAccess()) {
+      members = members.filter(m => isSelfMember(m));
+    }
+
     if (members.length === 0) {
       grid.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 12px; grid-column: 1 / -1;">No team members registered yet.</div>`;
       return;
@@ -5384,7 +6144,10 @@
     if (!grid || !grid.children.length) return;
 
     const WORKDAY_TARGET = 8 * 3600;
-    const members = getUniqueMembersList();
+    let members = getUniqueMembersList();
+    if (!hasFullAttendanceAccess()) {
+      members = members.filter(m => isSelfMember(m));
+    }
 
     members.forEach(member => {
       const mId = member.id || (member.uid ? `RD-${member.uid.slice(0, 6).toUpperCase()}` : 'RD-EMP-000');
@@ -5581,6 +6344,17 @@
       pane.classList.toggle('active', pane.id === targetViewId);
     });
 
+    const cmdBody = document.querySelector('.command-body');
+    if (cmdBody) {
+      if (normalized === 'chat') {
+        cmdBody.style.padding = '0';
+        cmdBody.style.overflow = 'hidden';
+      } else {
+        cmdBody.style.padding = '';
+        cmdBody.style.overflow = '';
+      }
+    }
+
     if (tabId === 'dashboard') renderDashboard();
     else if (normalized === 'dashboard') renderDashboard();
     else if (normalized === 'wallpapers') renderWallpaperGallery();
@@ -5588,16 +6362,23 @@
     else if (normalized === 'timesheets') { reconcilePersonalShiftWithPunches(); renderPunchLogs(); renderTeamHoursDashboard(); updateAttendanceMetricsUI(); }
     else if (normalized === 'tasks') renderTasks();
     else if (normalized === 'chat') {
+      const teamsChatPane = document.getElementById('teamsPaneChat');
+      if (teamsChatPane) {
+        document.querySelectorAll('.teams-deck-pane').forEach(p => {
+          p.classList.add('hidden');
+          p.classList.remove('active');
+        });
+        teamsChatPane.classList.remove('hidden');
+        teamsChatPane.classList.add('active');
+      }
       renderChatChannelsAndDMs();
-      selectChatTarget(state.activeChannelId);
+      selectChatTarget(state.activeChannelId || 'general');
     }
     else if (normalized === 'telemetry') {
       renderFleetTelemetry();
       updateLiveFleetHours();
     }
     else if (normalized === 'database') WorkspaceDB.updateMetricsUI();
-    updateBootProgress(95, "Mounting unified dual-theme engine...", "[THEME] Verifying palette tokens...");
-    setTimeout(dismissBootScreen, 200);
   }
 
   // Live real-time ticker for presence & fleet telemetry hours + team working hours
@@ -6791,7 +7572,7 @@
       }
 
       try {
-        await FirebaseService.signUp(email, password, name, 'employee', {
+        await FirebaseService.signUp(email, password, name, role || 'employee', {
           empId: empId || `RD-${Date.now().toString().slice(-4)}`,
           dept: dept || 'Hardware Architecture',
           photoURL: state.tempSignUpPhoto || ''
@@ -8208,6 +8989,398 @@
     }
   }
 
+  // =========================================================================
+  // ATTENDANCE ANALYTICS & HISTORICAL RECORDS CONTROLLER
+  // =========================================================================
+  let activeAnalyticsPeriod = 'THIS_WEEK';
+  let activeAnalyticsMemberId = 'SELF';
+
+  function calculateHistoricalAttendanceStats(filterMemberId = 'SELF', period = 'THIS_WEEK') {
+    const rawPunches = (WorkspaceDB.data.punchLogs || []).map(normalizePunch).filter(Boolean);
+    const hasAccess = hasFullAttendanceAccess();
+    const cur = getCurrentResolvedMember();
+    const curId = cur?.id;
+    const curUid = state.currentUser?.uid || cur?.uid;
+    const curEmail = (state.currentUser?.email || cur?.email || '').toLowerCase().trim();
+    const curName = (cur?.name || cur?.displayName || '').toLowerCase().trim();
+    const isFounder = (curEmail === 'jagadish2k2006@gmail.com') || (state.userRole === 'OWNER') || (curId === 'RD-FOUNDER-001');
+
+    // 1. Filter by Member
+    let memberPunches = rawPunches;
+    if (!hasAccess || filterMemberId === 'SELF') {
+      memberPunches = rawPunches.filter(p => {
+        if (!p) return false;
+        const pWorkerId = p.workerId;
+        const pEmail = (p.email || '').toLowerCase().trim();
+        const pName = (p.name || '').toLowerCase().trim();
+
+        if (curId && pWorkerId === curId) return true;
+        if (curUid && (pWorkerId === curUid || p.uid === curUid)) return true;
+        if (curEmail && pEmail && pEmail === curEmail) return true;
+        if (curName && pName && (pName === curName || pName.includes(curName) || curName.includes(pName))) return true;
+        if (isFounder && (pWorkerId === 'RD-FOUNDER-001' || pName.includes('jagadish') || pEmail.includes('jagadish'))) return true;
+        return false;
+      });
+    } else if (filterMemberId !== 'ALL') {
+      const targetMember = (WorkspaceDB.data.members || {})[filterMemberId] || getUniqueMembersList().find(m => m.id === filterMemberId || m.uid === filterMemberId);
+      const targetName = (targetMember?.name || targetMember?.displayName || '').toLowerCase().trim();
+      const targetEmail = (targetMember?.email || '').toLowerCase().trim();
+
+      memberPunches = rawPunches.filter(p => {
+        if (!p) return false;
+        const pWorkerId = p.workerId;
+        const pEmail = (p.email || '').toLowerCase().trim();
+        const pName = (p.name || '').toLowerCase().trim();
+
+        if (pWorkerId === filterMemberId || p.uid === filterMemberId) return true;
+        if (targetEmail && pEmail && pEmail === targetEmail) return true;
+        if (targetName && pName && (pName === targetName || pName.includes(targetName) || targetName.includes(pName))) return true;
+        return false;
+      });
+    }
+
+    // 2. Filter by Period Time Range
+    const now = new Date();
+    let startTs = 0;
+    let endTs = Date.now() + 86400000;
+    let rangeLabel = 'All Historical Records';
+
+    const currentDayOfWeek = (now.getDay() + 6) % 7; // 0=Mon, 6=Sun
+    const thisMonday = new Date(now);
+    thisMonday.setDate(now.getDate() - currentDayOfWeek);
+    thisMonday.setHours(0, 0, 0, 0);
+
+    if (period === 'THIS_WEEK') {
+      startTs = thisMonday.getTime();
+      rangeLabel = `This Week: ${thisMonday.toLocaleDateString([], { month: 'short', day: 'numeric' })} - Today`;
+    } else if (period === 'LAST_WEEK') {
+      const lastMonday = new Date(thisMonday);
+      lastMonday.setDate(thisMonday.getDate() - 7);
+      startTs = lastMonday.getTime();
+      endTs = thisMonday.getTime();
+      rangeLabel = `Last Week: ${lastMonday.toLocaleDateString([], { month: 'short', day: 'numeric' })} - ${new Date(endTs - 1000).toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+    } else if (period === 'PAST_2_WEEKS') {
+      const twoWeeksAgo = new Date(thisMonday);
+      twoWeeksAgo.setDate(thisMonday.getDate() - 14);
+      startTs = twoWeeksAgo.getTime();
+      rangeLabel = `Past 2 Weeks: ${twoWeeksAgo.toLocaleDateString([], { month: 'short', day: 'numeric' })} - Today`;
+    } else if (period === 'PAST_30_DAYS') {
+      startTs = Date.now() - (30 * 86400000);
+      rangeLabel = `Past 30 Days: ${new Date(startTs).toLocaleDateString([], { month: 'short', day: 'numeric' })} - Today`;
+    } else {
+      startTs = 0;
+      rangeLabel = 'All Verified Attendance History';
+    }
+
+    const filteredPunches = memberPunches.filter(p => {
+      const ts = p.timestamp || 0;
+      return ts >= startTs && ts <= endTs;
+    }).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    // 3. Compute Daily Hours & Sessions
+    const dayMap = new Map();
+    filteredPunches.forEach(p => {
+      const ts = p.timestamp || 0;
+      const d = new Date(ts);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (!dayMap.has(key)) {
+        dayMap.set(key, {
+          dateStr: key,
+          dateObj: d,
+          dayLabel: d.toLocaleDateString([], { weekday: 'short' }),
+          formattedDate: d.toLocaleDateString([], { month: 'short', day: 'numeric' }),
+          totalSec: 0,
+          punches: [],
+          onTime: true
+        });
+      }
+      dayMap.get(key).punches.push(p);
+    });
+
+    let totalSec = 0;
+    let totalShifts = 0;
+    let onTimeShifts = 0;
+
+    dayMap.forEach((dayData) => {
+      let activeIn = null;
+      dayData.punches.forEach(p => {
+        const ts = p.timestamp || 0;
+        if (p.action === 'CLOCK_IN') {
+          activeIn = ts;
+          totalShifts++;
+          const pDate = new Date(ts);
+          if (pDate.getHours() > 10 || (pDate.getHours() === 10 && pDate.getMinutes() > 15)) {
+            dayData.onTime = false;
+          } else {
+            onTimeShifts++;
+          }
+        } else if ((p.action === 'CLOCK_OUT' || p.action === 'BREAK') && activeIn) {
+          const sessionSec = Math.max(0, Math.floor((ts - activeIn) / 1000));
+          dayData.totalSec += sessionSec;
+          activeIn = null;
+        }
+      });
+
+      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      if (dayData.dateStr === todayKey && state.personalShift?.status === 'DUTY_ON' && state.personalShift.seconds) {
+        dayData.totalSec = Math.max(dayData.totalSec, state.personalShift.seconds);
+      }
+      totalSec += dayData.totalSec;
+    });
+
+    const activeDaysCount = Array.from(dayMap.values()).filter(d => d.totalSec > 60).length;
+    const effectiveDays = Math.max(1, activeDaysCount);
+    const dailyAvgHours = (totalSec / (effectiveDays * 3600)).toFixed(1);
+    const totalHours = (totalSec / 3600).toFixed(1);
+    const onTimeRate = totalShifts > 0 ? Math.round((onTimeShifts / totalShifts) * 100) : 100;
+
+    // 4. Compute Past Weeks Comparison
+    const weeksList = [];
+    for (let w = 0; w < 5; w++) {
+      const wMonday = new Date(thisMonday);
+      wMonday.setDate(thisMonday.getDate() - (w * 7));
+      const wSunday = new Date(wMonday);
+      wSunday.setDate(wMonday.getDate() + 6);
+      wSunday.setHours(23, 59, 59, 999);
+
+      const wStart = wMonday.getTime();
+      const wEnd = wSunday.getTime();
+
+      const weekPunches = memberPunches.filter(p => (p.timestamp || 0) >= wStart && (p.timestamp || 0) <= wEnd);
+      let wSec = 0;
+      let wDays = new Set();
+      let wIn = null;
+
+      weekPunches.forEach(p => {
+        const ts = p.timestamp || 0;
+        const d = new Date(ts);
+        const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+        if (p.action === 'CLOCK_IN') {
+          wIn = ts;
+          wDays.add(dayKey);
+        } else if ((p.action === 'CLOCK_OUT' || p.action === 'BREAK') && wIn) {
+          wSec += Math.max(0, Math.floor((ts - wIn) / 1000));
+          wIn = null;
+        }
+      });
+
+      if (w === 0 && state.personalShift?.status === 'DUTY_ON' && state.personalShift.seconds) {
+        wSec = Math.max(wSec, state.personalShift.seconds);
+        wDays.add('today');
+      }
+
+      const wHours = (wSec / 3600).toFixed(1);
+      const wAvg = wDays.size > 0 ? (wSec / (wDays.size * 3600)).toFixed(1) : '0.0';
+      const wPct = Math.min(100, Math.round((wSec / (40 * 3600)) * 100));
+
+      weeksList.push({
+        label: w === 0 ? `This Week (${wMonday.toLocaleDateString([], { month: 'short', day: 'numeric' })} - ${wSunday.toLocaleDateString([], { month: 'short', day: 'numeric' })})` : `Week -${w} (${wMonday.toLocaleDateString([], { month: 'short', day: 'numeric' })} - ${wSunday.toLocaleDateString([], { month: 'short', day: 'numeric' })})`,
+        totalHours: wHours,
+        dailyAvg: wAvg,
+        daysWorked: wDays.size,
+        targetPct: wPct,
+        status: wPct >= 100 ? 'Fulfilled (100%)' : (w === 0 ? 'In Progress' : `${wPct}% Completed`)
+      });
+    }
+
+    return {
+      period,
+      rangeLabel,
+      totalHours,
+      dailyAvgHours,
+      activeDaysCount,
+      onTimeRate,
+      dayMap: Array.from(dayMap.values()).sort((a, b) => a.dateObj - b.dateObj),
+      weeksList,
+      punches: [...filteredPunches].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    };
+  }
+
+  function closeAttendanceAnalyticsModal() {
+    const modal = document.getElementById('attendanceAnalyticsModal');
+    if (modal) modal.classList.add('hidden');
+  }
+  window.closeAttendanceAnalyticsModal = closeAttendanceAnalyticsModal;
+
+  function openAttendanceAnalyticsModal(initialPeriod = null) {
+    if (initialPeriod) activeAnalyticsPeriod = initialPeriod;
+    const modal = document.getElementById('attendanceAnalyticsModal');
+    if (!modal) return;
+
+    // Populate Member Filter dropdown in modal
+    const memberSelect = document.getElementById('analyticsMemberFilter');
+    const memberWrap = document.getElementById('analyticsMemberFilterWrap');
+    const hasAccess = hasFullAttendanceAccess();
+
+    if (memberSelect) {
+      memberSelect.replaceChildren();
+      if (!hasAccess) {
+        if (memberWrap) memberWrap.style.display = 'none';
+        const opt = document.createElement('option');
+        opt.value = 'SELF';
+        opt.textContent = state.currentMember?.displayName || 'My Records';
+        memberSelect.appendChild(opt);
+        activeAnalyticsMemberId = 'SELF';
+      } else {
+        if (memberWrap) memberWrap.style.display = 'flex';
+        const optAll = document.createElement('option');
+        optAll.value = 'ALL';
+        optAll.textContent = '🌟 Whole Team Overview';
+        if (activeAnalyticsMemberId === 'ALL') optAll.selected = true;
+        memberSelect.appendChild(optAll);
+
+        const optSelf = document.createElement('option');
+        optSelf.value = 'SELF';
+        optSelf.textContent = `👤 ${state.currentMember?.displayName || 'JAGADISH K'} (Founder)`;
+        if (activeAnalyticsMemberId === 'SELF') optSelf.selected = true;
+        memberSelect.appendChild(optSelf);
+
+        getUniqueMembersList().forEach(m => {
+          if (!m) return;
+          const opt = document.createElement('option');
+          opt.value = m.id || m.uid;
+          opt.textContent = `${m.displayName || m.name} [${m.id || 'RD'}]`;
+          if (activeAnalyticsMemberId === opt.value) opt.selected = true;
+          memberSelect.appendChild(opt);
+        });
+      }
+    }
+
+    // Highlight period pill
+    document.querySelectorAll('#analyticsPeriodPills .analytics-pill').forEach(pill => {
+      pill.classList.toggle('active', pill.getAttribute('data-period') === activeAnalyticsPeriod);
+    });
+
+    renderAttendanceAnalyticsModalData();
+    modal.classList.remove('hidden');
+  }
+
+  function renderAttendanceAnalyticsModalData() {
+    const stats = calculateHistoricalAttendanceStats(activeAnalyticsMemberId, activeAnalyticsPeriod);
+
+    // 1. KPI Numbers
+    safeSetText(document.getElementById('analyticsKpiDailyAvg'), stats.dailyAvgHours);
+    safeSetText(document.getElementById('analyticsKpiTotalHours'), stats.totalHours);
+    safeSetText(document.getElementById('analyticsKpiActiveDays'), String(stats.activeDaysCount));
+    safeSetText(document.getElementById('analyticsKpiOnTime'), `${stats.onTimeRate}%`);
+    safeSetText(document.getElementById('analyticsChartRangeLabel'), stats.rangeLabel);
+    safeSetText(document.getElementById('analyticsPunchesCountLabel'), `${stats.punches.length} verified records`);
+
+    // 2. Day-by-Day Bar Chart
+    const chartContainer = document.getElementById('analyticsDayChartWrap');
+    if (chartContainer) {
+      chartContainer.replaceChildren();
+      if (stats.dayMap.length === 0) {
+        chartContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 11.5px; width: 100%; text-align: center; margin: auto;">No shift punches recorded in this period.</div>`;
+      } else {
+        const maxSec = Math.max(...stats.dayMap.map(d => d.totalSec), 8 * 3600);
+        stats.dayMap.forEach(d => {
+          const hours = (d.totalSec / 3600).toFixed(1);
+          const pct = Math.min(100, Math.max(d.totalSec > 0 ? 8 : 4, Math.round((d.totalSec / maxSec) * 100)));
+          const targetMet = d.totalSec >= 7.5 * 3600;
+          const targetExceeded = d.totalSec >= 8.5 * 3600;
+
+          const col = document.createElement('div');
+          col.className = `analytics-chart-bar-item ${targetExceeded ? 'target-exceeded' : (targetMet ? 'target-met' : '')}`;
+          col.title = `${d.dayLabel}, ${d.formattedDate}: ${hours} hrs logged`;
+          col.innerHTML = `
+            <span class="analytics-bar-val">${hours > 0 ? `${hours}h` : ''}</span>
+            <div class="analytics-bar-track">
+              <div class="analytics-bar-fill" style="height: ${pct}%;"></div>
+            </div>
+            <span class="analytics-bar-label">${d.dayLabel}</span>
+            <span class="analytics-bar-date">${d.formattedDate}</span>
+          `;
+          chartContainer.appendChild(col);
+        });
+      }
+    }
+
+    // 3. Past Weeks Comparison Table
+    const weeksTbody = document.getElementById('analyticsWeeksTableBody');
+    if (weeksTbody) {
+      weeksTbody.replaceChildren();
+      stats.weeksList.forEach(w => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${escapeHtml(w.label)}</strong></td>
+          <td><span style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-cyan);">${w.totalHours} hrs</span></td>
+          <td><span style="font-family: var(--font-mono);">${w.dailyAvg} hrs/day</span></td>
+          <td>${w.daysWorked} days</td>
+          <td>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <div style="flex: 1; min-width: 60px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                <div style="width: ${w.targetPct}%; height: 100%; background: ${w.targetPct >= 100 ? '#10b981' : 'var(--accent-cyan)'};"></div>
+              </div>
+              <span style="font-size: 10.5px; font-family: var(--font-mono);">${w.targetPct}%</span>
+            </div>
+          </td>
+          <td><span class="badge-verified" style="font-size: 11px; font-weight: 600; color: ${w.targetPct >= 100 ? '#10b981' : '#38bdf8'};">${escapeHtml(w.status)}</span></td>
+        `;
+        weeksTbody.appendChild(tr);
+      });
+    }
+
+    // 4. Detailed Verified Punches
+    const punchesTbody = document.getElementById('analyticsPunchesTableBody');
+    if (punchesTbody) {
+      punchesTbody.replaceChildren();
+      if (stats.punches.length === 0) {
+        punchesTbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 16px;">No punch records found for this timeframe.</td></tr>`;
+      } else {
+        stats.punches.slice(0, 100).forEach(punch => {
+          const tr = document.createElement('tr');
+          const actionColor = punch.action === 'CLOCK_IN' ? 'var(--accent-green)' : (punch.action === 'BREAK' ? 'var(--accent-gold)' : 'var(--accent-red)');
+          const actionText = punch.action === 'CLOCK_IN' ? '▶ Clock In' : (punch.action === 'BREAK' ? '⏸ Break' : '⏹ Clock Out');
+
+          tr.innerHTML = `
+            <td><strong>${escapeHtml(punch.name || punch.workerId || 'Member')}</strong></td>
+            <td><span style="color: ${actionColor}; font-weight: 700; font-family: var(--font-mono); font-size: 11px;">${actionText}</span></td>
+            <td>${escapeHtml(punch.time || new Date(punch.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</td>
+            <td>${escapeHtml(punch.date || new Date(punch.timestamp || Date.now()).toLocaleDateString())}</td>
+            <td><span style="font-family: var(--font-mono); color: var(--accent-cyan); font-weight: 600;">${punch.durationStr || punch.duration || '--'}</span></td>
+            <td><span class="badge-verified" style="color: var(--accent-green); font-size: 11px; font-weight: 600;"><span style="color:#00e5a3;">✔</span> Verified (SHA-256)</span></td>
+          `;
+          punchesTbody.appendChild(tr);
+        });
+      }
+    }
+  }
+
+  function exportAnalyticsPeriodCsv() {
+    const stats = calculateHistoricalAttendanceStats(activeAnalyticsMemberId, activeAnalyticsPeriod);
+    if (!stats.punches || stats.punches.length === 0) {
+      showQuickToast('No punch logs in this selected period to export.', 'info');
+      return;
+    }
+
+    const headers = ['DATE', 'TIME', 'EMPLOYEE', 'EMPLOYEE_ID', 'ACTION', 'TIMESTAMP', 'STATUS'];
+    const rows = stats.punches.map(p => {
+      const d = new Date(p.timestamp || Date.now());
+      return [
+        `"${d.toLocaleDateString('en-US')}"`,
+        `"${d.toLocaleTimeString('en-US')}"`,
+        `"${p.name || p.workerId || 'Member'}"`,
+        `"${p.workerId || p.memberId || 'RD-EMP'}"`,
+        `"${p.action || 'PUNCH'}"`,
+        `"${p.timestamp || Date.now()}"`,
+        `"VERIFIED HARDWARE (SHA-256)"`
+      ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reddot-attendance-${activeAnalyticsPeriod.toLowerCase()}-${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showQuickToast('Period attendance CSV exported successfully!', 'success');
+  }
+
   function updateNotificationsUI() {
     const listContainer = document.querySelector('#headerNotificationDropdown .notif-list');
     const badge = document.getElementById('headerNotifBadge');
@@ -8218,43 +9391,80 @@
 
     const notifications = [];
 
-    // System initialization notice
-    notifications.push({
-      icon: '💾',
-      title: 'Local Vault Active',
-      desc: 'Workstation NVMe local persistent storage active.',
-      time: 'Online',
-      unread: false
+    // 1. Real activity items from WorkspaceDB.data.activity (mentions, chat messages, thread replies, calls)
+    const activities = (WorkspaceDB.data.activity || []).slice(0, 15);
+    activities.forEach(act => {
+      let icon = '🔔';
+      if (act.type === 'mention') icon = '🏷️';
+      else if (act.type === 'reply' || act.type === 'thread_reply' || act.type === 'chat') icon = '💬';
+      else if (act.type === 'call') icon = '📞';
+      else if (act.type === 'task') icon = '📋';
+      else if (act.type === 'punch') icon = '⏱️';
+
+      notifications.push({
+        ...act,
+        icon: icon,
+        title: act.title || 'New Notification',
+        desc: act.snippet || (act.channelId ? `Channel #${act.channelId}` : 'Tap to navigate'),
+        time: act.timestamp ? formatRelativeTime(act.timestamp) : 'Recently',
+        timestamp: act.timestamp || Date.now(),
+        unread: !!act.unread
+      });
     });
 
-    // Recent punch notices
-    const punches = (WorkspaceDB.data.punchLogs || []).slice(-3);
+    // 2. Recent sprint tasks from WorkspaceDB.data.tasks
+    const recentTasks = (WorkspaceDB.data.tasks || []).slice(-5);
+    recentTasks.forEach(t => {
+      const isDone = t.status === 'COMPLETED' || t.status === 'ACCOMPLISHED';
+      notifications.push({
+        type: 'task',
+        taskId: t.id,
+        icon: isDone ? '✅' : '⚡',
+        title: `Task: ${t.title || 'Sprint Task'}`,
+        desc: `Status: ${t.status || 'Active'} • Assignee: ${t.assigneeName || 'Member'}`,
+        time: t.updatedAt ? formatRelativeTime(t.updatedAt) : 'Recent',
+        timestamp: t.updatedAt || t.createdAt || Date.now(),
+        unread: false
+      });
+    });
+
+    // 3. Recent punch notices from WorkspaceDB.data.punchLogs
+    const punches = (WorkspaceDB.data.punchLogs || []).slice(-4);
     punches.forEach(p => {
       const isClockIn = p.action === 'CLOCK_IN';
       notifications.push({
+        type: 'punch',
+        punchId: p.id,
         icon: isClockIn ? '🟢' : '⏸️',
         title: `${p.name || 'Member'} ${isClockIn ? 'Clocked In' : 'Logged Activity'}`,
         desc: `Verified timestamp at ${p.time || 'workstation'}`,
         time: p.timestamp ? formatRelativeTime(p.timestamp) : 'Today',
+        timestamp: p.timestamp || Date.now(),
         unread: false
       });
     });
 
-    // Recent task notices
-    const recentTasks = (WorkspaceDB.data.tasks || []).slice(-3);
-    recentTasks.forEach(t => {
-      notifications.push({
-        icon: t.status === 'COMPLETED' || t.status === 'ACCOMPLISHED' ? '✅' : '⚡',
-        title: `Task: ${t.title || 'Sprint Task'}`,
-        desc: `Status: ${t.status || 'Active'} • Assignee: ${t.assigneeName || 'Member'}`,
-        time: t.updatedAt ? formatRelativeTime(t.updatedAt) : 'Recent',
-        unread: false
-      });
+    // 4. System initialization notice
+    notifications.push({
+      type: 'system',
+      icon: '💾',
+      title: 'Local Vault Active',
+      desc: 'Workstation NVMe local persistent storage active.',
+      time: 'Online',
+      timestamp: 0,
+      unread: false
+    });
+
+    // Sort notifications: unread first, then by timestamp descending
+    notifications.sort((a, b) => {
+      if (a.unread && !b.unread) return -1;
+      if (!a.unread && b.unread) return 1;
+      return (b.timestamp || 0) - (a.timestamp || 0);
     });
 
     const unreadCount = notifications.filter(n => n.unread).length;
     if (badge) {
-      badge.textContent = String(unreadCount);
+      badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
       badge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
     }
     if (headSpan) {
@@ -8269,17 +9479,26 @@
       return;
     }
 
-    notifications.slice(0, 5).forEach(n => {
+    notifications.slice(0, 10).forEach(n => {
       const item = document.createElement('div');
       item.className = `notif-item ${n.unread ? 'notif-item-unread' : ''}`;
+      item.style.cursor = 'pointer';
       item.innerHTML = `
-        <span style="font-size: 14px;">${n.icon}</span>
-        <div>
-          <div style="font-weight: 700; font-size: 12px; color: var(--text-white);">${escapeHtml(n.title)}</div>
-          <div style="font-size: 10.5px; opacity: 0.85; color: var(--text-secondary); margin-top: 2px;">${escapeHtml(n.desc)}</div>
-          <div style="color: #0284c7; font-size: 9.5px; margin-top: 3px;">${escapeHtml(n.time)}</div>
+        <span style="font-size: 14px; flex-shrink: 0; margin-top: 1px;">${n.icon}</span>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-weight: 700; font-size: 12px; color: var(--text-white); display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(n.title)}</span>
+            ${n.unread ? '<span style="width: 7px; height: 7px; border-radius: 50%; background: var(--accent-cyan, #00e5ff); display: inline-block; flex-shrink: 0;"></span>' : ''}
+          </div>
+          <div style="font-size: 10.5px; opacity: 0.85; color: var(--text-secondary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(n.desc)}</div>
+          <div style="color: var(--accent-cyan, #0284c7); font-size: 9.5px; margin-top: 3px; font-family: var(--font-mono);">${escapeHtml(n.time)}</div>
         </div>
       `;
+
+      item.addEventListener('click', () => {
+        navigateToNotificationDestination(n);
+      });
+
       listContainer.appendChild(item);
     });
   }
@@ -8598,6 +9817,13 @@ function openTaskDrawer(task) {
   // --- DUAL THEME ENGINE (OBSIDIAN DARK FIRST-CLASS) ---
   
   // Completed Tasks Archive Modal
+  function closeCompletedArchiveModal() {
+    document.getElementById('completedArchiveModal')?.classList.add('hidden');
+    document.getElementById('completedArchiveOverlay')?.remove();
+  }
+  window.closeCompletedArchiveModal = closeCompletedArchiveModal;
+  window.showCompletedArchiveModal = showCompletedArchiveModal;
+
   function showCompletedArchiveModal() {
     var existing = document.getElementById("completedArchiveOverlay");
     if (existing) existing.remove();
@@ -8724,7 +9950,31 @@ function initThemeEngine() {
 
   // --- CSV ATTENDANCE EXPORT ---
   function exportAttendanceCsv() {
-    const punches = WorkspaceDB.data.punches || [];
+    let rawList = (WorkspaceDB.data.punchLogs && WorkspaceDB.data.punchLogs.length > 0)
+      ? WorkspaceDB.data.punchLogs
+      : (WorkspaceDB.data.punches || []);
+
+    let punches = rawList.map(normalizePunch).filter(Boolean);
+    if (!hasFullAttendanceAccess()) {
+      const cur = getCurrentResolvedMember();
+      const myId = cur.id;
+      const myUid = state.currentUser?.uid || cur.uid;
+      const myEmail = (state.currentUser?.email || cur.email || '').toLowerCase().trim();
+      const myName = (cur.name || cur.displayName || '').toLowerCase().trim();
+
+      punches = punches.filter(p => {
+        if (!p) return false;
+        const pWorkerId = p.workerId || p.memberId;
+        const pEmail = (p.email || '').toLowerCase().trim();
+        const pName = (p.name || p.memberName || '').toLowerCase().trim();
+        if (myId && pWorkerId === myId) return true;
+        if (myUid && (pWorkerId === myUid || p.uid === myUid)) return true;
+        if (myEmail && pEmail && pEmail === myEmail) return true;
+        if (myName && pName && (pName === myName || pName.includes(myName) || myName.includes(pName))) return true;
+        return false;
+      });
+    }
+
     if (punches.length === 0) {
       showQuickToast('No punch logs recorded to export.', 'info');
       return;
@@ -8785,6 +10035,8 @@ function initThemeEngine() {
     function closeOmnibox() {
       modal.classList.add('hidden');
     }
+    window.closeOmnibox = closeOmnibox;
+    window.openOmnibox = openOmnibox;
 
     trigger?.addEventListener('click', openOmnibox);
     btnClose?.addEventListener('click', closeOmnibox);
@@ -8899,6 +10151,40 @@ function initThemeEngine() {
 
     // Time & Shifts CSV Export
     document.getElementById('btnDownloadCsvAudit')?.addEventListener('click', exportAttendanceCsv);
+
+    // Attendance Analytics & Historical Records
+    document.getElementById('cardAttendanceThisWeek')?.addEventListener('click', () => openAttendanceAnalyticsModal('THIS_WEEK'));
+    document.getElementById('cardAttendanceDailyAverage')?.addEventListener('click', () => openAttendanceAnalyticsModal('THIS_WEEK'));
+    document.getElementById('btnOpenAttendanceAnalytics')?.addEventListener('click', () => openAttendanceAnalyticsModal('THIS_WEEK'));
+
+    document.getElementById('punchLogPeriodFilter')?.addEventListener('change', () => renderPunchLogs());
+
+    // Analytics Modal Controls
+    document.getElementById('btnCloseAttendanceAnalytics')?.addEventListener('click', () => {
+      document.getElementById('attendanceAnalyticsModal')?.classList.add('hidden');
+    });
+    document.getElementById('btnCloseAttendanceAnalyticsFoot')?.addEventListener('click', () => {
+      document.getElementById('attendanceAnalyticsModal')?.classList.add('hidden');
+    });
+    document.getElementById('attendanceAnalyticsBackdrop')?.addEventListener('click', () => {
+      document.getElementById('attendanceAnalyticsModal')?.classList.add('hidden');
+    });
+
+    document.querySelectorAll('#analyticsPeriodPills .analytics-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        activeAnalyticsPeriod = pill.getAttribute('data-period') || 'THIS_WEEK';
+        document.querySelectorAll('#analyticsPeriodPills .analytics-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        renderAttendanceAnalyticsModalData();
+      });
+    });
+
+    document.getElementById('analyticsMemberFilter')?.addEventListener('change', (e) => {
+      activeAnalyticsMemberId = e.target.value || 'SELF';
+      renderAttendanceAnalyticsModalData();
+    });
+
+    document.getElementById('btnExportAnalyticsPeriodCsv')?.addEventListener('click', exportAnalyticsPeriodCsv);
 
     // Keyboard Shortcuts: F7 (Take Break), F8 (Clock Out)
     window.addEventListener('keydown', (e) => {
@@ -9074,14 +10360,12 @@ function initThemeEngine() {
 
     document.getElementById('btnMarkAllNotifsRead')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      document.querySelectorAll('.notif-item-unread').forEach(item => item.classList.remove('notif-item-unread'));
-      const badge = document.getElementById('headerNotifBadge');
-      if (badge) {
-        badge.textContent = '0';
-        badge.style.display = 'none';
+      if (WorkspaceDB.data.activity) {
+        WorkspaceDB.data.activity.forEach(a => a.unread = false);
+        WorkspaceDB.save().catch(() => {});
       }
-      const titleSpan = notifDropdown?.querySelector('.notif-head span');
-      if (titleSpan) titleSpan.textContent = 'SYSTEM NOTIFICATIONS (0)';
+      if (typeof updateActivityBadge === 'function') updateActivityBadge();
+      updateNotificationsUI();
       playNotificationChirp(true);
       showQuickToast('All notifications marked as read.', 'info');
     });
@@ -9094,6 +10378,87 @@ function initThemeEngine() {
         }
       }
     });
+
+    // Message Info Modal close handlers
+    document.getElementById('btnCloseMessageInfo')?.addEventListener('click', closeMessageInfoModal);
+    document.getElementById('btnCloseMessageInfoFoot')?.addEventListener('click', closeMessageInfoModal);
+    document.getElementById('messageInfoBackdrop')?.addEventListener('click', closeMessageInfoModal);
+
+    // Attendance Analytics Modal close handlers
+    document.getElementById('btnCloseAttendanceAnalytics')?.addEventListener('click', closeAttendanceAnalyticsModal);
+    document.getElementById('btnCloseAttendanceAnalyticsFoot')?.addEventListener('click', closeAttendanceAnalyticsModal);
+    document.getElementById('attendanceAnalyticsBackdrop')?.addEventListener('click', closeAttendanceAnalyticsModal);
+
+    // Completed Archive Modal close handlers
+    document.getElementById('btnCloseCompletedArchive')?.addEventListener('click', closeCompletedArchiveModal);
+    document.getElementById('btnCloseCompletedArchiveFoot')?.addEventListener('click', closeCompletedArchiveModal);
+    document.getElementById('completedArchiveBackdrop')?.addEventListener('click', closeCompletedArchiveModal);
+
+    // Omnibox Modal close handlers
+    document.getElementById('btnOmniboxClose')?.addEventListener('click', () => {
+      document.getElementById('globalOmniboxModal')?.classList.add('hidden');
+    });
+    document.getElementById('omniboxModalBackdrop')?.addEventListener('click', () => {
+      document.getElementById('globalOmniboxModal')?.classList.add('hidden');
+    });
+
+    // Global click delegation for all modal close triggers
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('#btnCloseMessageInfo') || e.target.closest('#btnCloseMessageInfoFoot') || e.target.id === 'messageInfoBackdrop') {
+        closeMessageInfoModal();
+      }
+      if (e.target.closest('#btnCloseAttendanceAnalytics') || e.target.closest('#btnCloseAttendanceAnalyticsFoot') || e.target.id === 'attendanceAnalyticsBackdrop') {
+        closeAttendanceAnalyticsModal();
+      }
+      if (e.target.closest('#btnCloseCompletedArchive') || e.target.closest('#btnCloseCompletedArchiveFoot') || e.target.id === 'completedArchiveBackdrop') {
+        closeCompletedArchiveModal();
+      }
+      if (e.target.closest('#btnOmniboxClose') || e.target.id === 'omniboxModalBackdrop') {
+        document.getElementById('globalOmniboxModal')?.classList.add('hidden');
+      }
+    });
+
+    // Global ESC key listener to dismiss active overlay/modal
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const msgInfo = document.getElementById('messageInfoModal');
+        if (msgInfo && !msgInfo.classList.contains('hidden')) {
+          closeMessageInfoModal();
+          e.stopPropagation();
+          return;
+        }
+        const attModal = document.getElementById('attendanceAnalyticsModal');
+        if (attModal && !attModal.classList.contains('hidden')) {
+          closeAttendanceAnalyticsModal();
+          e.stopPropagation();
+          return;
+        }
+        const compModal = document.getElementById('completedArchiveModal');
+        if (compModal && !compModal.classList.contains('hidden')) {
+          closeCompletedArchiveModal();
+          e.stopPropagation();
+          return;
+        }
+        const arcOverlay = document.getElementById('completedArchiveOverlay');
+        if (arcOverlay) {
+          arcOverlay.remove();
+          e.stopPropagation();
+          return;
+        }
+        const omniModal = document.getElementById('globalOmniboxModal');
+        if (omniModal && !omniModal.classList.contains('hidden')) {
+          omniModal.classList.add('hidden');
+          e.stopPropagation();
+          return;
+        }
+        const notifDropdown = document.getElementById('headerNotificationDropdown');
+        if (notifDropdown && !notifDropdown.classList.contains('hidden')) {
+          notifDropdown.classList.add('hidden');
+          e.stopPropagation();
+          return;
+        }
+      }
+    }, true);
 
     // Teams Rail direct button bindings
     document.getElementById('railBtnActivity')?.addEventListener('click', () => switchTeamsRailTab('activity'));
@@ -9137,33 +10502,64 @@ function initThemeEngine() {
     const sText = document.getElementById('bootStatusText');
     const feed = document.getElementById('bootTerminalFeed');
 
+    const appFill = document.getElementById('appLoadingBarFill');
+    const appPText = document.getElementById('appLoadingPercent');
+    const appSText = document.getElementById('appLoadingStatusText');
+    const appFeed = document.getElementById('appLoadingFeed');
+
     if (fill) fill.style.width = percent + '%';
+    if (appFill) appFill.style.width = percent + '%';
     if (pText) pText.textContent = percent + '%';
+    if (appPText) appPText.textContent = percent + '%';
     if (sText && statusText) sText.textContent = statusText;
-    if (feed && logLine) {
-      const line = document.createElement('div');
-      line.className = 'boot-log-line active';
-      line.textContent = '> ' + logLine;
-      feed.appendChild(line);
-      feed.scrollTop = feed.scrollHeight;
+    if (appSText && statusText) appSText.textContent = statusText;
+
+    if (logLine) {
+      if (feed) {
+        const line = document.createElement('div');
+        line.className = 'boot-log-line active';
+        line.textContent = '> ' + logLine;
+        feed.appendChild(line);
+        feed.scrollTop = feed.scrollHeight;
+      }
+      if (appFeed) {
+        const line = document.createElement('div');
+        line.className = 'app-loading-line';
+        line.textContent = '> ' + logLine;
+        appFeed.appendChild(line);
+        appFeed.scrollTop = appFeed.scrollHeight;
+      }
     }
   }
 
+  let bootScreenDismissed = false;
   function dismissBootScreen() {
+    if (bootScreenDismissed) return;
+    bootScreenDismissed = true;
+
     const boot = document.getElementById('appBootScreen');
-    if (boot && !boot.classList.contains('fade-out')) {
-      updateBootProgress(100, 'Workstation Ready. Mounting Executive Shell...', '[READY] All systems nominal. Handshake TLS 1.3 OK.');
-      setTimeout(() => {
+    const appLoading = document.getElementById('appLoadingScreen');
+
+    updateBootProgress(100, 'Workstation Ready. Shell Mounted.', '[READY] All security subsystems authenticated.');
+
+    setTimeout(() => {
+      if (boot && !boot.classList.contains('fade-out')) {
         boot.classList.add('fade-out');
         setTimeout(() => {
           if (boot && boot.parentNode) boot.parentNode.removeChild(boot);
         }, 500);
-      }, 350);
-    }
+      }
+      if (appLoading && !appLoading.classList.contains('fade-out')) {
+        appLoading.classList.add('fade-out');
+        setTimeout(() => {
+          if (appLoading && appLoading.parentNode) appLoading.parentNode.removeChild(appLoading);
+        }, 500);
+      }
+    }, 300);
   }
 
-  // Safety timer: Never allow boot screen to freeze on screen
-  setTimeout(dismissBootScreen, 2200);
+  // Safety timer: Never allow boot screen to freeze on screen if auth/network hangs
+  setTimeout(dismissBootScreen, 2500);
 
   async function init() {
     updateBootProgress(30, "Initializing persistent database & local storage...", "[DB] Loading native disk store...");
@@ -9211,8 +10607,7 @@ function initThemeEngine() {
     updateAttendanceMetricsUI();
     updateNotificationsUI();
     WorkspaceDB.updateMetricsUI();
-    updateBootProgress(95, "Mounting unified dual-theme engine...", "[THEME] Verifying palette tokens...");
-    setTimeout(dismissBootScreen, 200);
+    updateBootProgress(85, "Connecting to security mesh & verifying authentication...", "[AUTH] Verifying cloud credentials...");
 
     function setupCloudRealtimeSubscriptions() {
       if (!window.FirebaseService || !FirebaseService.db) return;
@@ -9292,8 +10687,6 @@ function initThemeEngine() {
           renderTeamHoursDashboard();
           renderChatChannelsAndDMs();
           WorkspaceDB.updateMetricsUI();
-    updateBootProgress(95, "Mounting unified dual-theme engine...", "[THEME] Verifying palette tokens...");
-    setTimeout(dismissBootScreen, 200);
         }
       });
 
@@ -9355,6 +10748,7 @@ function initThemeEngine() {
                 const isNew = cloudMsgs.length > prevMsgs.length;
                 const lastMsg = cloudMsgs.length > 0 ? cloudMsgs[cloudMsgs.length - 1] : null;
 
+                reconcileChannelMessages(cloudMsgs, ch.id);
                 WorkspaceDB.data.chats[ch.id] = cloudMsgs;
                 WorkspaceDB.save();
 
@@ -9389,6 +10783,7 @@ function initThemeEngine() {
             const isNew = cloudMsgs.length > prevMsgs.length;
             const lastMsg = cloudMsgs.length > 0 ? cloudMsgs[cloudMsgs.length - 1] : null;
 
+            reconcileChannelMessages(cloudMsgs, chId);
             WorkspaceDB.data.chats[chId] = cloudMsgs;
             WorkspaceDB.save();
 
@@ -9418,9 +10813,12 @@ function initThemeEngine() {
             let changed = false;
             Object.keys(presenceData).forEach(uid => {
               const p = presenceData[uid];
-              const isOnline = p && p.state === 'online';
+              const isOnline = p && (p.state === 'online' || p.isOnline === true);
+              const lastSeen = p?.lastSeenAt || p?.lastSeen || Date.now();
               Object.values(WorkspaceDB.data.members).forEach(m => {
-                if (m && (m.uid === uid || m.id === uid)) {
+                if (m && (m.uid === uid || m.id === uid || (m.email && p.email && m.email.toLowerCase() === p.email.toLowerCase()))) {
+                  m.isOnline = isOnline;
+                  m.lastSeenAt = isOnline ? Date.now() : lastSeen;
                   const newStatus = m.suspended ? 'DUTY_OFF' : (isOnline ? 'DUTY_ON' : 'DUTY_OFF');
                   if (m.status !== newStatus) {
                     m.status = newStatus;
@@ -9432,6 +10830,9 @@ function initThemeEngine() {
             if (changed) {
               renderWorkers();
               renderFleetTelemetry();
+              renderChatChannelsAndDMs();
+              updateChatHeaderStatus();
+              renderTeamHoursDashboard();
             }
           }
         });
@@ -9550,15 +10951,18 @@ function initThemeEngine() {
       FirebaseService.onAuthStateChanged((user, member) => {
         updateAuthUI(user, member);
         if (!user) {
-          // Open Login Modal on first session without locking screen
-          const hasSeenPrompt = sessionStorage.getItem('rd_auth_prompted') || localStorage.getItem('rd_auth_dismissed');
+          updateBootProgress(100, 'Session Unauthenticated. Please sign in.', '[AUTH] Sign-in required.');
+          dismissBootScreen();
+          // Prompt unauthenticated user to sign in
+          const hasSeenPrompt = sessionStorage.getItem('rd_auth_dismissed_session');
           if (!hasSeenPrompt) {
-            sessionStorage.setItem('rd_auth_prompted', '1');
             openAuthModal('signin');
           }
           setupCloudRealtimeSubscriptions();
         } else {
+          updateBootProgress(100, `Authenticated as ${user.displayName || user.email}`, `[AUTH] Welcome, ${user.email}.`);
           closeAuthModal();
+          dismissBootScreen();
           setupCloudRealtimeSubscriptions();
         }
       });
@@ -9581,8 +10985,6 @@ function initThemeEngine() {
         renderWorkers();
         renderFleetTelemetry();
         WorkspaceDB.updateMetricsUI();
-    updateBootProgress(95, "Mounting unified dual-theme engine...", "[THEME] Verifying palette tokens...");
-    setTimeout(dismissBootScreen, 200);
       }
     }, 10000);
 

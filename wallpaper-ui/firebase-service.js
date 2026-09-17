@@ -822,6 +822,9 @@
             if (data.voiceNoteJson && !data.voiceNote) {
               try { data.voiceNote = JSON.parse(data.voiceNoteJson); } catch (_) {}
             }
+            if (data.delivered === undefined) {
+              data.delivered = true;
+            }
             msgs.push({ id: doc.id, ...data });
           });
           callback(msgs);
@@ -836,25 +839,31 @@
         return null;
       }
 
+      // Security check: strictly block unauthenticated message sending!
+      if (!this.currentUser) {
+        console.error('[FIREBASE] Unauthenticated sendMessage blocked. Must sign in.');
+        throw new Error('Authentication required to send messages. Please sign in.');
+      }
+
       const cleanText = text ? text.trim() : '';
       const cleanChannelId = (channelId || 'general').trim();
 
-      const senderUid = this.currentUser ? this.currentUser.uid : (this.currentMember ? (this.currentMember.uid || this.currentMember.id) : 'RD-FOUNDER-001');
-      const senderEmpId = this.currentMember ? (this.currentMember.id || `RD-${String(senderUid).slice(0, 6).toUpperCase()}`) : 'RD-FOUNDER-001';
-      const senderName = this.currentMember ? (this.currentMember.displayName || this.currentMember.name) : (this.currentUser ? (this.currentUser.displayName || this.currentUser.email.split('@')[0]) : 'JAGADISH K');
-      const senderEmail = this.currentUser ? this.currentUser.email.toLowerCase() : 'jagadish2k2006@gmail.com';
-      const senderPhoto = this.currentMember?.photoURL || this.currentMember?.photoUrl || this.currentUser?.photoURL || '';
+      const senderUid = this.currentUser.uid;
+      const senderEmpId = this.currentMember?.id || (window.state?.currentMemberId) || `RD-${String(senderUid).slice(0, 6).toUpperCase()}`;
+      const senderName = this.currentMember?.displayName || this.currentMember?.name || this.currentUser.displayName || (this.currentUser.email ? this.currentUser.email.split('@')[0] : 'Member');
+      const senderEmail = (this.currentUser.email || '').toLowerCase();
+      const senderPhoto = this.currentMember?.photoURL || this.currentMember?.photoUrl || this.currentUser.photoURL || '';
 
       const msgId = options.id || ('msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
 
       const messageData = {
         id: String(msgId),
-        senderId: String(senderUid || 'RD-FOUNDER-001'),
-        senderUid: String(senderUid || 'RD-FOUNDER-001'),
-        senderEmpId: String(senderEmpId || 'RD-FOUNDER-001'),
-        senderName: String(senderName || 'JAGADISH K'),
-        senderEmail: String(senderEmail || 'jagadish2k2006@gmail.com').toLowerCase(),
-        senderPhoto: String(senderPhoto || ''),
+        senderId: String(senderUid),
+        senderUid: String(senderUid),
+        senderEmpId: String(senderEmpId),
+        senderName: String(senderName),
+        senderEmail: String(senderEmail),
+        senderPhoto: String(senderPhoto),
         text: String(cleanText),
         createdAt: Number(options.createdAt || Date.now()),
         editedAt: null,
@@ -865,7 +874,10 @@
         attachments: options.attachments || [],
         voiceNote: options.voiceNote || null,
         mentions: options.mentions || [],
-        isPinned: false
+        isPinned: false,
+        delivered: true,
+        deliveredTo: { [senderUid]: Date.now() },
+        readBy: {}
       };
 
       let sent = false;
@@ -908,7 +920,8 @@
             text: { stringValue: messageData.text },
             createdAt: { integerValue: String(messageData.createdAt) },
             channelId: { stringValue: messageData.channelId },
-            isEdited: { booleanValue: false }
+            isEdited: { booleanValue: false },
+            delivered: { booleanValue: true }
           };
 
           if (messageData.attachments && messageData.attachments.length > 0) {
@@ -982,14 +995,34 @@
       return false;
     },
 
-    async deleteMessage(channelId, messageId) {
+    async deleteMessage(channelId, messageId, requesterUid = null) {
       if (!channelId || !messageId) return false;
       const cleanChannelId = channelId.trim();
       const cleanMessageId = messageId.trim();
 
+      const myUid = requesterUid || this.currentUser?.uid || this.currentMember?.uid || this.currentMember?.id;
+      const myEmail = (this.currentUser?.email || '').toLowerCase();
+
+      if (!myUid && !myEmail) {
+        console.warn('[FIREBASE] Unauthorized delete: User not authenticated.');
+        return false;
+      }
+
       if (this.db) {
         try {
-          await this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages`).doc(cleanMessageId).delete();
+          const docRef = this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages`).doc(cleanMessageId);
+          const doc = await docRef.get();
+          if (doc.exists) {
+            const data = doc.data() || {};
+            const senderUid = data.senderUid || data.senderId;
+            const senderEmail = (data.senderEmail || '').toLowerCase();
+            const isAuthor = (myUid && (senderUid === myUid || senderUid === this.currentMember?.id)) || (myEmail && senderEmail && senderEmail === myEmail);
+            if (!isAuthor) {
+              console.warn('[FIREBASE] Unauthorized delete: Only the author can delete their own message!');
+              return false;
+            }
+          }
+          await docRef.delete();
           console.log('[FIREBASE] Message deleted from Firestore:', cleanMessageId);
           return true;
         } catch (err) {
@@ -1004,9 +1037,73 @@
           await fetch(restUrl, { method: 'DELETE' });
           return true;
         }
-      } catch (_) {}
+      } catch (e) {
+        console.warn('[FIREBASE] REST deleteMessage error:', e);
+      }
 
       return false;
+    },
+
+    async markMessageAsRead(channelId, messageId, readerInfo = null) {
+      if (!channelId || !messageId || !this.db) return false;
+      const cleanChannelId = channelId.trim();
+      const cleanMessageId = messageId.trim();
+      const readerUid = readerInfo?.uid || this.currentUser?.uid || this.currentMember?.id;
+      if (!readerUid) return false;
+
+      const readerName = readerInfo?.name || this.currentMember?.displayName || this.currentMember?.name || this.currentUser?.displayName || 'Teammate';
+      const readerEmpId = readerInfo?.empId || this.currentMember?.id || '';
+
+      try {
+        const docRef = this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages`).doc(cleanMessageId);
+        await docRef.update({
+          [`readBy.${readerUid}`]: {
+            uid: readerUid,
+            name: readerName,
+            empId: readerEmpId,
+            readAt: Date.now()
+          },
+          delivered: true
+        });
+        return true;
+      } catch (err) {
+        try {
+          const docRef = this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages`).doc(cleanMessageId);
+          await docRef.set({
+            readBy: {
+              [readerUid]: {
+                uid: readerUid,
+                name: readerName,
+                empId: readerEmpId,
+                readAt: Date.now()
+              }
+            },
+            delivered: true
+          }, { merge: true });
+          return true;
+        } catch (_) {
+          return false;
+        }
+      }
+    },
+
+    async markMessageDelivered(channelId, messageId, receiverInfo = null) {
+      if (!channelId || !messageId || !this.db) return false;
+      const cleanChannelId = channelId.trim();
+      const cleanMessageId = messageId.trim();
+      const receiverUid = receiverInfo?.uid || this.currentUser?.uid || this.currentMember?.id;
+      if (!receiverUid) return false;
+
+      try {
+        const docRef = this.db.collection(`organizations/${ORG_ID}/channels/${cleanChannelId}/messages`).doc(cleanMessageId);
+        await docRef.update({
+          [`deliveredTo.${receiverUid}`]: Date.now(),
+          delivered: true
+        });
+        return true;
+      } catch (_) {
+        return false;
+      }
     },
 
     async toggleReaction(channelId, messageId, emoji, userObj = null) {

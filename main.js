@@ -1288,6 +1288,41 @@ ipcMain.on('show-native-notification', (event, payload) => {
   }
 });
 
+// Incoming Call Native Alert & Window Focus
+ipcMain.on('incoming-call-alert', (event, payload) => {
+  if (!isTrustedSender(event) || !payload || typeof payload !== 'object') return;
+  const callerName = String(payload.callerName || 'Teammate').slice(0, 100);
+  const callType = String(payload.callType || 'Video').toUpperCase();
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isVisible()) mainWindow.show();
+    mainWindow.focus();
+    mainWindow.moveTop();
+    mainWindow.flashFrame(true);
+  }
+
+  if (Notification.isSupported()) {
+    const iconPath = path.join(__dirname, 'wallpaper-ui', 'assets', 'id-card.png');
+    const notification = new Notification({
+      title: `📞 Incoming ${callType} Call`,
+      body: `${callerName} is calling you on REDDOT Workstation. Click to answer.`,
+      icon: iconPath,
+      silent: false
+    });
+    notification.on('click', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        if (!mainWindow.isVisible()) mainWindow.show();
+        mainWindow.focus();
+        mainWindow.moveTop();
+        mainWindow.flashFrame(false);
+      }
+    });
+    notification.show();
+  }
+});
+
 // Single instance lock
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
