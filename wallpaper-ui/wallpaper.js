@@ -286,7 +286,6 @@
     callLogs: [],
     threadReplies: {},
     punchLogs: [],
-    leaveRequests: [],
     auditLogs: [
       { action: "WORKSPACE_INIT", performedByName: "SYSTEM", details: "Native persistent storage initialized.", timestamp: Date.now() }
     ],
@@ -326,7 +325,6 @@
       if (!this.data.savedMessages) this.data.savedMessages = [];
       if (!this.data.callLogs) this.data.callLogs = [];
       if (!this.data.threadReplies) this.data.threadReplies = {};
-      if (!this.data.leaveRequests || !Array.isArray(this.data.leaveRequests)) this.data.leaveRequests = [];
       if (!this.data.deletedMembers || !Array.isArray(this.data.deletedMembers)) {
         this.data.deletedMembers = ['RD-RD-FOU'];
       } else if (!this.data.deletedMembers.includes('RD-RD-FOU')) {
@@ -543,9 +541,6 @@
   };
 
   window.state = state;
-  window.WorkspaceDB = WorkspaceDB;
-  window.renderMessages = renderMessages;
-  window.scheduleRenderMessages = scheduleRenderMessages;
 
   // --- AUTHENTICATION & PROFILE CONTROLLERS ---
   function openAuthModal(initialTab = 'signin') {
@@ -2895,21 +2890,16 @@
       try { state.activeTypingUnsub(); } catch (_) {}
       state.activeTypingUnsub = null;
     }
-    // Clean up background listener if this channel was tracked in background
-    if (state.bgChatUnsubs && state.bgChatUnsubs.has(channelId)) {
-      try { state.bgChatUnsubs.get(channelId)(); } catch (_) {}
-      state.bgChatUnsubs.delete(channelId);
-    }
 
     // Attach dynamic real-time Firestore messages listener
     if (window.FirebaseService && FirebaseService.subscribeMessages) {
       state.activeChatUnsub = FirebaseService.subscribeMessages(channelId, (cloudMsgs) => {
-        if (cloudMsgs && Array.isArray(cloudMsgs)) {
+        if (cloudMsgs) {
           reconcileChannelMessages(cloudMsgs, channelId);
           WorkspaceDB.data.chats[channelId] = cloudMsgs;
-          debouncedDbSave();
+          WorkspaceDB.save();
           if (state.activeChannelId === channelId) {
-            scheduleRenderMessages();
+            renderMessages();
           }
         }
       });
@@ -2979,629 +2969,9 @@
     return parts.join('');
   }
 
-  // --- REAL-TIME CHAT ENGINE: HIGH PERFORMANCE INCREMENTAL RECONCILIATION ---
-  let _dbSaveTimer = null;
-  function debouncedDbSave() {
-    if (_dbSaveTimer) clearTimeout(_dbSaveTimer);
-    _dbSaveTimer = setTimeout(() => {
-      _dbSaveTimer = null;
-      WorkspaceDB.save().catch(() => {});
-    }, 1500);
-  }
-
-  let _readReceiptTimer = null;
-  const _pendingReadReceipts = [];
-
-  function queueMessageReadReceipt(channelId, messageId, readerInfo) {
-    _pendingReadReceipts.push({ channelId, messageId, readerInfo });
-    if (_readReceiptTimer) return;
-    _readReceiptTimer = setTimeout(async () => {
-      _readReceiptTimer = null;
-      const batch = _pendingReadReceipts.splice(0, _pendingReadReceipts.length);
-      for (const item of batch) {
-        if (window.FirebaseService?.markMessageAsRead) {
-          try {
-            await FirebaseService.markMessageAsRead(item.channelId, item.messageId, item.readerInfo);
-          } catch (_) {}
-        }
-      }
-    }, 500);
-  }
-
-  let _msgRenderScheduled = false;
-  let _msgRenderForceScroll = false;
-
-  function scheduleRenderMessages(forceScroll = false) {
-    if (forceScroll) _msgRenderForceScroll = true;
-    if (_msgRenderScheduled) return;
-    _msgRenderScheduled = true;
-    requestAnimationFrame(() => {
-      _msgRenderScheduled = false;
-      const force = _msgRenderForceScroll;
-      _msgRenderForceScroll = false;
-      renderMessages(force);
-    });
-  }
-
-  function getMessageTicksHtml(msg, isSelf, isLastMsg, latestOtherMsgTime, currentUid) {
-    if (!isSelf) return '';
-    const msgUid = msg.senderUid || msg.senderId;
-    const msgEmpId = msg.senderEmpId || msg.senderId;
-    const msgTime = Number(msg.createdAt) || 0;
-    const now = Date.now();
-    const isPast = (now - msgTime > 15000) || (!isLastMsg);
-    const hasSubsequentOther = latestOtherMsgTime >= msgTime;
-    const readKeys = Object.keys(msg.readBy || {});
-    const hasOtherReader = readKeys.some(u => {
-      const uLow = String(u).toLowerCase();
-      return uLow !== String(currentUid || '').toLowerCase() &&
-             uLow !== String(msgUid || '').toLowerCase() &&
-             uLow !== String(msgEmpId || '').toLowerCase() &&
-             !uLow.includes('founder') &&
-             !uLow.includes('jagadish');
-    });
-
-    const isReadByAll = msg.readByAll === true || isPast || hasSubsequentOther || hasOtherReader;
-    const isDeliveredToAll = isReadByAll || msg.delivered === true || (now - msgTime > 1500) || !msg.isPending;
-
-    if (isReadByAll) {
-      return `<span class="msg-status-tick tick-read" title="Read by all users (Double Green Tick)">✓✓</span>`;
-    } else if (isDeliveredToAll) {
-      return `<span class="msg-status-tick tick-delivered" title="Delivered to all (Double Grey Tick)">✓✓</span>`;
-    } else {
-      return `<span class="msg-status-tick tick-sent" title="Sent to cloud (Single Grey Tick)">✓</span>`;
-    }
-  }
-
-  function getMessageReactionsHtml(msg, currentUid, currentEmpId) {
-    const myUid = currentUid || currentEmpId || 'RD-USER';
-    const rxEntries = Object.entries(msg.reactions || {});
-    if (rxEntries.length === 0) return '';
-    return `
-      <div class="reaction-pills-row">
-        ${rxEntries.map(([emoji, users]) => {
-          const userList = Array.isArray(users) ? users : [];
-          const hasMine = userList.some(u => (typeof u === 'string' ? u === myUid : u.uid === myUid));
-          const names = userList.map(u => (typeof u === 'string' ? u : (u.name || 'Teammate'))).join(', ');
-          return `
-            <span class="reaction-chip ${hasMine ? 'has-my-reaction' : ''}" data-emoji="${escapeHtml(emoji)}" data-msg-id="${escapeHtml(msg.id)}" title="${escapeHtml(names)} reacted">
-              <span>${escapeHtml(emoji)}</span>
-              <span class="reaction-count">${userList.length}</span>
-            </span>
-          `;
-        }).join('')}
-      </div>
-    `;
-  }
-
-  function getMessageActionsBarHtml(msg, isSelf, isBookmarked) {
-    const canEdit = isSelf;
-    const canDelete = isSelf;
-    return `
-      <div class="chat-msg-actions-bar">
-        <button type="button" class="msg-action-btn btn-react" data-emoji="👍" data-msg-id="${escapeHtml(msg.id)}" title="Like">👍</button>
-        <button type="button" class="msg-action-btn btn-react" data-emoji="❤️" data-msg-id="${escapeHtml(msg.id)}" title="Heart">❤️</button>
-        <button type="button" class="msg-action-btn btn-react" data-emoji="😂" data-msg-id="${escapeHtml(msg.id)}" title="Laugh">😂</button>
-        <button type="button" class="msg-action-btn btn-react" data-emoji="😮" data-msg-id="${escapeHtml(msg.id)}" title="Surprised">😮</button>
-        <button type="button" class="msg-action-btn btn-react" data-emoji="🚀" data-msg-id="${escapeHtml(msg.id)}" title="Rocket">🚀</button>
-        <button type="button" class="msg-action-btn btn-msg-info" data-msg-id="${escapeHtml(msg.id)}" title="Message Info (Seen &amp; Delivery Details)">ℹ️</button>
-        <button type="button" class="msg-action-btn btn-thread-action" data-msg-id="${escapeHtml(msg.id)}" title="Reply in thread">💬</button>
-        <button type="button" class="msg-action-btn btn-reply-msg" data-msg-id="${escapeHtml(msg.id)}" title="Quote reply">↩️</button>
-        <button type="button" class="msg-action-btn btn-bookmark-msg" data-msg-id="${escapeHtml(msg.id)}" title="${isBookmarked ? 'Remove Bookmark' : 'Save Message'}">${isBookmarked ? '⭐' : '🔖'}</button>
-        ${canEdit ? `<button type="button" class="msg-action-btn btn-edit-msg" data-msg-id="${escapeHtml(msg.id)}" title="Edit message">✏️</button>` : ''}
-        <button type="button" class="msg-action-btn btn-pin-msg" data-msg-id="${escapeHtml(msg.id)}" title="${msg.isPinned ? 'Unpin message' : 'Pin message'}">${msg.isPinned ? '📍' : '📌'}</button>
-        <button type="button" class="msg-action-btn btn-copy-msg" data-msg-id="${escapeHtml(msg.id)}" title="Copy message text">📋</button>
-        ${canDelete ? `<button type="button" class="msg-action-btn btn-danger btn-delete-msg" data-msg-id="${escapeHtml(msg.id)}" title="Delete your message">🗑️</button>` : ''}
-      </div>
-    `;
-  }
-
-  function buildMessageRowElement(msg, msgIndex, sortedMsgs, latestOtherMsgTime, isNew = false) {
-    const currentUid = state.currentUser?.uid;
-    const currentEmpId = state.currentMemberId;
-    const isSelf = isSelfMsg(msg);
-    const isEditing = state.editingMessageId === msg.id;
-    const isBookmarked = (WorkspaceDB.data.savedMessages || []).some(b => b.id === msg.id);
-
-    const msgRow = document.createElement('div');
-    msgRow.setAttribute('data-msg-id', msg.id);
-    msgRow.className = `chat-msg-row ${isSelf ? 'msg-self' : 'msg-other'} ${msg.isPinned ? 'msg-pinned' : ''}${isNew ? ' msg-animate-in' : ''}`;
-
-    const msgUid = msg.senderUid || msg.senderId;
-    const senderBadge = escapeHtml(msg.senderEmpId || (msgUid ? `RD-${String(msgUid).slice(0, 5).toUpperCase()}` : 'RD'));
-    const senderName = escapeHtml(msg.senderName || 'Colleague');
-    const avatar = escapeHtml((msg.senderName || 'RD').slice(0, 2).toUpperCase());
-    let photoUrl = sanitizeUrl(msg.senderPhoto || '');
-    if (!photoUrl && msgUid) {
-      const mObj = (WorkspaceDB.data.members || {})[msgUid] || (WorkspaceDB.data.members || {})[msg.senderEmpId];
-      if (mObj) photoUrl = sanitizeUrl(mObj.photoURL || mObj.photoUrl || mObj.idCardPhoto || '');
-    }
-    if (!photoUrl && isSelf && state.currentUser) {
-      photoUrl = sanitizeUrl(state.currentUser.photoURL || state.currentUser.photoUrl || '');
-    }
-    const timeStr = escapeHtml(new Date(msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    const fullDateTitle = escapeHtml(new Date(msg.createdAt || Date.now()).toLocaleString([], {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    }));
-
-    if (state.chatSearchQuery) {
-      const isMatch = msg.text && msg.text.toLowerCase().includes(state.chatSearchQuery.toLowerCase());
-      msgRow.style.opacity = isMatch ? '1' : '0.35';
-    }
-
-    // 1. Quoted Reply Snippet HTML
-    let replySnippetHtml = '';
-    if (msg.replyTo) {
-      replySnippetHtml = `
-        <div class="msg-reply-quote" data-target-msg-id="${escapeHtml(msg.replyTo.id || '')}">
-          <div style="overflow: hidden;">
-            <span class="reply-quote-sender">↩️ ${escapeHtml(msg.replyTo.senderName || 'Teammate')}</span>
-            <div class="reply-quote-text">${escapeHtml(msg.replyTo.text || '')}</div>
-          </div>
-        </div>
-      `;
-    }
-
-    // 2. Images Grid HTML
-    let imagesHtml = '';
-    if (msg.attachments && msg.attachments.length > 0) {
-      const imgs = msg.attachments.filter(a => a.type?.startsWith('image/') || a.isImage);
-      if (imgs.length > 0) {
-        imagesHtml = `
-          <div class="msg-images-grid">
-            ${imgs.map(img => `
-              <img src="${sanitizeUrl(img.dataUrl || img.url)}" class="msg-img-thumb" alt="${escapeHtml(img.name || 'image')}" data-lightbox-src="${sanitizeUrl(img.dataUrl || img.url)}" data-caption="${escapeHtml(img.name || '')}">
-            `).join('')}
-          </div>
-        `;
-      }
-    }
-
-    // 3. Files List & Google Drive Cloud Cards HTML
-    let filesHtml = '';
-    if (msg.attachments && msg.attachments.length > 0) {
-      const docs = msg.attachments.filter(a => !a.type?.startsWith('image/') && !a.isImage);
-      if (docs.length > 0) {
-        filesHtml = `
-          <div class="msg-files-list">
-            ${docs.map(doc => {
-              if (doc.isGDrive || doc.gdriveUrl) {
-                const ext = (doc.name || '').split('.').pop().toUpperCase() || 'FILE';
-                const previewUrl = doc.previewUrl || doc.gdriveUrl;
-                const dlUrl = doc.directDownloadUrl || doc.gdriveUrl;
-                const sizeStr = doc.sizeStr || (doc.size ? formatBytes(doc.size) : 'Cloud File');
-                const isVideo = doc.type === 'video' || (doc.name && doc.name.match(/\.(mp4|mkv|mov|webm)$/i));
-                return `
-                  <div class="msg-gdrive-card">
-                    <div class="gdrive-icon-col">
-                      <img src="https://ssl.gstatic.com/docs/doclist/images/drive_2022q3_32dp.png" alt="Google Drive" class="gdrive-logo-icon">
-                      <span class="gdrive-type-badge">${escapeHtml(ext)}</span>
-                    </div>
-                    <div class="gdrive-info-col">
-                      <div class="msg-gdrive-name" title="${escapeHtml(doc.name || 'Google Drive File')}">${escapeHtml(doc.name || 'Google Drive File')}</div>
-                      <div class="msg-gdrive-meta">
-                        <span class="gdrive-brand">Google Drive Cloud</span> &bull; 
-                        <span>${escapeHtml(sizeStr)}</span>
-                      </div>
-                    </div>
-                    <div class="gdrive-actions-col">
-                      <a href="${sanitizeUrl(previewUrl)}" target="_blank" class="btn-gdrive-preview" title="Preview in Google Drive">
-                        <span>👁️ Preview</span>
-                      </a>
-                      <a href="${sanitizeUrl(dlUrl)}" target="_blank" download="${escapeHtml(doc.name || 'file')}" class="btn-gdrive-download" title="Direct download from Google Drive">
-                        <span>⬇️ Download</span>
-                      </a>
-                    </div>
-                  </div>
-                  ${isVideo && doc.gdriveId ? `
-                    <div class="gdrive-video-wrap">
-                      <iframe src="https://drive.google.com/file/d/${escapeHtml(doc.gdriveId)}/preview" class="gdrive-video-iframe" allow="autoplay" loading="lazy"></iframe>
-                    </div>
-                  ` : ''}
-                `;
-              }
-
-              return `
-                <a href="${sanitizeUrl(doc.dataUrl || doc.url)}" download="${escapeHtml(doc.name || 'document')}" class="msg-file-card" title="Click to download ${escapeHtml(doc.name || '')}">
-                  <span class="file-ext-badge">${escapeHtml((doc.name || '').split('.').pop().toUpperCase() || 'FILE')}</span>
-                  <div style="overflow: hidden; flex: 1;">
-                    <div class="file-meta-name">${escapeHtml(doc.name || 'Document')}</div>
-                    <div class="file-meta-size">${formatBytes(doc.size || 0)}</div>
-                  </div>
-                  <span class="file-action-dl">⬇️</span>
-                </a>
-              `;
-            }).join('')}
-          </div>
-        `;
-      }
-    }
-
-    // 4. Voice Note Player HTML
-    let voiceHtml = '';
-    if (msg.voiceNote && (msg.voiceNote.dataUrl || msg.voiceNote.url)) {
-      voiceHtml = `
-        <div class="msg-voice-bubble" data-audio-src="${sanitizeUrl(msg.voiceNote.dataUrl || msg.voiceNote.url)}">
-          <button type="button" class="btn-voice-play" title="Play Voice Memo">▶</button>
-          <div class="voice-wave-bars">
-            <span class="voice-bar" style="height: 6px;"></span>
-            <span class="voice-bar" style="height: 12px;"></span>
-            <span class="voice-bar" style="height: 16px;"></span>
-            <span class="voice-bar" style="height: 8px;"></span>
-            <span class="voice-bar" style="height: 14px;"></span>
-            <span class="voice-bar" style="height: 10px;"></span>
-          </div>
-          <span class="voice-duration">${escapeHtml(msg.voiceNote.durationStr || '0:05')}</span>
-        </div>
-      `;
-    }
-
-    const reactionsHtml = getMessageReactionsHtml(msg, currentUid, currentEmpId);
-    const actionsBarHtml = getMessageActionsBarHtml(msg, isSelf, isBookmarked);
-    const isLastMsg = msgIndex === sortedMsgs.length - 1;
-    const ticksHtml = getMessageTicksHtml(msg, isSelf, isLastMsg, latestOtherMsgTime, currentUid);
-
-    // 5. Message Body or Inline Editor
-    let bodyHtml = '';
-    if (isEditing) {
-      bodyHtml = `
-        <div class="msg-inline-edit-box">
-          <textarea class="msg-inline-edit-textarea" id="inlineEditArea_${msg.id}" rows="2">${escapeHtml(msg.text)}</textarea>
-          <div class="msg-inline-edit-actions">
-            <button type="button" class="btn-edit-cancel" data-msg-id="${msg.id}">Cancel (Esc)</button>
-            <button type="button" class="btn-edit-save" data-msg-id="${msg.id}">Save (Enter)</button>
-          </div>
-        </div>
-      `;
-    } else {
-      bodyHtml = `
-        <div class="msg-text">${renderMarkdownText(msg.text)}</div>
-      `;
-    }
-
-    msgRow.innerHTML = `
-      <div class="msg-avatar">
-        ${photoUrl ? `<img src="${photoUrl}" alt="${senderName}" style="width:100%;height:100%;object-fit:cover;object-position:center;border-radius:50%;display:block;" onerror="this.style.display='none'; if(this.parentElement) this.parentElement.textContent='${avatar}';">` : avatar}
-      </div>
-      <div class="msg-bubble">
-        ${actionsBarHtml}
-        ${msg.importance === 'important' ? `<div class="msg-importance-banner important">❗ IMPORTANT ANNOUNCEMENT</div>` : ''}
-        ${msg.subject ? `<div class="msg-subject-header">${escapeHtml(msg.subject)}</div>` : ''}
-        <div class="msg-header">
-          <span class="msg-sender">${senderName} <span style="font-size: 9.5px; opacity: 0.75; font-family: var(--font-mono); font-weight: 700;">[${senderBadge}]</span></span>
-          <span class="msg-time" title="${fullDateTitle}">${timeStr}${ticksHtml}</span>
-          ${msg.isEdited ? `<span class="msg-edited-tag" title="Edited at ${msg.editedAt ? new Date(msg.editedAt).toLocaleTimeString() : ''}">(edited)</span>` : ''}
-          ${msg.isPinned ? `<span class="msg-pin-icon" title="Pinned Announcement" style="color: #ffb300; font-size: 11px;">📌</span>` : ''}
-        </div>
-        ${replySnippetHtml}
-        ${bodyHtml}
-        ${imagesHtml}
-        ${filesHtml}
-        ${voiceHtml}
-        ${reactionsHtml}
-        <button type="button" class="msg-thread-pill btn-open-thread" data-msg-id="${msg.id}">
-          <span>💬</span>
-          <span class="thread-replies-label">${msg.replyCount ? `${msg.replyCount} ${msg.replyCount === 1 ? 'reply' : 'replies'}` : 'Reply in thread'}</span>
-          ${msg.lastReplyUser ? `<span class="thread-last-user" style="opacity: 0.7; font-weight: normal;">• Last reply by ${escapeHtml(msg.lastReplyUser)}</span>` : ''}
-        </button>
-      </div>
-    `;
-
-    msg._lastRenderedText = msg.text;
-    return msgRow;
-  }
-
-  function updateMessageRowElement(row, msg, msgIndex, sortedMsgs, latestOtherMsgTime) {
-    const currentUid = state.currentUser?.uid;
-    const currentEmpId = state.currentMemberId;
-    const isSelf = isSelfMsg(msg);
-    const isLastMsg = msgIndex === sortedMsgs.length - 1;
-
-    // 1. Update search opacity
-    if (state.chatSearchQuery) {
-      const isMatch = msg.text && msg.text.toLowerCase().includes(state.chatSearchQuery.toLowerCase());
-      row.style.opacity = isMatch ? '1' : '0.35';
-    } else {
-      row.style.opacity = '1';
-    }
-
-    // 2. Update Ticks (in-place)
-    const timeEl = row.querySelector('.msg-time');
-    if (timeEl && isSelf) {
-      const newTicksHtml = getMessageTicksHtml(msg, isSelf, isLastMsg, latestOtherMsgTime, currentUid);
-      const existingTick = timeEl.querySelector('.msg-status-tick');
-      if (existingTick) {
-        if (!newTicksHtml) {
-          existingTick.remove();
-        } else {
-          const temp = document.createElement('div');
-          temp.innerHTML = newTicksHtml;
-          const newTickEl = temp.firstElementChild;
-          if (newTickEl && (existingTick.className !== newTickEl.className || existingTick.textContent !== newTickEl.textContent)) {
-            existingTick.replaceWith(newTickEl);
-          }
-        }
-      } else if (newTicksHtml) {
-        timeEl.insertAdjacentHTML('beforeend', newTicksHtml);
-      }
-    }
-
-    // 3. Update Reactions
-    const bubble = row.querySelector('.msg-bubble');
-    if (bubble) {
-      const existingReactions = bubble.querySelector('.reaction-pills-row');
-      const newReactionsHtml = getMessageReactionsHtml(msg, currentUid, currentEmpId);
-      if (existingReactions) {
-        if (!newReactionsHtml) {
-          existingReactions.remove();
-        } else {
-          const temp = document.createElement('div');
-          temp.innerHTML = newReactionsHtml;
-          const newReactionsEl = temp.firstElementChild;
-          if (newReactionsEl) {
-            existingReactions.replaceWith(newReactionsEl);
-          }
-        }
-      } else if (newReactionsHtml) {
-        const threadBtn = bubble.querySelector('.msg-thread-pill');
-        const temp = document.createElement('div');
-        temp.innerHTML = newReactionsHtml;
-        const newReactionsEl = temp.firstElementChild;
-        if (newReactionsEl) {
-          if (threadBtn) bubble.insertBefore(newReactionsEl, threadBtn);
-          else bubble.appendChild(newReactionsEl);
-        }
-      }
-
-      // 4. Update Pin Status
-      row.classList.toggle('msg-pinned', !!msg.isPinned);
-      const header = bubble.querySelector('.msg-header');
-      if (header) {
-        let pinIcon = header.querySelector('.msg-pin-icon');
-        if (msg.isPinned && !pinIcon) {
-          header.insertAdjacentHTML('beforeend', `<span class="msg-pin-icon" title="Pinned Announcement" style="color: #ffb300; font-size: 11px;">📌</span>`);
-        } else if (!msg.isPinned && pinIcon) {
-          pinIcon.remove();
-        }
-
-        // 5. Update Edited Status
-        if (msg.isEdited) {
-          let editedTag = header.querySelector('.msg-edited-tag');
-          if (!editedTag) {
-            header.insertAdjacentHTML('beforeend', `<span class="msg-edited-tag" title="Edited at ${msg.editedAt ? new Date(msg.editedAt).toLocaleTimeString() : ''}">(edited)</span>`);
-          }
-        }
-      }
-
-      // 6. Update text if edited and not currently editing
-      if (state.editingMessageId !== msg.id) {
-        const textEl = bubble.querySelector('.msg-text');
-        if (textEl && msg._lastRenderedText !== msg.text) {
-          textEl.innerHTML = renderMarkdownText(msg.text);
-          msg._lastRenderedText = msg.text;
-        }
-      }
-
-      // 7. Update Thread Reply Counter
-      const threadLabel = bubble.querySelector('.thread-replies-label');
-      if (threadLabel) {
-        const targetLabel = msg.replyCount ? `${msg.replyCount} ${msg.replyCount === 1 ? 'reply' : 'replies'}` : 'Reply in thread';
-        if (threadLabel.textContent !== targetLabel) threadLabel.textContent = targetLabel;
-      }
-    }
-  }
-
-  function handleChatContainerClick(e) {
-    const container = document.getElementById('chatMessagesContainer');
-    if (!container) return;
-    const msgs = WorkspaceDB.data.chats[state.activeChannelId] || [];
-
-    // 1. Reaction button in actions bar
-    const reactBtn = e.target.closest('.btn-react');
-    if (reactBtn) {
-      e.stopPropagation();
-      const msgId = reactBtn.getAttribute('data-msg-id');
-      const emoji = reactBtn.getAttribute('data-emoji');
-      if (msgId && emoji) toggleReactionOnMessage(msgId, emoji);
-      return;
-    }
-
-    // 2. Reaction chip below message
-    const chip = e.target.closest('.reaction-chip');
-    if (chip) {
-      e.stopPropagation();
-      const msgId = chip.getAttribute('data-msg-id');
-      const emoji = chip.getAttribute('data-emoji');
-      if (msgId && emoji) toggleReactionOnMessage(msgId, emoji);
-      return;
-    }
-
-    // 3. Message Info button & Tick click
-    const infoBtn = e.target.closest('.btn-msg-info');
-    if (infoBtn) {
-      e.stopPropagation();
-      const msgId = infoBtn.getAttribute('data-msg-id');
-      if (msgId) openMessageInfoModal(msgId);
-      return;
-    }
-
-    const tick = e.target.closest('.msg-status-tick');
-    if (tick) {
-      e.stopPropagation();
-      const row = tick.closest('.chat-msg-row');
-      const msgId = row?.getAttribute('data-msg-id');
-      if (msgId) openMessageInfoModal(msgId);
-      return;
-    }
-
-    // 4. Quote Reply button
-    const replyBtn = e.target.closest('.btn-reply-msg');
-    if (replyBtn) {
-      e.stopPropagation();
-      const msgId = replyBtn.getAttribute('data-msg-id');
-      const targetMsg = msgs.find(m => m.id === msgId);
-      if (targetMsg) startReplyingTo(targetMsg);
-      return;
-    }
-
-    // 5. Edit message button
-    const editBtn = e.target.closest('.btn-edit-msg');
-    if (editBtn) {
-      e.stopPropagation();
-      const msgId = editBtn.getAttribute('data-msg-id');
-      if (msgId) editChatMessage(msgId);
-      return;
-    }
-
-    // 6. Pin message button
-    const pinBtn = e.target.closest('.btn-pin-msg');
-    if (pinBtn) {
-      e.stopPropagation();
-      const msgId = pinBtn.getAttribute('data-msg-id');
-      if (msgId) togglePinChatMessage(msgId);
-      return;
-    }
-
-    // 7. Copy message button
-    const copyBtn = e.target.closest('.btn-copy-msg');
-    if (copyBtn) {
-      e.stopPropagation();
-      const msgId = copyBtn.getAttribute('data-msg-id');
-      const targetMsg = msgs.find(m => m.id === msgId);
-      if (targetMsg && targetMsg.text) {
-        navigator.clipboard.writeText(targetMsg.text);
-        copyBtn.textContent = '✅';
-        setTimeout(() => { copyBtn.textContent = '📋'; }, 1500);
-      }
-      return;
-    }
-
-    // 8. Delete message button
-    const deleteBtn = e.target.closest('.btn-delete-msg');
-    if (deleteBtn) {
-      e.stopPropagation();
-      const msgId = deleteBtn.getAttribute('data-msg-id');
-      if (msgId) deleteChatMessage(msgId);
-      return;
-    }
-
-    // 9. Thread button
-    const threadBtn = e.target.closest('.btn-thread-action, .btn-open-thread');
-    if (threadBtn) {
-      e.stopPropagation();
-      const msgId = threadBtn.getAttribute('data-msg-id');
-      if (msgId) openThreadSidePanel(msgId);
-      return;
-    }
-
-    // 10. Bookmark button
-    const bookmarkBtn = e.target.closest('.btn-bookmark-msg');
-    if (bookmarkBtn) {
-      e.stopPropagation();
-      const msgId = bookmarkBtn.getAttribute('data-msg-id');
-      if (msgId) toggleBookmarkMessage(msgId);
-      return;
-    }
-
-    // 11. Inline edit actions
-    const editCancelBtn = e.target.closest('.btn-edit-cancel');
-    if (editCancelBtn) {
-      e.stopPropagation();
-      state.editingMessageId = null;
-      scheduleRenderMessages();
-      return;
-    }
-
-    const editSaveBtn = e.target.closest('.btn-edit-save');
-    if (editSaveBtn) {
-      e.stopPropagation();
-      const msgId = editSaveBtn.getAttribute('data-msg-id');
-      const area = document.getElementById(`inlineEditArea_${msgId}`);
-      if (area) saveEditedMessage(msgId, area.value);
-      return;
-    }
-
-    // 12. Lightbox triggers for images
-    const imgThumb = e.target.closest('.msg-img-thumb');
-    if (imgThumb) {
-      e.stopPropagation();
-      openLightbox(imgThumb.getAttribute('data-lightbox-src') || imgThumb.src, imgThumb.getAttribute('data-caption') || '');
-      return;
-    }
-
-    // 13. Jump to quoted reply
-    const quote = e.target.closest('.msg-reply-quote');
-    if (quote) {
-      e.stopPropagation();
-      const targetId = quote.getAttribute('data-target-msg-id');
-      if (!targetId) return;
-      const targetRow = container.querySelector(`[data-msg-id="${targetId}"]`);
-      if (targetRow) {
-        targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        targetRow.style.transition = 'box-shadow 0.3s ease';
-        targetRow.style.boxShadow = '0 0 16px var(--accent-cyan)';
-        setTimeout(() => { targetRow.style.boxShadow = 'none'; }, 1800);
-      }
-      return;
-    }
-
-    // 14. Voice Note Player
-    const voicePlayBtn = e.target.closest('.btn-voice-play');
-    if (voicePlayBtn) {
-      e.stopPropagation();
-      const bubble = voicePlayBtn.closest('.msg-voice-bubble');
-      const src = bubble?.getAttribute('data-audio-src');
-      if (bubble && src) {
-        if (!bubble._audio) {
-          bubble._audio = new Audio(src);
-          bubble._audio.onended = () => {
-            voicePlayBtn.textContent = '▶';
-            bubble.querySelectorAll('.voice-bar').forEach(b => b.classList.remove('active'));
-          };
-        }
-        if (bubble._audio.paused) {
-          bubble._audio.play();
-          voicePlayBtn.textContent = '⏸';
-          bubble.querySelectorAll('.voice-bar').forEach(b => b.classList.add('active'));
-        } else {
-          bubble._audio.pause();
-          voicePlayBtn.textContent = '▶';
-          bubble.querySelectorAll('.voice-bar').forEach(b => b.classList.remove('active'));
-        }
-      }
-      return;
-    }
-  }
-
   function renderMessages(forceScroll = false) {
     const container = document.getElementById('chatMessagesContainer');
     if (!container) return;
-
-    // Attach delegated click & keydown listeners on container once
-    if (!container._hasDelegatedListener) {
-      container._hasDelegatedListener = true;
-      container.addEventListener('click', handleChatContainerClick);
-      container.addEventListener('keydown', (e) => {
-        if (e.target && e.target.classList.contains('msg-inline-edit-textarea')) {
-          const area = e.target;
-          const msgId = area.id.replace('inlineEditArea_', '');
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            saveEditedMessage(msgId, area.value);
-          } else if (e.key === 'Escape') {
-            e.preventDefault();
-            state.editingMessageId = null;
-            scheduleRenderMessages();
-          }
-        }
-      });
-    }
 
     if (!WorkspaceDB.data.chats[state.activeChannelId]) {
       WorkspaceDB.data.chats[state.activeChannelId] = [];
@@ -3657,7 +3027,6 @@
 
     // Empty state check
     if (msgs.length === 0) {
-      container._renderedChannelId = state.activeChannelId;
       container.innerHTML = `
         <div class="empty-state-box" style="padding: 40px 20px; text-align: center;">
           <span style="font-size: 36px; display: block; margin-bottom: 10px;">💬</span>
@@ -3668,14 +3037,14 @@
       return;
     }
 
-    // Remove empty state box if previously present
-    const emptyBox = container.querySelector('.empty-state-box');
-    if (emptyBox) emptyBox.remove();
-
-    // Check if user was scrolled at or near bottom
+    // Check if scroll was at bottom
     const wasAtBottom = (container.scrollHeight - container.scrollTop <= container.clientHeight + 80);
 
     const currentUid = state.currentUser?.uid;
+    const currentEmail = state.currentUser?.email?.toLowerCase();
+    const currentEmpId = state.currentMemberId;
+
+    // Sort chronologically so date dividers and ticks display accurately
     const sortedMsgs = [...msgs].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
     // Determine the latest timestamp of ANY message sent by someone else in this channel
@@ -3687,10 +3056,30 @@
       }
     });
 
-    // Debounced and deduped read receipts for incoming messages viewed in real-time
-    if (!state.readMarkedMsgIds) state.readMarkedMsgIds = new Set();
-    sortedMsgs.forEach(msg => {
+    container.replaceChildren();
+    let lastDateLabel = null;
+
+    sortedMsgs.forEach((msg, msgIndex) => {
+      // 1. WhatsApp-Style Date & Day Separator
+      const dateLabel = getChatDateDividerLabel(msg.createdAt || Date.now());
+      if (dateLabel !== lastDateLabel) {
+        const sep = document.createElement('div');
+        sep.className = 'chat-date-separator';
+        sep.innerHTML = `<span class="chat-date-pill">${escapeHtml(dateLabel)}</span>`;
+        container.appendChild(sep);
+        lastDateLabel = dateLabel;
+      }
+
+      const msgUid = msg.senderUid || msg.senderId;
+      const msgEmail = (msg.senderEmail || '').toLowerCase();
+      const msgEmpId = msg.senderEmpId || msg.senderId;
+
       const isSelf = isSelfMsg(msg);
+      const canEdit = isSelf;
+      const canDelete = isSelf; // STRICT SECURITY: NO ONE can delete another teammate's message!
+      const isEditing = state.editingMessageId === msg.id;
+
+      // Automatically record read receipts for incoming messages viewed in real-time
       if (!isSelf && currentUid && (!msg.readBy || !msg.readBy[currentUid])) {
         if (!msg.readBy) msg.readBy = {};
         const readerInfo = {
@@ -3699,119 +3088,430 @@
           empId: state.currentMemberId || ''
         };
         msg.readBy[currentUid] = { ...readerInfo, readAt: Date.now() };
-
-        if (!state.readMarkedMsgIds.has(msg.id)) {
-          state.readMarkedMsgIds.add(msg.id);
-          queueMessageReadReceipt(state.activeChannelId, msg.id, readerInfo);
+        if (window.FirebaseService?.markMessageAsRead) {
+          FirebaseService.markMessageAsRead(state.activeChannelId, msg.id, readerInfo).catch(() => {});
         }
+      }
+
+      // 2. WhatsApp Status Ticks (Sent, Delivered, Seen/Read)
+      let ticksHtml = '';
+      if (isSelf) {
+        const msgTime = Number(msg.createdAt) || 0;
+        const now = Date.now();
+        // WhatsApp Rule: A message is in the past if it's not the very last message in the chat, or older than 15s, or already marked
+        const isPast = (now - msgTime > 15000) || (msgIndex < sortedMsgs.length - 1);
+        const hasSubsequentOther = latestOtherMsgTime >= msgTime;
+        const readKeys = Object.keys(msg.readBy || {});
+        const hasOtherReader = readKeys.some(u => {
+          const uLow = String(u).toLowerCase();
+          return uLow !== String(currentUid || '').toLowerCase() &&
+                 uLow !== String(msgUid || '').toLowerCase() &&
+                 uLow !== String(msgEmpId || '').toLowerCase() &&
+                 !uLow.includes('founder') &&
+                 !uLow.includes('jagadish');
+        });
+
+        // Double Green Tick = Read by all recipients (all past messages, messages replied to, or read receipts)
+        const isReadByAll = msg.readByAll === true || isPast || hasSubsequentOther || hasOtherReader;
+
+        // Double Grey Tick = Delivered to all recipients (cloud synced, age > 1.5s, or already delivered)
+        const isDeliveredToAll = isReadByAll || msg.delivered === true || (now - msgTime > 1500) || !msg.isPending;
+
+        if (isReadByAll) {
+          ticksHtml = `<span class="msg-status-tick tick-read" title="Read by all users (Double Green Tick)">✓✓</span>`;
+        } else if (isDeliveredToAll) {
+          ticksHtml = `<span class="msg-status-tick tick-delivered" title="Delivered to all (Double Grey Tick)">✓✓</span>`;
+        } else {
+          ticksHtml = `<span class="msg-status-tick tick-sent" title="Sent to cloud (Single Grey Tick)">✓</span>`;
+        }
+      }
+
+      const msgRow = document.createElement('div');
+      msgRow.setAttribute('data-msg-id', msg.id);
+      msgRow.className = `chat-msg-row ${isSelf ? 'msg-self' : 'msg-other'} ${msg.isPinned ? 'msg-pinned' : ''}`;
+
+      const senderName = escapeHtml(msg.senderName || 'Colleague');
+      const senderBadge = escapeHtml(msg.senderEmpId || (msgUid ? `RD-${String(msgUid).slice(0, 5).toUpperCase()}` : 'RD'));
+      const avatar = escapeHtml((msg.senderName || 'RD').slice(0, 2).toUpperCase());
+      const photoUrl = sanitizeUrl(msg.senderPhoto || '');
+      const timeStr = escapeHtml(new Date(msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      const fullDateTitle = escapeHtml(new Date(msg.createdAt || Date.now()).toLocaleString([], {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }));
+
+      // Filter highlights if search active
+      const isMatch = state.chatSearchQuery && msg.text && msg.text.toLowerCase().includes(state.chatSearchQuery.toLowerCase());
+      if (state.chatSearchQuery) {
+        msgRow.style.opacity = isMatch ? '1' : '0.35';
+      } else {
+        msgRow.style.opacity = '1';
+      }
+
+      // 1. Quoted Reply Snippet HTML
+      let replySnippetHtml = '';
+      if (msg.replyTo) {
+        replySnippetHtml = `
+          <div class="msg-reply-quote" data-target-msg-id="${escapeHtml(msg.replyTo.id || '')}">
+            <div style="overflow: hidden;">
+              <span class="reply-quote-sender">↩️ ${escapeHtml(msg.replyTo.senderName || 'Teammate')}</span>
+              <div class="reply-quote-text">${escapeHtml(msg.replyTo.text || '')}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      // 2. Images Grid HTML
+      let imagesHtml = '';
+      if (msg.attachments && msg.attachments.length > 0) {
+        const imgs = msg.attachments.filter(a => a.type?.startsWith('image/') || a.isImage);
+        if (imgs.length > 0) {
+          imagesHtml = `
+            <div class="msg-images-grid">
+              ${imgs.map(img => `
+                <img src="${sanitizeUrl(img.dataUrl || img.url)}" class="msg-img-thumb" alt="${escapeHtml(img.name || 'image')}" data-lightbox-src="${sanitizeUrl(img.dataUrl || img.url)}" data-caption="${escapeHtml(img.name || '')}">
+              `).join('')}
+            </div>
+          `;
+        }
+      }
+
+      // 3. Files List HTML
+      let filesHtml = '';
+      if (msg.attachments && msg.attachments.length > 0) {
+        const docs = msg.attachments.filter(a => !a.type?.startsWith('image/') && !a.isImage);
+        if (docs.length > 0) {
+          filesHtml = `
+            <div class="msg-files-list">
+              ${docs.map(doc => `
+                <a href="${sanitizeUrl(doc.dataUrl || doc.url)}" download="${escapeHtml(doc.name || 'document')}" class="msg-file-card" title="Click to download ${escapeHtml(doc.name || '')}">
+                  <span class="file-ext-badge">${escapeHtml((doc.name || '').split('.').pop().toUpperCase() || 'FILE')}</span>
+                  <div style="overflow: hidden; flex: 1;">
+                    <div class="file-meta-name">${escapeHtml(doc.name || 'Document')}</div>
+                    <div class="file-meta-size">${formatBytes(doc.size || 0)}</div>
+                  </div>
+                  <span class="file-action-dl">⬇️</span>
+                </a>
+              `).join('')}
+            </div>
+          `;
+        }
+      }
+
+      // 4. Voice Note Player HTML
+      let voiceHtml = '';
+      if (msg.voiceNote && (msg.voiceNote.dataUrl || msg.voiceNote.url)) {
+        voiceHtml = `
+          <div class="msg-voice-bubble" data-audio-src="${sanitizeUrl(msg.voiceNote.dataUrl || msg.voiceNote.url)}">
+            <button type="button" class="btn-voice-play" title="Play Voice Memo">▶</button>
+            <div class="voice-wave-bars">
+              <span class="voice-bar" style="height: 6px;"></span>
+              <span class="voice-bar" style="height: 12px;"></span>
+              <span class="voice-bar" style="height: 16px;"></span>
+              <span class="voice-bar" style="height: 8px;"></span>
+              <span class="voice-bar" style="height: 14px;"></span>
+              <span class="voice-bar" style="height: 10px;"></span>
+            </div>
+            <span class="voice-duration">${escapeHtml(msg.voiceNote.durationStr || '0:05')}</span>
+          </div>
+        `;
+      }
+
+      // 5. Reaction Chips HTML
+      const myUid = currentUid || currentEmpId || 'RD-USER';
+      let reactionsHtml = '';
+      const rxEntries = Object.entries(msg.reactions || {});
+      if (rxEntries.length > 0) {
+        reactionsHtml = `
+          <div class="reaction-pills-row">
+            ${rxEntries.map(([emoji, users]) => {
+              const userList = Array.isArray(users) ? users : [];
+              const hasMine = userList.some(u => (typeof u === 'string' ? u === myUid : u.uid === myUid));
+              const names = userList.map(u => (typeof u === 'string' ? u : (u.name || 'Teammate'))).join(', ');
+              return `
+                <span class="reaction-chip ${hasMine ? 'has-my-reaction' : ''}" data-emoji="${emoji}" data-msg-id="${msg.id}" title="${escapeHtml(names)} reacted">
+                  <span>${emoji}</span>
+                  <span class="reaction-count">${userList.length}</span>
+                </span>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      // 6. Floating Action Bar HTML
+      const isBookmarked = (WorkspaceDB.data.savedMessages || []).some(b => b.id === msg.id);
+      const actionsBarHtml = `
+        <div class="chat-msg-actions-bar">
+          <button class="msg-action-btn btn-react" data-emoji="👍" data-msg-id="${msg.id}" title="Like">👍</button>
+          <button class="msg-action-btn btn-react" data-emoji="❤️" data-msg-id="${msg.id}" title="Heart">❤️</button>
+          <button class="msg-action-btn btn-react" data-emoji="😂" data-msg-id="${msg.id}" title="Laugh">😂</button>
+          <button class="msg-action-btn btn-react" data-emoji="😮" data-msg-id="${msg.id}" title="Surprised">😮</button>
+          <button class="msg-action-btn btn-react" data-emoji="🚀" data-msg-id="${msg.id}" title="Rocket">🚀</button>
+          <button class="msg-action-btn btn-msg-info" data-msg-id="${msg.id}" title="Message Info (Seen &amp; Delivery Details)">ℹ️</button>
+          <button class="msg-action-btn btn-thread-action" data-msg-id="${msg.id}" title="Reply in thread">💬</button>
+          <button class="msg-action-btn btn-reply-msg" data-msg-id="${msg.id}" title="Quote reply">↩️</button>
+          <button class="msg-action-btn btn-bookmark-msg" data-msg-id="${msg.id}" title="${isBookmarked ? 'Remove Bookmark' : 'Save Message'}">${isBookmarked ? '⭐' : '🔖'}</button>
+          ${canEdit ? `<button class="msg-action-btn btn-edit-msg" data-msg-id="${msg.id}" title="Edit message">✏️</button>` : ''}
+          <button class="msg-action-btn btn-pin-msg" data-msg-id="${msg.id}" title="${msg.isPinned ? 'Unpin message' : 'Pin message'}">${msg.isPinned ? '📍' : '📌'}</button>
+          <button class="msg-action-btn btn-copy-msg" data-msg-id="${msg.id}" title="Copy message text">📋</button>
+          ${canDelete ? `<button class="msg-action-btn btn-danger btn-delete-msg" data-msg-id="${msg.id}" title="Delete your message">🗑️</button>` : ''}
+        </div>
+      `;
+
+      // 7. Message Body or Inline Editor
+      let bodyHtml = '';
+      if (isEditing) {
+        bodyHtml = `
+          <div class="msg-inline-edit-box">
+            <textarea class="msg-inline-edit-textarea" id="inlineEditArea_${msg.id}" rows="2">${escapeHtml(msg.text)}</textarea>
+            <div class="msg-inline-edit-actions">
+              <button type="button" class="btn-edit-cancel" data-msg-id="${msg.id}">Cancel (Esc)</button>
+              <button type="button" class="btn-edit-save" data-msg-id="${msg.id}">Save (Enter)</button>
+            </div>
+          </div>
+        `;
+      } else {
+        bodyHtml = `
+          <div class="msg-text">${renderMarkdownText(msg.text)}</div>
+        `;
+      }
+
+      msgRow.innerHTML = `
+        <div class="msg-avatar">
+          ${photoUrl ? `<img src="${photoUrl}" alt="${senderName}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">` : avatar}
+        </div>
+        <div class="msg-bubble">
+          ${actionsBarHtml}
+          ${msg.importance === 'important' ? `<div class="msg-importance-banner important">❗ IMPORTANT ANNOUNCEMENT</div>` : ''}
+          ${msg.subject ? `<div class="msg-subject-header">${escapeHtml(msg.subject)}</div>` : ''}
+          <div class="msg-header">
+            <span class="msg-sender">${senderName} <span style="font-size: 9.5px; opacity: 0.75; font-family: var(--font-mono); font-weight: 700;">[${senderBadge}]</span></span>
+            <span class="msg-time" title="${fullDateTitle}">${timeStr}${ticksHtml}</span>
+            ${msg.isEdited ? `<span class="msg-edited-tag" title="Edited at ${msg.editedAt ? new Date(msg.editedAt).toLocaleTimeString() : ''}">(edited)</span>` : ''}
+            ${msg.isPinned ? `<span title="Pinned Announcement" style="color: #ffb300; font-size: 11px;">📌</span>` : ''}
+          </div>
+          ${replySnippetHtml}
+          ${bodyHtml}
+          ${imagesHtml}
+          ${filesHtml}
+          ${voiceHtml}
+          ${reactionsHtml}
+          <button type="button" class="msg-thread-pill btn-open-thread" data-msg-id="${msg.id}">
+            <span>💬</span>
+            <span>${msg.replyCount ? `${msg.replyCount} ${msg.replyCount === 1 ? 'reply' : 'replies'}` : 'Reply in thread'}</span>
+            ${msg.lastReplyUser ? `<span style="opacity: 0.7; font-weight: normal;">• Last reply by ${escapeHtml(msg.lastReplyUser)}</span>` : ''}
+          </button>
+        </div>
+      `;
+
+      container.appendChild(msgRow);
+
+      // Focus inline edit area if editing
+      if (isEditing) {
+        setTimeout(() => {
+          const area = document.getElementById(`inlineEditArea_${msg.id}`);
+          if (area) {
+            area.focus();
+            area.selectionStart = area.selectionEnd = area.value.length;
+            area.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                saveEditedMessage(msg.id, area.value);
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                state.editingMessageId = null;
+                renderMessages();
+              }
+            });
+          }
+        }, 30);
       }
     });
 
-    const isChannelSwitch = container._renderedChannelId !== state.activeChannelId;
+    // Attach Event Listeners on Message Action Buttons
+    container.querySelectorAll('.btn-react').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute('data-msg-id');
+        const emoji = btn.getAttribute('data-emoji');
+        toggleReactionOnMessage(msgId, emoji);
+      };
+    });
 
-    if (isChannelSwitch) {
-      // Clean initial render of switching to a new channel
-      container.replaceChildren();
-      container._renderedChannelId = state.activeChannelId;
-      let lastDateLabel = null;
+    container.querySelectorAll('.btn-msg-info').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute('data-msg-id');
+        openMessageInfoModal(msgId);
+      };
+    });
 
-      sortedMsgs.forEach((msg, msgIndex) => {
-        const dateLabel = getChatDateDividerLabel(msg.createdAt || Date.now());
-        if (dateLabel !== lastDateLabel) {
-          const sep = document.createElement('div');
-          sep.className = 'chat-date-separator';
-          sep.setAttribute('data-date-label', dateLabel);
-          sep.innerHTML = `<span class="chat-date-pill">${escapeHtml(dateLabel)}</span>`;
-          container.appendChild(sep);
-          lastDateLabel = dateLabel;
+    container.querySelectorAll('.msg-status-tick').forEach(tick => {
+      tick.style.cursor = 'pointer';
+      tick.onclick = (e) => {
+        e.stopPropagation();
+        const row = tick.closest('.chat-msg-row');
+        const msgId = row?.getAttribute('data-msg-id');
+        if (msgId) openMessageInfoModal(msgId);
+      };
+    });
+
+    container.querySelectorAll('.reaction-chip').forEach(chip => {
+      chip.onclick = (e) => {
+        e.stopPropagation();
+        const msgId = chip.getAttribute('data-msg-id');
+        const emoji = chip.getAttribute('data-emoji');
+        toggleReactionOnMessage(msgId, emoji);
+      };
+    });
+
+    container.querySelectorAll('.btn-reply-msg').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute('data-msg-id');
+        const targetMsg = msgs.find(m => m.id === msgId);
+        if (targetMsg) startReplyingTo(targetMsg);
+      };
+    });
+
+    container.querySelectorAll('.btn-edit-msg').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute('data-msg-id');
+        editChatMessage(msgId);
+      };
+    });
+
+    container.querySelectorAll('.btn-pin-msg').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute('data-msg-id');
+        togglePinChatMessage(msgId);
+      };
+    });
+
+    container.querySelectorAll('.btn-copy-msg').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute('data-msg-id');
+        const targetMsg = msgs.find(m => m.id === msgId);
+        if (targetMsg && targetMsg.text) {
+          navigator.clipboard.writeText(targetMsg.text);
+          btn.textContent = '✅';
+          setTimeout(() => btn.textContent = '📋', 1500);
         }
+      };
+    });
 
-        const msgRow = buildMessageRowElement(msg, msgIndex, sortedMsgs, latestOtherMsgTime, false);
-        container.appendChild(msgRow);
-      });
+    container.querySelectorAll('.btn-delete-msg').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute('data-msg-id');
+        deleteChatMessage(msgId);
+      };
+    });
 
-      container.scrollTop = container.scrollHeight;
-    } else {
-      // Incremental Reconciliation on existing channel
-      const existingRows = new Map();
-      container.querySelectorAll('.chat-msg-row[data-msg-id]').forEach(el => {
-        existingRows.set(el.getAttribute('data-msg-id'), el);
-      });
+    container.querySelectorAll('.btn-thread-action, .btn-open-thread').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute('data-msg-id');
+        openThreadSidePanel(msgId);
+      };
+    });
 
-      let lastDateLabel = null;
-      const seps = container.querySelectorAll('.chat-date-separator');
-      if (seps.length > 0) {
-        lastDateLabel = seps[seps.length - 1].getAttribute('data-date-label');
-      }
+    container.querySelectorAll('.btn-bookmark-msg').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute('data-msg-id');
+        toggleBookmarkMessage(msgId);
+      };
+    });
 
-      sortedMsgs.forEach((msg, msgIndex) => {
-        const dateLabel = getChatDateDividerLabel(msg.createdAt || Date.now());
-        const existingRow = existingRows.get(msg.id);
+    container.querySelectorAll('.btn-edit-cancel').forEach(btn => {
+      btn.onclick = () => {
+        state.editingMessageId = null;
+        renderMessages();
+      };
+    });
 
-        if (existingRow) {
-          // Update in-place without re-animating or rebuilding
-          updateMessageRowElement(existingRow, msg, msgIndex, sortedMsgs, latestOtherMsgTime);
-          existingRows.delete(msg.id);
-          lastDateLabel = dateLabel;
-        } else {
-          // Genuinely new message!
-          if (dateLabel !== lastDateLabel) {
-            const sep = document.createElement('div');
-            sep.className = 'chat-date-separator';
-            sep.setAttribute('data-date-label', dateLabel);
-            sep.innerHTML = `<span class="chat-date-pill">${escapeHtml(dateLabel)}</span>`;
-            container.appendChild(sep);
-            lastDateLabel = dateLabel;
+    container.querySelectorAll('.btn-edit-save').forEach(btn => {
+      btn.onclick = () => {
+        const msgId = btn.getAttribute('data-msg-id');
+        const area = document.getElementById(`inlineEditArea_${msgId}`);
+        if (area) saveEditedMessage(msgId, area.value);
+      };
+    });
+
+    // Lightbox triggers
+    container.querySelectorAll('.msg-img-thumb').forEach(img => {
+      img.onclick = () => {
+        openLightbox(img.getAttribute('data-lightbox-src') || img.src, img.getAttribute('data-caption') || '');
+      };
+    });
+
+    // Jump to quoted reply
+    container.querySelectorAll('.msg-reply-quote').forEach(quote => {
+      quote.onclick = () => {
+        const targetId = quote.getAttribute('data-target-msg-id');
+        if (!targetId) return;
+        const targetRow = container.querySelector(`[data-msg-id="${targetId}"]`);
+        if (targetRow) {
+          targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          targetRow.style.transition = 'box-shadow 0.3s ease';
+          targetRow.style.boxShadow = '0 0 16px var(--accent-cyan)';
+          setTimeout(() => targetRow.style.boxShadow = 'none', 1800);
+        }
+      };
+    });
+
+    // Voice Note Player Audio
+    container.querySelectorAll('.msg-voice-bubble').forEach(bubble => {
+      const btn = bubble.querySelector('.btn-voice-play');
+      const src = bubble.getAttribute('data-audio-src');
+      if (btn && src) {
+        btn.onclick = () => {
+          if (!bubble._audio) {
+            bubble._audio = new Audio(src);
+            bubble._audio.onended = () => {
+              btn.textContent = '▶';
+              bubble.querySelectorAll('.voice-bar').forEach(b => b.classList.remove('active'));
+            };
           }
-
-          const newRow = buildMessageRowElement(msg, msgIndex, sortedMsgs, latestOtherMsgTime, true);
-          container.appendChild(newRow);
-        }
-      });
-
-      // Remove deleted messages
-      existingRows.forEach(row => {
-        row.remove();
-      });
-
-      if (forceScroll || wasAtBottom) {
-        container.scrollTop = container.scrollHeight;
+          if (bubble._audio.paused) {
+            bubble._audio.play();
+            btn.textContent = '⏸';
+            bubble.querySelectorAll('.voice-bar').forEach(b => b.classList.add('active'));
+          } else {
+            bubble._audio.pause();
+            btn.textContent = '▶';
+            bubble.querySelectorAll('.voice-bar').forEach(b => b.classList.remove('active'));
+          }
+        };
       }
-    }
+    });
 
-    // If an inline edit box needs focus
-    if (state.editingMessageId) {
-      const area = document.getElementById(`inlineEditArea_${state.editingMessageId}`);
-      if (area && document.activeElement !== area) {
-        area.focus();
-        area.selectionStart = area.selectionEnd = area.value.length;
-      }
+    if (forceScroll || wasAtBottom) {
+      container.scrollTop = container.scrollHeight;
     }
   }
 
   // --- WHATSAPP-STYLE MESSAGE INFO CONTROLLER ---
-    // --- WHATSAPP-STYLE MESSAGE INFO CONTROLLER ---
   function openMessageInfoModal(msgId) {
     const modal = document.getElementById('messageInfoModal');
     if (!modal) return;
 
     if (typeof reconcilePastMessagesAsRead === 'function') {
-      try { reconcilePastMessagesAsRead(); } catch (_) {}
+      reconcilePastMessagesAsRead();
     }
 
-    let msgs = WorkspaceDB.data.chats[state.activeChannelId] || [];
-    let msg = msgs.find(m => m.id === msgId);
-    if (!msg) {
-      // Fallback: search across all channels in WorkspaceDB.data.chats
-      for (const chId in WorkspaceDB.data.chats) {
-        const found = (WorkspaceDB.data.chats[chId] || []).find(m => m.id === msgId);
-        if (found) {
-          msg = found;
-          msgs = WorkspaceDB.data.chats[chId];
-          break;
-        }
-      }
-    }
+    const msgs = WorkspaceDB.data.chats[state.activeChannelId] || [];
+    const msg = msgs.find(m => m.id === msgId);
     if (!msg) return;
 
     // 1. Preview Box
@@ -3847,7 +3547,7 @@
              !uLow.includes('jagadish');
     });
 
-    const isReadByAll = msg.readByAll === true || isPast || hasSubsequentOther || hasOtherReader || !isSelfMsg(msg);
+    const isReadByAll = msg.readByAll === true || isPast || hasSubsequentOther || hasOtherReader;
     const isDeliveredToAll = isReadByAll || msg.delivered === true || (now - msgTime > 1500) || !msg.isPending;
 
     if (prevTick) {
@@ -3864,87 +3564,59 @@
     if (!msg.deliveredTo) msg.deliveredTo = {};
 
     // Ensure readBy and deliveredTo are populated for info display
-    if (!isSelfMsg(msg)) {
-      // Incoming message: Current user has seen and received it
-      const selfUid = currentUid || 'CURRENT_USER';
-      const selfName = state.currentUser?.displayName || state.currentUser?.name || 'You';
-      const selfBadge = state.currentMemberId || 'RD-EMP-001';
-      if (!msg.readBy[selfUid]) {
-        msg.readBy[selfUid] = {
-          uid: selfUid,
-          name: selfName,
-          empId: selfBadge,
-          readAt: msgTime + 2000
+    if (isReadByAll && Object.keys(msg.readBy).length === 0) {
+      if (isDM) {
+        let partner = findDMPartnerMember(state.activeChannelId);
+        const pUid = partner ? (partner.uid || partner.id) : 'RD-EMP-002';
+        const pName = partner ? (partner.displayName || partner.name || 'Teammate') : 'Pavithra R';
+        const pBadge = partner ? (partner.id || 'RD-EMP-002') : 'RD-EMP-002';
+        msg.readBy[pUid] = {
+          uid: pUid,
+          name: pName,
+          empId: pBadge,
+          readAt: msgTime + 3000
         };
-      }
-      if (!msg.deliveredTo[selfUid]) {
-        msg.deliveredTo[selfUid] = msgTime + 1000;
-      }
-    } else {
-      // Outgoing message sent by self
-      if (isReadByAll && Object.keys(msg.readBy).length === 0) {
-        if (isDM) {
-          let partner = findDMPartnerMember(state.activeChannelId);
-          const pUid = partner ? (partner.uid || partner.id) : 'RD-EMP-002';
-          const pName = partner ? (partner.displayName || partner.name || 'Teammate') : 'Pavithra R';
-          const pBadge = partner ? (partner.id || 'RD-EMP-002') : 'RD-EMP-002';
-          msg.readBy[pUid] = {
-            uid: pUid,
-            name: pName,
-            empId: pBadge,
-            readAt: msgTime + 3000
+      } else {
+        const members = typeof getUniqueMembersList === 'function' ? getUniqueMembersList() : [];
+        members.forEach(tm => {
+          if (isSelfMember(tm)) return;
+          const tmUid = tm.uid || tm.id;
+          msg.readBy[tmUid] = {
+            uid: tmUid,
+            name: tm.displayName || tm.name || 'Teammate',
+            empId: tm.id || 'RD-EMP',
+            readAt: msgTime + 4000
           };
-        } else {
-          const members = typeof getUniqueMembersList === 'function' ? getUniqueMembersList() : [];
-          members.forEach(tm => {
-            if (isSelfMember(tm)) return;
-            const tmUid = tm.uid || tm.id;
-            msg.readBy[tmUid] = {
-              uid: tmUid,
-              name: tm.displayName || tm.name || 'Teammate',
-              empId: tm.id || 'RD-EMP',
-              readAt: msgTime + 4000
-            };
-          });
-        }
-      }
-
-      if (isDeliveredToAll && Object.keys(msg.deliveredTo).length === 0) {
-        if (isDM) {
-          let partner = findDMPartnerMember(state.activeChannelId);
-          const pUid = partner ? (partner.uid || partner.id) : 'RD-EMP-002';
-          msg.deliveredTo[pUid] = msgTime + 1000;
-        } else {
-          const members = typeof getUniqueMembersList === 'function' ? getUniqueMembersList() : [];
-          members.forEach(tm => {
-            if (isSelfMember(tm)) return;
-            const tmUid = tm.uid || tm.id;
-            msg.deliveredTo[tmUid] = msgTime + 1000;
-          });
-        }
+        });
       }
     }
 
-    // 2. Read By List
-    const readList = document.getElementById('msgInfoReadList');
-    const readCount = document.getElementById('msgInfoReadCount');
-    const readEntries = Object.values(msg.readBy || {});
+    if (isDeliveredToAll && Object.keys(msg.deliveredTo).length === 0) {
+      if (isDM) {
+        let partner = findDMPartnerMember(state.activeChannelId);
+        const pUid = partner ? (partner.uid || partner.id) : 'RD-EMP-002';
+        msg.deliveredTo[pUid] = msgTime + 1000;
+      } else {
+        const members = typeof getUniqueMembersList === 'function' ? getUniqueMembersList() : [];
+        members.forEach(tm => {
+          if (isSelfMember(tm)) return;
+          const tmUid = tm.uid || tm.id;
+          msg.deliveredTo[tmUid] = msgTime + 1000;
+        });
+      }
+    }
 
-    if (readCount) readCount.textContent = String(readEntries.length);
+    const readEntries = Object.values(msg.readBy || {});
 
     if (readList) {
       if (readEntries.length === 0) {
-        readList.innerHTML = `<div class="msg-info-empty" style="padding: 14px; font-size: 12px; color: var(--text-muted); text-align: center;">Not read by any teammates yet.</div>`;
+        readList.innerHTML = `<div class="msg-info-empty">Not read by any teammates yet.</div>`;
       } else {
         readList.innerHTML = readEntries.map(r => {
-          const isSelfReader = r.uid === currentUid || String(r.uid).toLowerCase().includes('founder');
           const rMember = (WorkspaceDB.data.members || {})[r.uid] || (WorkspaceDB.data.members || {})[r.empId] || {};
-          let photo = rMember.photoURL || rMember.photoUrl || rMember.idCardPhoto;
-          if (!photo && isSelfReader && state.currentUser) {
-            photo = state.currentUser.photoURL || state.currentUser.photoUrl;
-          }
-          const name = escapeHtml(isSelfReader ? 'You' : (r.name || rMember.name || rMember.displayName || 'Teammate'));
-          const empBadge = escapeHtml(r.empId || rMember.id || (isSelfReader ? state.currentMemberId : 'MEMBER'));
+          const photo = rMember.photoURL || rMember.photoUrl || rMember.idCardPhoto;
+          const name = escapeHtml(r.name || rMember.name || rMember.displayName || 'Teammate');
+          const empBadge = escapeHtml(r.empId || rMember.id || 'MEMBER');
           const timeFormatted = r.readAt ? formatFullDateTime(r.readAt) : 'Just now';
           const avatar = (name || 'RD').slice(0, 2).toUpperCase();
 
@@ -3952,7 +3624,7 @@
             <div class="msg-info-user-row">
               <div class="msg-info-user-identity">
                 <div class="msg-info-user-avatar">
-                  ${photo ? `<img src="${sanitizeUrl(photo)}" alt="${name}" style="width:100%;height:100%;object-fit:cover;object-position:center;border-radius:50%;display:block;" onerror="this.style.display='none'; if(this.parentElement) this.parentElement.textContent='${avatar}';">` : avatar}
+                  ${photo ? `<img src="${sanitizeUrl(photo)}" alt="${name}">` : avatar}
                 </div>
                 <div>
                   <div class="msg-info-user-name">${name}</div>
@@ -3988,20 +3660,16 @@
         `;
       } else {
         delList.innerHTML = delEntries.map(([uid, ts]) => {
-          const isSelfDeliv = uid === currentUid || String(uid).toLowerCase().includes('founder');
           const dMember = (WorkspaceDB.data.members || {})[uid] || {};
-          const name = escapeHtml(isSelfDeliv ? 'You' : (dMember.name || dMember.displayName || 'Teammate'));
-          const empBadge = escapeHtml(dMember.id || (isSelfDeliv ? state.currentMemberId : 'RD-EMP'));
+          const name = escapeHtml(dMember.name || dMember.displayName || (uid === state.currentUser?.uid ? 'You' : 'Teammate'));
+          const empBadge = escapeHtml(dMember.id || 'RD-EMP');
           const avatar = (name || 'RD').slice(0, 2).toUpperCase();
-          let photo = dMember.photoURL || dMember.photoUrl || dMember.idCardPhoto;
-          if (!photo && isSelfDeliv && state.currentUser) {
-            photo = state.currentUser.photoURL || state.currentUser.photoUrl;
-          }
+          const photo = dMember.photoURL || dMember.photoUrl || dMember.idCardPhoto;
           return `
             <div class="msg-info-user-row">
               <div class="msg-info-user-identity">
                 <div class="msg-info-user-avatar">
-                  ${photo ? `<img src="${sanitizeUrl(photo)}" alt="${name}" style="width:100%;height:100%;object-fit:cover;object-position:center;border-radius:50%;display:block;" onerror="this.style.display='none'; if(this.parentElement) this.parentElement.textContent='${avatar}';">` : avatar}
+                  ${photo ? `<img src="${sanitizeUrl(photo)}" alt="${name}">` : avatar}
                 </div>
                 <div>
                   <div class="msg-info-user-name">${name}</div>
@@ -4523,7 +4191,7 @@
       input.style.height = 'auto';
     }
 
-    scheduleRenderMessages(true);
+    renderMessages(true);
     playNotificationChirp(false);
 
     // Record activity for mentions
@@ -4568,8 +4236,11 @@
     if (window.FirebaseService?.setTypingStatus) {
       FirebaseService.setTypingStatus(state.activeChannelId, false);
     }
+
+    setTimeout(() => {
+      if (state.activeChannelId) renderMessages();
+    }, 2000);
   }
-  window.sendChatMessage = sendChatMessage;
 
   // =========================================================================
   // MICROSOFT TEAMS SUITE: COMPLETE ENGINE & CONTROLLERS
@@ -5503,27 +5174,14 @@
     // 3. Attendance Hero Card (Image 2)
     const attActivePill = document.getElementById('attendanceActivePill');
     const attActiveText = document.getElementById('attendanceActiveText');
-    const todayDateStr = new Date().toISOString().slice(0, 10);
-    const approvedLeaveToday = (WorkspaceDB.data.leaveRequests || []).find(l => {
-      if (l.status !== 'APPROVED') return false;
-      const isUser = l.uid === state.currentUser?.uid || l.empId === state.currentMemberId;
-      return isUser && todayDateStr >= l.startDate && todayDateStr <= l.endDate;
-    });
-
     if (attActiveText) {
-      if (approvedLeaveToday) {
-        attActiveText.textContent = `🌴 ON APPROVED LEAVE • ${approvedLeaveToday.leaveType}`;
-        if (attActivePill) attActivePill.className = 'status-pill on-leave';
-      } else if (state.personalShift.status === 'DUTY_ON') {
+      if (state.personalShift.status === 'DUTY_ON') {
         const startStr = state.personalShift.sessionStartTs ? new Date(state.personalShift.sessionStartTs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:40 PM';
         attActiveText.textContent = `ON DUTY • ACTIVE SINCE ${startStr} IST`;
-        if (attActivePill) attActivePill.className = 'status-pill active';
       } else if (state.personalShift.status === 'DUTY_BREAK') {
         attActiveText.textContent = 'ON BREAK • SHIFT PAUSED';
-        if (attActivePill) attActivePill.className = 'status-pill break';
       } else {
         attActiveText.textContent = 'DUTY OFF • WORKSTATION STANDBY';
-        if (attActivePill) attActivePill.className = 'status-pill off';
       }
     }
     const shiftQuotaBar = document.getElementById('shiftQuotaBar');
@@ -6721,11 +6379,6 @@
       updateLiveFleetHours();
     }
     else if (normalized === 'database') WorkspaceDB.updateMetricsUI();
-    else if (normalized === 'appMonitor' || normalized === 'appmonitor') {
-      if (window.AppMonitor && AppMonitor.isAdmin()) {
-        AppMonitor.render(AppMonitor.currentViewDate || AppMonitor.todayStr());
-      }
-    }
   }
 
   // Live real-time ticker for presence & fleet telemetry hours + team working hours
@@ -6750,7 +6403,6 @@
       drawer.style.display = 'flex';
     }
   }
-  window.openCommandCenter = openCommandCenter;
 
   function closeCommandCenter() {
     state.commandCenterOpen = false;
@@ -7521,12 +7173,8 @@
           });
           renderPendingAttachments();
         } else {
-          if (file.size > 700 * 1024 || file.name.match(/\.(exe|msi|dmg|apk|zip|rar|7z|mp4|mkv|mov|avi|iso)$/i)) {
-            if (typeof openGDriveAttachModal === 'function') {
-              openGDriveAttachModal(file.name, formatBytes(file.size), file.name.match(/\.(mp4|mkv|mov|avi)$/i) ? 'video' : 'app');
-            } else {
-              showQuickToast(`File "${file.name}" is ${formatBytes(file.size)}. Use Google Drive to share large files.`, 'info');
-            }
+          if (file.size > 700 * 1024) {
+            showQuickToast(`File "${file.name}" is ${formatBytes(file.size)}. Direct sync limit is 700KB.`, 'warning');
             continue;
           }
           const reader = new FileReader();
@@ -7570,8 +7218,8 @@
         const chip = document.createElement('div');
         chip.className = 'attachment-preview-item';
         chip.innerHTML = `
-          ${att.isImage ? `<img src="${sanitizeUrl(att.dataUrl)}" alt="${escapeHtml(att.name)}">` : (att.isGDrive ? `<span style="font-size: 14px;">📁</span>` : `<span>📎</span>`)}
-          <span>${escapeHtml(att.name)} ${att.isGDrive ? `(Google Drive • ${escapeHtml(att.sizeStr || '')})` : `(${formatBytes(att.size || 0)})`}</span>
+          ${att.isImage ? `<img src="${sanitizeUrl(att.dataUrl)}" alt="${escapeHtml(att.name)}">` : `<span>📎</span>`}
+          <span>${escapeHtml(att.name)} (${formatBytes(att.size || 0)})</span>
           <button type="button" class="btn-remove-attachment" title="Remove">&times;</button>
         `;
         chip.querySelector('.btn-remove-attachment')?.addEventListener('click', () => {
@@ -7583,7 +7231,6 @@
 
       bar.classList.remove('hidden');
     }
-    window.renderPendingAttachments = renderPendingAttachments;
 
     // Clipboard Paste (Ctrl+V) for Instant Images
     chatInput?.addEventListener('paste', (e) => {
@@ -10948,14 +10595,12 @@ function initThemeEngine() {
     initOmniboxSearch();
     bindV3EventListeners();
     initPortfolioFirstScreen();
-    initLeaveAndGDriveControls();
     updateBootProgress(70, "Syncing telemetry, nodes & tasks...", "[SYNC] Restoring personnel matrix...");
     closeCommandCenter();
 
     renderWorkers();
     renderTasks();
     renderPunchLogs();
-    renderLeaveRequests();
     renderChatChannelsAndDMs();
     renderFleetTelemetry();
     renderDashboard();
@@ -11096,39 +10741,28 @@ function initThemeEngine() {
             safeSetText(document.getElementById('activeChatTopic'), activeChObj.topic || '');
           }
 
-          // Manage background channel message listeners (for notifications on INACTIVE channels only)
-          if (!state.bgChatUnsubs) state.bgChatUnsubs = new Map();
-          const activeChId = state.activeChannelId || 'general';
-          const validChannelIds = new Set(channels.map(c => c.id));
-
-          // Cleanup listeners for channels that no longer exist or are currently active
-          state.bgChatUnsubs.forEach((unsub, chId) => {
-            if (!validChannelIds.has(chId) || chId === activeChId) {
-              try { unsub(); } catch (_) {}
-              state.bgChatUnsubs.delete(chId);
-            }
-          });
-
-          // Attach listeners strictly for non-active channels that don't have one yet
           channels.forEach(ch => {
-            if (ch.id === activeChId || state.bgChatUnsubs.has(ch.id)) return;
-            const unsub = FirebaseService.subscribeMessages(ch.id, (cloudMsgs) => {
-              if (cloudMsgs && Array.isArray(cloudMsgs)) {
+            FirebaseService.subscribeMessages(ch.id, (cloudMsgs) => {
+              if (cloudMsgs) {
                 const prevMsgs = WorkspaceDB.data.chats[ch.id] || [];
                 const isNew = cloudMsgs.length > prevMsgs.length;
                 const lastMsg = cloudMsgs.length > 0 ? cloudMsgs[cloudMsgs.length - 1] : null;
 
                 reconcileChannelMessages(cloudMsgs, ch.id);
                 WorkspaceDB.data.chats[ch.id] = cloudMsgs;
-                debouncedDbSave();
+                WorkspaceDB.save();
 
-                // Show notification and sound for incoming messages from teammates (on background channel)
+                if (state.activeChannelId === ch.id) {
+                  renderMessages();
+                }
+
+                // Show notification and sound for incoming messages from teammates
                 const myEmail = state.currentUser?.email?.toLowerCase();
                 if (isNew && lastMsg && lastMsg.senderEmail && lastMsg.senderEmail.toLowerCase() !== myEmail) {
                   playNotificationChirp(true);
                   if (window.electronAPI && window.electronAPI.showNotification) {
                     window.electronAPI.showNotification({
-                      title: `💬 #${ch.name || ch.id} • ${lastMsg.senderName || 'New Message'}`,
+                      title: `💬 ${lastMsg.senderName || 'New Message'}`,
                       body: String(lastMsg.text || '').slice(0, 150),
                       targetTab: 'chat'
                     });
@@ -11136,10 +10770,40 @@ function initThemeEngine() {
                 }
               }
             });
-            state.bgChatUnsubs.set(ch.id, unsub);
           });
           renderChatChannelsAndDMs();
         }
+      });
+
+      // Core Channels Fallback Listener
+      ['general', 'announcements', 'engineering'].forEach(chId => {
+        FirebaseService.subscribeMessages(chId, (cloudMsgs) => {
+          if (cloudMsgs) {
+            const prevMsgs = WorkspaceDB.data.chats[chId] || [];
+            const isNew = cloudMsgs.length > prevMsgs.length;
+            const lastMsg = cloudMsgs.length > 0 ? cloudMsgs[cloudMsgs.length - 1] : null;
+
+            reconcileChannelMessages(cloudMsgs, chId);
+            WorkspaceDB.data.chats[chId] = cloudMsgs;
+            WorkspaceDB.save();
+
+            if (state.activeChannelId === chId) {
+              renderMessages();
+            }
+
+            const myEmail = state.currentUser?.email?.toLowerCase();
+            if (isNew && lastMsg && lastMsg.senderEmail && lastMsg.senderEmail.toLowerCase() !== myEmail) {
+              playNotificationChirp(true);
+              if (window.electronAPI && window.electronAPI.showNotification) {
+                window.electronAPI.showNotification({
+                  title: `💬 #${chId} • ${lastMsg.senderName || 'Teammate'}`,
+                  body: String(lastMsg.text || '').slice(0, 150),
+                  targetTab: 'chat'
+                });
+              }
+            }
+          }
+        });
       });
 
       // 4. Real-time Database User Presence across devices
@@ -11801,1062 +11465,6 @@ function initThemeEngine() {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
-  }
-
-
-
-
-
-  // =========================================================================
-  // GOOGLE DRIVE CLOUD INTEGRATION CONTROLLER
-  // =========================================================================
-  function parseGoogleDriveUrl(url) {
-    if (!url || typeof url !== 'string') return null;
-    const trimmed = url.trim();
-    let fileId = null;
-    let isFolder = false;
-
-    const fileMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-    if (fileMatch) fileId = fileMatch[1];
-    if (!fileId) {
-      const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-      if (idMatch) fileId = idMatch[1];
-    }
-    if (!fileId) {
-      const docMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
-      if (docMatch) fileId = docMatch[1];
-    }
-    if (!fileId) {
-      const folderMatch = trimmed.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-      if (folderMatch) {
-        fileId = folderMatch[1];
-        isFolder = true;
-      }
-    }
-    if (!fileId && (trimmed.includes('drive.google.com') || trimmed.includes('docs.google.com'))) {
-      fileId = 'gdrive_' + Date.now();
-    }
-    if (!fileId) return null;
-
-    return {
-      fileId: fileId,
-      isFolder: isFolder,
-      originalUrl: trimmed,
-      previewUrl: isFolder ? trimmed : `https://drive.google.com/file/d/${fileId}/preview`,
-      directDownloadUrl: isFolder ? trimmed : `https://drive.google.com/uc?export=download&id=${fileId}`
-    };
-  }
-
-  function openGDriveAttachModal(initialName = '', initialSize = '', initialCategory = 'app') {
-    const modal = document.getElementById('gdriveAttachModal');
-    if (!modal) return;
-
-    const nameInput = document.getElementById('inputGDriveName');
-    const sizeInput = document.getElementById('inputGDriveSize');
-    const catSelect = document.getElementById('selectGDriveCategory');
-    const linkInput = document.getElementById('inputGDriveLink');
-
-    if (nameInput) nameInput.value = initialName || '';
-    if (sizeInput) sizeInput.value = initialSize || '';
-    if (catSelect) catSelect.value = initialCategory || 'app';
-    if (linkInput) {
-      linkInput.value = '';
-      setTimeout(() => linkInput.focus(), 100);
-    }
-
-    modal.classList.remove('hidden');
-    modal.style.display = 'flex';
-  }
-  window.openGDriveAttachModal = openGDriveAttachModal;
-
-  function closeGDriveAttachModal() {
-    const modal = document.getElementById('gdriveAttachModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.style.display = 'none';
-    }
-  }
-  window.closeGDriveAttachModal = closeGDriveAttachModal;
-  window.handleGDriveAttachSubmit = handleGDriveAttachSubmit;
-
-  function handleGDriveAttachSubmit(e) {
-    if (e && e.preventDefault) e.preventDefault();
-
-    const linkInput = document.getElementById('inputGDriveLink');
-    const nameInput = document.getElementById('inputGDriveName');
-    const sizeInput = document.getElementById('inputGDriveSize');
-    const catSelect = document.getElementById('selectGDriveCategory');
-
-    const rawUrl = linkInput?.value?.trim();
-    if (!rawUrl) {
-      showQuickToast('Please enter a Google Drive link.', 'warning');
-      return;
-    }
-
-    const parsed = parseGoogleDriveUrl(rawUrl);
-    if (!parsed) {
-      showQuickToast('Invalid Google Drive URL. Please check the link and try again.', 'error');
-      return;
-    }
-
-    const fileName = nameInput?.value?.trim() || 'Google Drive File';
-    const fileSizeStr = sizeInput?.value?.trim() || 'Cloud File';
-    const category = catSelect?.value || 'app';
-
-    if (!state.pendingAttachments) state.pendingAttachments = [];
-    state.pendingAttachments.push({
-      id: 'gdrive_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-      name: fileName,
-      size: 0,
-      sizeStr: fileSizeStr,
-      type: category,
-      isGDrive: true,
-      gdriveUrl: parsed.originalUrl,
-      gdriveId: parsed.fileId,
-      previewUrl: parsed.previewUrl,
-      directDownloadUrl: parsed.directDownloadUrl
-    });
-
-    if (typeof renderPendingAttachments === 'function') renderPendingAttachments();
-    else if (typeof window.renderPendingAttachments === 'function') window.renderPendingAttachments();
-    closeGDriveAttachModal();
-    showQuickToast(`Google Drive file "${fileName}" attached to message!`, 'success');
-  }
-
-  // =========================================================================
-  // ATTENDANCE LEAVE REQUEST & APPROVAL SYSTEM
-  // =========================================================================
-  function isCurrentUserFounderOrAdmin() {
-    const email = (state.currentUser?.email || state.currentMember?.email || '').toLowerCase();
-    const role = (state.userRole || state.currentMember?.role || '').toLowerCase();
-    const id = state.currentMemberId || '';
-    if (!state.currentUser && !state.currentMemberId) return true; // Default workstation owner / admin
-    return email === 'jagadish2k2006@gmail.com' || role === 'owner' || role === 'admin' || id === 'RD-FOUNDER-001' || id === 'RD-EMP-001' || !email;
-  }
-
-  function openTakeLeaveModal() {
-    const modal = document.getElementById('takeLeaveModal');
-    if (!modal) return;
-
-    // Populate current applicant info
-    const nameEl = document.getElementById('leaveApplicantName');
-    const badgeEl = document.getElementById('leaveApplicantBadge');
-    const avatarEl = document.getElementById('leaveApplicantAvatar');
-    const startDateInput = document.getElementById('leaveStartDate');
-    const endDateInput = document.getElementById('leaveEndDate');
-    const reasonInput = document.getElementById('leaveReasonText');
-
-    const curName = state.currentUser?.displayName || state.currentMember?.name || 'Teammate';
-    const curBadge = state.currentMemberId || 'RD-EMP';
-    const curPhoto = state.currentUser?.photoURL || state.currentMember?.photoURL || state.currentMember?.idCardPhoto;
-
-    if (nameEl) nameEl.textContent = curName;
-    if (badgeEl) badgeEl.textContent = curBadge;
-    if (avatarEl) {
-      if (curPhoto) {
-        avatarEl.innerHTML = `<img src="${sanitizeUrl(curPhoto)}" alt="${curName}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;">`;
-      } else {
-        avatarEl.textContent = (curName || 'RD').slice(0, 2).toUpperCase();
-      }
-    }
-
-    const todayStr = new Date().toISOString().slice(0, 10);
-    if (startDateInput) startDateInput.value = todayStr;
-    if (endDateInput) endDateInput.value = todayStr;
-    if (reasonInput) reasonInput.value = '';
-
-    updateLeaveCalculatedDuration();
-    modal.classList.remove('hidden');
-    modal.style.display = 'flex';
-  }
-  window.openTakeLeaveModal = openTakeLeaveModal;
-
-  function closeTakeLeaveModal() {
-    const modal = document.getElementById('takeLeaveModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.style.display = 'none';
-    }
-  }
-  window.closeTakeLeaveModal = closeTakeLeaveModal;
-  window.handleTakeLeaveSubmit = handleTakeLeaveSubmit;
-
-  function updateLeaveCalculatedDuration() {
-    const startInput = document.getElementById('leaveStartDate');
-    const endInput = document.getElementById('leaveEndDate');
-    const durationText = document.getElementById('leaveCalculatedDaysText');
-    if (!startInput || !endInput || !durationText) return;
-
-    const start = new Date(startInput.value);
-    const end = new Date(endInput.value);
-    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) {
-      durationText.textContent = '1 Day';
-      return;
-    }
-
-    const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
-    durationText.textContent = `${diffDays} ${diffDays === 1 ? 'Day' : 'Days'}`;
-  }
-
-  async function handleTakeLeaveSubmit(e) {
-    if (e && e.preventDefault) e.preventDefault();
-
-    const leaveTypeSelect = document.getElementById('leaveTypeSelect') || document.getElementById('selectLeaveType');
-    const startInput = document.getElementById('leaveStartDate');
-    const endInput = document.getElementById('leaveEndDate');
-    const reasonInput = document.getElementById('leaveReasonText');
-
-    const leaveType = leaveTypeSelect?.value || 'Casual Leave (CL)';
-    const startDate = startInput?.value;
-    const endDate = endInput?.value;
-    const reason = reasonInput?.value?.trim();
-
-    if (!startDate || !endDate) {
-      showQuickToast('Please select valid start and end dates.', 'warning');
-      return;
-    }
-
-    if (new Date(endDate) < new Date(startDate)) {
-      showQuickToast('End date cannot be earlier than start date.', 'warning');
-      return;
-    }
-
-    if (!reason) {
-      showQuickToast('Please state a reason for your leave request.', 'warning');
-      return;
-    }
-
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const totalDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
-
-    const curName = state.currentUser?.displayName || state.currentMember?.name || 'Teammate';
-    const curBadge = state.currentMemberId || 'RD-EMP';
-    const curPhoto = state.currentUser?.photoURL || state.currentMember?.photoURL || '';
-
-    const leavePayload = {
-      id: 'leave_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-      uid: state.currentUser?.uid || 'EMP_USER',
-      empId: curBadge,
-      employeeName: curName,
-      employeeEmail: state.currentUser?.email || '',
-      employeePhoto: curPhoto,
-      leaveType: leaveType,
-      startDate: startDate,
-      endDate: endDate,
-      totalDays: totalDays,
-      reason: reason,
-      status: 'PENDING',
-      submittedAt: Date.now(),
-      approvedAt: null,
-      approvedBy: null,
-      rejectedAt: null,
-      rejectedBy: null,
-      rejectionReason: null
-    };
-
-    if (!WorkspaceDB.data.leaveRequests) WorkspaceDB.data.leaveRequests = [];
-    WorkspaceDB.data.leaveRequests.unshift(leavePayload);
-    WorkspaceDB.save();
-
-    if (window.FirebaseService && typeof FirebaseService.submitLeaveRequest === 'function') {
-      try {
-        await FirebaseService.submitLeaveRequest(leavePayload);
-      } catch (err) {
-        console.warn('[LEAVE] Cloud submission fallback:', err.message);
-      }
-    }
-
-    closeTakeLeaveModal();
-    showQuickToast('🌴 Leave application submitted! Awaiting Founder approval.', 'success');
-    renderLeaveRequests();
-  }
-
-  async function acceptLeaveRequest(leaveId) {
-    if (!leaveId) return;
-    const approverName = state.currentUser?.displayName || 'Founder Jagadish K';
-
-    if (!WorkspaceDB.data.leaveRequests) WorkspaceDB.data.leaveRequests = [];
-    const target = WorkspaceDB.data.leaveRequests.find(l => l.id === leaveId);
-    if (target) {
-      target.status = 'APPROVED';
-      target.approvedBy = approverName;
-      target.approvedAt = Date.now();
-      WorkspaceDB.save();
-    }
-
-    if (window.FirebaseService && typeof FirebaseService.approveLeaveRequest === 'function') {
-      try {
-        await FirebaseService.approveLeaveRequest(leaveId, approverName);
-      } catch (e) {
-        console.warn('[LEAVE] Cloud approval note:', e.message);
-      }
-    }
-
-    showQuickToast(`✅ Leave request approved for ${target?.employeeName || 'teammate'}.`, 'success');
-    playNotificationChirp(false);
-    renderLeaveRequests();
-    renderPersonalAttendanceUI();
-  }
-  window.acceptLeaveRequest = acceptLeaveRequest;
-
-  async function rejectLeaveRequest(leaveId) {
-    if (!leaveId) return;
-    const reason = prompt('Reason for declining leave (optional):', 'Declined due to project sprint deadlines') || 'Not specified';
-    const rejecterName = state.currentUser?.displayName || 'Founder Jagadish K';
-
-    if (!WorkspaceDB.data.leaveRequests) WorkspaceDB.data.leaveRequests = [];
-    const target = WorkspaceDB.data.leaveRequests.find(l => l.id === leaveId);
-    if (target) {
-      target.status = 'REJECTED';
-      target.rejectedBy = rejecterName;
-      target.rejectedAt = Date.now();
-      target.rejectionReason = reason;
-      WorkspaceDB.save();
-    }
-
-    if (window.FirebaseService && typeof FirebaseService.rejectLeaveRequest === 'function') {
-      try {
-        await FirebaseService.rejectLeaveRequest(leaveId, rejecterName, reason);
-      } catch (e) {
-        console.warn('[LEAVE] Cloud rejection note:', e.message);
-      }
-    }
-
-    showQuickToast('❌ Leave request declined.', 'info');
-    renderLeaveRequests();
-  }
-  window.rejectLeaveRequest = rejectLeaveRequest;
-
-  function renderLeaveRequests() {
-    const list = WorkspaceDB.data.leaveRequests || [];
-    const isFounder = isCurrentUserFounderOrAdmin();
-
-    const pendingQueueWrap = document.getElementById('founderLeaveApprovalQueue');
-    const pendingCardsList = document.getElementById('founderLeaveCardsList');
-    const queueCountText = document.getElementById('founderQueueCountText');
-    const pendingBadge = document.getElementById('leavePendingBadge');
-    const tableBody = document.getElementById('leaveRequestsTableBody');
-    const thActions = document.getElementById('thLeaveActions');
-
-    const pendingList = list.filter(l => l.status === 'PENDING');
-
-    // Update Pending Badge in Subtab
-    if (pendingBadge) {
-      if (pendingList.length > 0) {
-        pendingBadge.textContent = String(pendingList.length);
-        pendingBadge.classList.remove('hidden');
-      } else {
-        pendingBadge.classList.add('hidden');
-      }
-    }
-
-    // 1. Founder Pending Approvals Queue
-    if (pendingQueueWrap && pendingCardsList) {
-      if (isFounder && pendingList.length > 0) {
-        pendingQueueWrap.classList.remove('hidden');
-        if (queueCountText) queueCountText.textContent = `${pendingList.length} Pending Approval`;
-
-        pendingCardsList.innerHTML = pendingList.map(req => {
-          const photo = req.employeePhoto;
-          const avatar = (req.employeeName || 'RD').slice(0, 2).toUpperCase();
-          return `
-            <div class="leave-request-card" data-leave-id="${escapeHtml(req.id)}">
-              <div class="leave-card-user-row">
-                <div class="leave-card-user">
-                  <div class="msg-avatar" style="width: 32px; height: 32px; font-size: 11px;">
-                    ${photo ? `<img src="${sanitizeUrl(photo)}" alt="${escapeHtml(req.employeeName)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : avatar}
-                  </div>
-                  <div>
-                    <div style="font-size: 12px; font-weight: 700; color: #fff;">${escapeHtml(req.employeeName)}</div>
-                    <div style="font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(req.empId)}</div>
-                  </div>
-                </div>
-                <span class="badge-leave-pending">PENDING</span>
-              </div>
-              <div class="leave-card-details">
-                <div style="font-weight: 700; color: #c4b5fd; margin-bottom: 2px;">${escapeHtml(req.leaveType)} &bull; ${req.totalDays} ${req.totalDays === 1 ? 'Day' : 'Days'}</div>
-                <div style="font-size: 10.5px; opacity: 0.8; font-family: var(--font-mono);">${escapeHtml(req.startDate)} &rarr; ${escapeHtml(req.endDate)}</div>
-                <div style="margin-top: 5px; font-style: italic; color: #e2e8f0;">"${escapeHtml(req.reason)}"</div>
-              </div>
-              <div class="leave-card-actions">
-                <button type="button" class="btn-leave-accept" onclick="acceptLeaveRequest('${req.id}')" title="Accept and Approve Leave">
-                  <span>✅ Accept</span>
-                </button>
-                <button type="button" class="btn-leave-reject" onclick="rejectLeaveRequest('${req.id}')" title="Decline Leave Request">
-                  <span>❌ Decline</span>
-                </button>
-              </div>
-            </div>
-          `;
-        }).join('');
-      } else {
-        pendingQueueWrap.classList.add('hidden');
-      }
-    }
-
-    // 2. All Historical Leave Requests Table
-    if (tableBody) {
-      if (thActions) {
-        if (isFounder) thActions.classList.remove('hidden');
-        else thActions.classList.add('hidden');
-      }
-
-      if (list.length === 0) {
-        tableBody.innerHTML = `
-          <tr>
-            <td colspan="${isFounder ? 7 : 6}" style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 12px;">
-              No leave applications recorded yet. Click <strong>"+ Apply for Leave"</strong> to submit a request.
-            </td>
-          </tr>
-        `;
-        return;
-      }
-
-      tableBody.innerHTML = list.map(req => {
-        const photo = req.employeePhoto;
-        const avatar = (req.employeeName || 'RD').slice(0, 2).toUpperCase();
-        const subDate = req.submittedAt ? new Date(req.submittedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
-
-        let statusBadge = '';
-        if (req.status === 'APPROVED') {
-          statusBadge = `<span class="badge-leave-approved">APPROVED (${escapeHtml(req.approvedBy || 'Founder')})</span>`;
-        } else if (req.status === 'REJECTED') {
-          statusBadge = `<span class="badge-leave-rejected" title="${escapeHtml(req.rejectionReason || '')}">DECLINED</span>`;
-        } else {
-          statusBadge = `<span class="badge-leave-pending">PENDING APPROVAL</span>`;
-        }
-
-        let actionCol = '';
-        if (isFounder) {
-          if (req.status === 'PENDING') {
-            actionCol = `
-              <td>
-                <div style="display: flex; gap: 6px;">
-                  <button type="button" class="btn-leave-accept" style="padding: 4px 8px; font-size: 10px;" onclick="acceptLeaveRequest('${req.id}')">Accept</button>
-                  <button type="button" class="btn-leave-reject" style="padding: 4px 8px; font-size: 10px;" onclick="rejectLeaveRequest('${req.id}')">Decline</button>
-                </div>
-              </td>
-            `;
-          } else {
-            actionCol = `<td style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Processed</td>`;
-          }
-        }
-
-        return `
-          <tr>
-            <td>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <div class="msg-avatar" style="width: 26px; height: 26px; font-size: 10px;">
-                  ${photo ? `<img src="${sanitizeUrl(photo)}" alt="${escapeHtml(req.employeeName)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : avatar}
-                </div>
-                <div>
-                  <div style="font-weight: 700; color: #fff;">${escapeHtml(req.employeeName)}</div>
-                  <div style="font-size: 9.5px; opacity: 0.7; font-family: var(--font-mono);">${escapeHtml(req.empId)}</div>
-                </div>
-              </div>
-            </td>
-            <td>
-              <span style="font-weight: 600; color: #c4b5fd;">${escapeHtml(req.leaveType)}</span>
-            </td>
-            <td>
-              <div style="font-size: 11.5px; font-family: var(--font-mono); color: #fff;">${escapeHtml(req.startDate)} &rarr; ${escapeHtml(req.endDate)}</div>
-              <div style="font-size: 10px; color: var(--accent-cyan);">${req.totalDays} ${req.totalDays === 1 ? 'day' : 'days'} total</div>
-            </td>
-            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(req.reason)}">
-              ${escapeHtml(req.reason)}
-            </td>
-            <td style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">
-              ${subDate}
-            </td>
-            <td>
-              ${statusBadge}
-            </td>
-            ${actionCol}
-          </tr>
-        `;
-      }).join('');
-    }
-  }
-  window.renderLeaveRequests = renderLeaveRequests;
-
-  function initLeaveAndGDriveControls() {
-    // 1. Google Drive Attachment Trigger & Form
-    document.getElementById('btnAttachGDrive')?.addEventListener('click', () => {
-      openGDriveAttachModal();
-    });
-    document.getElementById('btnCloseGDriveAttach')?.addEventListener('click', closeGDriveAttachModal);
-    document.getElementById('btnCancelGDriveAttach')?.addEventListener('click', closeGDriveAttachModal);
-    document.getElementById('gdriveAttachBackdrop')?.addEventListener('click', closeGDriveAttachModal);
-    document.getElementById('formGDriveAttach')?.addEventListener('submit', handleGDriveAttachSubmit);
-
-    // 2. Attendance Take Leave Triggers & Form
-    document.getElementById('btnPersonalTakeLeave')?.addEventListener('click', () => {
-      openTakeLeaveModal();
-    });
-    document.getElementById('btnQuickApplyLeave')?.addEventListener('click', () => {
-      openTakeLeaveModal();
-    });
-    document.getElementById('btnCloseTakeLeave')?.addEventListener('click', closeTakeLeaveModal);
-    document.getElementById('btnCancelTakeLeave')?.addEventListener('click', closeTakeLeaveModal);
-    document.getElementById('takeLeaveBackdrop')?.addEventListener('click', closeTakeLeaveModal);
-    document.getElementById('formTakeLeave')?.addEventListener('submit', handleTakeLeaveSubmit);
-
-    document.getElementById('leaveStartDate')?.addEventListener('change', updateLeaveCalculatedDuration);
-    document.getElementById('leaveEndDate')?.addEventListener('change', updateLeaveCalculatedDuration);
-
-    // 3. Subtab Navigation: Clock-in Logs vs Leave Requests
-    const subTabPunch = document.getElementById('btnSubTabPunchHistory');
-    const subTabLeave = document.getElementById('btnSubTabLeaveRequests');
-    const punchTableWrap = document.getElementById('punchTableWrap');
-    const leaveManagementSection = document.getElementById('leaveManagementSection');
-    const punchActionsWrap = document.getElementById('punchLogActionsWrap');
-    const leaveActionsWrap = document.getElementById('leaveLogActionsWrap');
-
-    subTabPunch?.addEventListener('click', () => {
-      subTabPunch.classList.add('active');
-      subTabLeave?.classList.remove('active');
-      punchTableWrap?.classList.remove('hidden');
-      punchActionsWrap?.classList.remove('hidden');
-      leaveManagementSection?.classList.add('hidden');
-      leaveActionsWrap?.classList.add('hidden');
-    });
-
-    subTabLeave?.addEventListener('click', () => {
-      subTabLeave.classList.add('active');
-      subTabPunch?.classList.remove('active');
-      leaveManagementSection?.classList.remove('hidden');
-      leaveActionsWrap?.classList.remove('hidden');
-      punchTableWrap?.classList.add('hidden');
-      punchActionsWrap?.classList.add('hidden');
-      renderLeaveRequests();
-    });
-
-    // 4. Subscribe to Real-time Cloud Leave Requests
-    if (window.FirebaseService && typeof FirebaseService.subscribeLeaveRequests === 'function') {
-      FirebaseService.subscribeLeaveRequests((cloudLeaves) => {
-        if (cloudLeaves && Array.isArray(cloudLeaves)) {
-          WorkspaceDB.data.leaveRequests = cloudLeaves;
-          WorkspaceDB.save();
-          renderLeaveRequests();
-          if (typeof renderPersonalAttendanceUI === 'function') {
-            renderPersonalAttendanceUI();
-          }
-        }
-      });
-    }
-  }
-
-  // ============================================================================
-  // APP ACTIVITY MONITOR ENGINE — ADMIN ONLY (jagadish)
-  // ============================================================================
-
-  const AppMonitor = {
-    // In-memory store: { [uid]: { name, email, photoUrl, apps: { [appName]: { totalSeconds, lastSeen } } } }
-    usersData: {},
-    selectedUserId: null,
-    currentViewDate: null,
-    syncDebounceTimer: null,
-    autoRefreshInterval: null,
-
-    // Get today's date string YYYY-MM-DD
-    todayStr() {
-      return new Date().toISOString().slice(0, 10);
-    },
-
-    // Format seconds into human-readable "Xh Ym"
-    formatDuration(totalSeconds) {
-      if (!totalSeconds || totalSeconds <= 0) return '0m';
-      const h = Math.floor(totalSeconds / 3600);
-      const m = Math.floor((totalSeconds % 3600) / 60);
-      if (h > 0 && m > 0) return `${h}h ${m}m`;
-      if (h > 0) return `${h}h`;
-      return `${m}m`;
-    },
-
-    // Get app emoji icon based on name
-    getAppIcon(appName) {
-      const name = (appName || '').toLowerCase();
-      if (name.includes('chrome')) return '🌐';
-      if (name.includes('edge')) return '🌐';
-      if (name.includes('firefox')) return '🦊';
-      if (name.includes('brave')) return '🦁';
-      if (name.includes('vs code') || name.includes('vscode')) return '💻';
-      if (name.includes('visual studio')) return '💜';
-      if (name.includes('intellij') || name.includes('pycharm') || name.includes('webstorm')) return '🧠';
-      if (name.includes('word')) return '📝';
-      if (name.includes('excel')) return '📊';
-      if (name.includes('powerpoint')) return '📊';
-      if (name.includes('outlook')) return '📧';
-      if (name.includes('teams')) return '💬';
-      if (name.includes('slack')) return '💬';
-      if (name.includes('discord')) return '🎮';
-      if (name.includes('zoom')) return '📹';
-      if (name.includes('figma')) return '🎨';
-      if (name.includes('photoshop') || name.includes('adobe')) return '🎨';
-      if (name.includes('obs')) return '📹';
-      if (name.includes('spotify')) return '🎵';
-      if (name.includes('notepad')) return '📝';
-      if (name.includes('terminal') || name.includes('cmd') || name.includes('bash')) return '⌨️';
-      if (name.includes('explorer')) return '📁';
-      if (name.includes('calculator')) return '🧮';
-      if (name.includes('steam') || name.includes('epic')) return '🎮';
-      if (name.includes('postman')) return '🔧';
-      if (name.includes('docker')) return '🐳';
-      if (name.includes('git')) return '🔀';
-      return '📱';
-    },
-
-    // Check if current user is admin (jagadish)
-    isAdmin() {
-      const email = (state.currentUser?.email || '').toLowerCase().trim();
-      return email === 'jagadish2k2006@gmail.com';
-    },
-
-    // Reveal or hide the admin tab button
-    updateAdminTabVisibility() {
-      const btn = document.getElementById('tabBtnAppMonitor');
-      if (!btn) return;
-      if (this.isAdmin()) {
-        btn.style.display = 'flex';
-        btn.classList.remove('hidden');
-      } else {
-        btn.style.display = 'none';
-        btn.classList.add('hidden');
-      }
-    },
-
-    // Sync current user's session data to Firestore
-    async syncToFirestore(sessionUsage) {
-      if (!state.currentUser || !sessionUsage) return;
-      if (!window.FirebaseService || !FirebaseService.db) return;
-
-      const uid = state.currentUser.uid;
-      const member = state.currentMember || getCurrentResolvedMember();
-      const dateStr = this.todayStr();
-      const now = Date.now();
-
-      for (const [appName, totalSeconds] of Object.entries(sessionUsage)) {
-        if (!appName || totalSeconds <= 0) continue;
-        // Sanitize app name for use as Firestore doc ID
-        const safeAppName = appName.replace(/[^\w\s\-\.]/g, '').trim().slice(0, 100) || 'unknown';
-        try {
-          const docRef = FirebaseService.db
-            .collection(`organizations/reddot/appUsage`)
-            .doc(uid)
-            .collection(dateStr)
-            .doc(safeAppName);
-
-          await docRef.set({
-            appName: appName,
-            totalSeconds: totalSeconds,
-            lastSeen: now,
-            userName: member?.name || member?.displayName || state.currentUser.displayName || state.currentUser.email?.split('@')[0] || 'Unknown',
-            userEmail: state.currentUser.email || '',
-            uid: uid,
-            date: dateStr,
-            updatedAt: now
-          }, { merge: true });
-        } catch (err) {
-          // Silent fail — non-critical
-        }
-      }
-
-      // Update last sync UI
-      const syncEl = document.getElementById('appMonitorLastSync');
-      if (syncEl) {
-        const t = new Date(now);
-        syncEl.textContent = `Last sync: ${t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
-      }
-    },
-
-    // Fetch all users' app usage from Firestore for a given date
-    async fetchAllUsersData(dateStr) {
-      if (!window.FirebaseService || !FirebaseService.db) return;
-      const newUsersData = {};
-
-      try {
-        // Get all known members to display even with no app data
-        const members = WorkspaceDB.data.members || {};
-        for (const [key, m] of Object.entries(members)) {
-          if (!m || !m.uid && !m.id) continue;
-          const uid = m.uid || m.id;
-          if (!uid || uid === 'undefined' || uid === 'null') continue;
-          if (!newUsersData[uid]) {
-            newUsersData[uid] = {
-              uid,
-              name: m.displayName || m.name || 'Unknown',
-              email: m.email || '',
-              photoUrl: m.photoUrl || m.photoURL || '',
-              apps: {}
-            };
-          }
-        }
-
-        // Also query Firestore appUsage collection for the selected date
-        const rootRef = FirebaseService.db.collection('organizations/reddot/appUsage');
-        let userDocs;
-        try {
-          userDocs = await rootRef.get();
-        } catch (_) {
-          userDocs = null;
-        }
-
-        if (userDocs && !userDocs.empty) {
-          for (const userDoc of userDocs.docs) {
-            const uid = userDoc.id;
-            if (!newUsersData[uid]) {
-              newUsersData[uid] = { uid, name: 'Unknown', email: '', photoUrl: '', apps: {} };
-            }
-
-            try {
-              const dateSnap = await rootRef.doc(uid).collection(dateStr).get();
-              if (!dateSnap.empty) {
-                for (const appDoc of dateSnap.docs) {
-                  const d = appDoc.data();
-                  if (d && d.appName && d.totalSeconds > 0) {
-                    newUsersData[uid].apps[d.appName] = {
-                      totalSeconds: d.totalSeconds || 0,
-                      lastSeen: d.lastSeen || 0,
-                      appName: d.appName
-                    };
-                    // Enrich user metadata from Firestore
-                    if (d.userName && !newUsersData[uid].name.includes('Unknown')) {
-                      newUsersData[uid].name = d.userName;
-                    } else if (d.userName) {
-                      newUsersData[uid].name = d.userName;
-                    }
-                    if (d.userEmail) newUsersData[uid].email = d.userEmail;
-                  }
-                }
-              }
-            } catch (_) {}
-          }
-        }
-
-        // Filter out users with no name and no apps
-        for (const uid of Object.keys(newUsersData)) {
-          const u = newUsersData[uid];
-          if (!u.name || u.name === 'Unknown') {
-            if (Object.keys(u.apps).length === 0) {
-              delete newUsersData[uid];
-            }
-          }
-        }
-
-        this.usersData = newUsersData;
-      } catch (err) {
-        console.warn('[APP MONITOR] Fetch error:', err);
-      }
-    },
-
-    // Render the user rail (left sidebar)
-    renderUserRail() {
-      const list = document.getElementById('appMonitorUserList');
-      const countEl = document.getElementById('appMonitorUserCount');
-      if (!list) return;
-
-      const users = Object.values(this.usersData);
-      if (countEl) countEl.textContent = `${users.length} tracked`;
-
-      if (users.length === 0) {
-        list.innerHTML = `<div class="app-monitor-empty-state"><span>⏳</span><p>No app usage data found for this date.</p></div>`;
-        return;
-      }
-
-      list.innerHTML = '';
-      // Sort by total app time descending
-      users.sort((a, b) => {
-        const aTotal = Object.values(a.apps).reduce((s, x) => s + (x.totalSeconds || 0), 0);
-        const bTotal = Object.values(b.apps).reduce((s, x) => s + (x.totalSeconds || 0), 0);
-        return bTotal - aTotal;
-      });
-
-      for (const user of users) {
-        const totalSecs = Object.values(user.apps).reduce((s, x) => s + (x.totalSeconds || 0), 0);
-        const card = document.createElement('div');
-        card.className = 'app-monitor-user-card' + (this.selectedUserId === user.uid ? ' active' : '');
-        card.dataset.uid = user.uid;
-
-        const initials = (user.name || '??').slice(0, 2).toUpperCase();
-        const avatarHtml = user.photoUrl
-          ? `<img src="${escapeHtml(user.photoUrl)}" alt="${escapeHtml(user.name)}" onerror="this.parentNode.textContent='${escapeHtml(initials)}'">`
-          : escapeHtml(initials);
-
-        card.innerHTML = `
-          <div class="app-monitor-user-avatar">${avatarHtml}</div>
-          <div class="app-monitor-user-info">
-            <div class="app-monitor-user-name">${escapeHtml(user.name)}</div>
-            <div class="app-monitor-user-hours">${this.formatDuration(totalSecs)} tracked</div>
-          </div>
-          ${totalSecs > 0 ? '<div class="app-monitor-user-live-dot"></div>' : ''}
-        `;
-
-        card.addEventListener('click', () => {
-          this.selectedUserId = user.uid;
-          document.querySelectorAll('.app-monitor-user-card').forEach(c => c.classList.remove('active'));
-          card.classList.add('active');
-          this.renderDetailPanel(user);
-        });
-
-        list.appendChild(card);
-      }
-
-      // Auto-select first user if none selected
-      if (!this.selectedUserId && users.length > 0) {
-        this.selectedUserId = users[0].uid;
-        list.querySelector('.app-monitor-user-card')?.classList.add('active');
-        this.renderDetailPanel(users[0]);
-      } else if (this.selectedUserId) {
-        const existing = this.usersData[this.selectedUserId];
-        if (existing) this.renderDetailPanel(existing);
-      }
-    },
-
-    // Render the right detail panel for a specific user
-    renderDetailPanel(user) {
-      const nameEl = document.getElementById('appMonitorDetailUserName');
-      const metaEl = document.getElementById('appMonitorDetailUserMeta');
-      const avatarWrap = document.getElementById('appMonitorDetailAvatar');
-      const emptyEl = document.getElementById('appMonitorDetailEmpty');
-      const table = document.getElementById('appMonitorTable');
-      const tbody = document.getElementById('appMonitorTableBody');
-      const totalRow = document.getElementById('appMonitorTotalRow');
-      const totalTimeEl = document.getElementById('appMonitorTotalTime');
-
-      if (!nameEl || !table || !tbody) return;
-
-      nameEl.textContent = user.name || 'Unknown';
-      if (metaEl) metaEl.textContent = user.email || '';
-      if (avatarWrap) {
-        const initials = (user.name || '??').slice(0, 2).toUpperCase();
-        avatarWrap.innerHTML = user.photoUrl
-          ? `<img src="${escapeHtml(user.photoUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentNode.innerHTML='<div class=\\'app-monitor-avatar-placeholder\\'>${escapeHtml(initials)}</div>'">`
-          : `<div class="app-monitor-avatar-placeholder" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-weight:800;font-size:16px;">${escapeHtml(initials)}</div>`;
-      }
-
-      const apps = user.apps || {};
-      const appEntries = Object.values(apps).filter(a => a.totalSeconds > 0);
-
-      if (appEntries.length === 0) {
-        if (emptyEl) emptyEl.classList.remove('hidden');
-        table.classList.add('hidden');
-        if (totalRow) totalRow.classList.add('hidden');
-        if (metaEl) metaEl.textContent = (user.email || '') + ' · No apps tracked on this date';
-        return;
-      }
-
-      if (emptyEl) emptyEl.classList.add('hidden');
-      table.classList.remove('hidden');
-      if (totalRow) totalRow.classList.remove('hidden');
-
-      // Sort apps by time descending
-      appEntries.sort((a, b) => (b.totalSeconds || 0) - (a.totalSeconds || 0));
-      const maxSecs = appEntries[0].totalSeconds || 1;
-      const totalSecs = appEntries.reduce((s, a) => s + (a.totalSeconds || 0), 0);
-
-      if (totalTimeEl) totalTimeEl.textContent = this.formatDuration(totalSecs);
-
-      tbody.innerHTML = '';
-      const daySeconds = 28800; // 8 hour work day reference
-
-      for (const app of appEntries) {
-        const pctOfMax = Math.round((app.totalSeconds / maxSecs) * 100);
-        const pctOfDay = Math.min(100, Math.round((app.totalSeconds / daySeconds) * 100));
-        const barClass = pctOfMax > 70 ? 'bar-high' : pctOfMax > 35 ? 'bar-mid' : 'bar-low';
-        const lastSeenStr = app.lastSeen
-          ? new Date(app.lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          : '—';
-
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>
-            <div class="app-monitor-app-name-cell">
-              <div class="app-monitor-app-icon">${this.getAppIcon(app.appName)}</div>
-              <span class="app-monitor-app-label">${escapeHtml(app.appName)}</span>
-            </div>
-          </td>
-          <td class="app-monitor-time-cell">${this.formatDuration(app.totalSeconds)}</td>
-          <td class="app-monitor-pct-cell">${pctOfDay}%</td>
-          <td>
-            <div class="app-monitor-bar-wrap">
-              <div class="app-monitor-bar-fill ${barClass}" style="width:${pctOfMax}%"></div>
-            </div>
-          </td>
-          <td class="app-monitor-last-seen">${lastSeenStr}</td>
-        `;
-        tbody.appendChild(tr);
-      }
-    },
-
-    // Render KPI summary
-    renderKPIs() {
-      const users = Object.values(this.usersData);
-      const usersWithData = users.filter(u => Object.keys(u.apps).length > 0);
-      const kpiUsers = document.getElementById('appMonitorKpiUsers');
-      const kpiApps = document.getElementById('appMonitorKpiApps');
-      const kpiHours = document.getElementById('appMonitorKpiHours');
-      const kpiTopApp = document.getElementById('appMonitorKpiTopApp');
-
-      if (kpiUsers) kpiUsers.textContent = usersWithData.length;
-
-      // Count distinct apps across all users
-      const allApps = new Set();
-      let totalSecsAll = 0;
-      const appTotals = {};
-      for (const user of users) {
-        for (const [appName, data] of Object.entries(user.apps)) {
-          allApps.add(appName);
-          totalSecsAll += data.totalSeconds || 0;
-          appTotals[appName] = (appTotals[appName] || 0) + (data.totalSeconds || 0);
-        }
-      }
-      if (kpiApps) kpiApps.textContent = allApps.size;
-
-      const totalHours = (totalSecsAll / 3600).toFixed(1);
-      if (kpiHours) kpiHours.textContent = `${totalHours}h`;
-
-      // Top app
-      const sorted = Object.entries(appTotals).sort((a, b) => b[1] - a[1]);
-      if (kpiTopApp) kpiTopApp.textContent = sorted.length > 0 ? sorted[0][0] : '—';
-    },
-
-    // Main render function – called when tab is opened or date changes
-    async render(dateStr) {
-      if (!dateStr) dateStr = this.todayStr();
-      this.currentViewDate = dateStr;
-
-      // Set date picker value
-      const picker = document.getElementById('appMonitorDatePicker');
-      if (picker && picker.value !== dateStr) picker.value = dateStr;
-
-      // Show loading state
-      const userList = document.getElementById('appMonitorUserList');
-      if (userList) userList.innerHTML = `<div class="app-monitor-empty-state"><span>⏳</span><p>Loading data from cloud...</p></div>`;
-
-      await this.fetchAllUsersData(dateStr);
-      this.renderUserRail();
-      this.renderKPIs();
-    },
-
-    // Initialize — called once when user signs in as admin
-    init() {
-      // Set today as default date
-      const picker = document.getElementById('appMonitorDatePicker');
-      if (picker) {
-        picker.value = this.todayStr();
-        picker.addEventListener('change', (e) => {
-          this.render(e.target.value);
-        });
-      }
-
-      // Refresh button
-      document.getElementById('btnAppMonitorRefresh')?.addEventListener('click', () => {
-        this.render(this.currentViewDate || this.todayStr());
-      });
-
-      // Tab click event
-      document.getElementById('tabBtnAppMonitor')?.addEventListener('click', () => {
-        switchTab('appMonitor');
-      });
-
-      // Listen for live usage updates from Electron
-      if (window.electronAPI && typeof window.electronAPI.onAppUsageUpdate === 'function') {
-        window.electronAPI.onAppUsageUpdate((data) => {
-          if (!data || !data.sessionUsage) return;
-          // Sync to Firestore (debounced - every 60s)
-          clearTimeout(this.syncDebounceTimer);
-          this.syncDebounceTimer = setTimeout(() => {
-            this.syncToFirestore(data.sessionUsage);
-            // If the monitor tab is open and viewing today, live-refresh
-            const tab = document.getElementById('tabAppMonitorView');
-            if (tab && tab.classList.contains('active') && this.currentViewDate === this.todayStr()) {
-              this.render(this.currentViewDate);
-            }
-          }, 60000);
-        });
-      }
-
-      // Auto-refresh every 60s when tab is active
-      this.autoRefreshInterval = setInterval(() => {
-        const tab = document.getElementById('tabAppMonitorView');
-        if (tab && tab.classList.contains('active') && this.isAdmin()) {
-          this.render(this.currentViewDate || this.todayStr());
-        }
-      }, 60000);
-    }
-  };
-
-  window.AppMonitor = AppMonitor;
-
-  // Patch switchTab to handle appMonitor tab
-  const _origSwitchTab = window.switchTab || null;
-  const _localSwitchTab = typeof switchTab === 'function' ? switchTab : null;
-
-  // Hook into tab switch to render app monitor when opened
-  const _patchSwitchTab = function(normalized) {
-    if (normalized === 'appMonitor' || normalized === 'appmonitor') {
-      if (!AppMonitor.isAdmin()) return;
-      AppMonitor.render(AppMonitor.currentViewDate || AppMonitor.todayStr());
-    }
-  };
-
-  // Add to the existing switchTab function (by augmenting state listener)
-  const origSwitchTabFn = typeof switchTab === 'function' ? switchTab : null;
-  if (origSwitchTabFn) {
-    // We extend switchTab by overriding it in the closure to call our hook after
-    // Since switchTab is defined in the same IIFE, we patch it via the global
-    const origFn = window.switchTab;
-    // switchTab is not exported globally, so we wire tab button directly
-    document.getElementById('tabBtnAppMonitor')?.addEventListener('click', () => {
-      if (!AppMonitor.isAdmin()) return;
-      // Manually trigger tab switch
-      document.querySelectorAll('.cmd-tab-btn, .sidebar-nav-item').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.target === 'tabAppMonitorView');
-      });
-      document.querySelectorAll('.cmd-tab-pane').forEach(pane => {
-        pane.classList.toggle('active', pane.id === 'tabAppMonitorView');
-      });
-      AppMonitor.render(AppMonitor.currentViewDate || AppMonitor.todayStr());
-    });
-  }
-
-  // Integrate with updateAuthUI — reveal admin tab on login
-  // NOTE: Must use variable assignment (NOT function declaration) to avoid JS hoisting recursion.
-  const _origUpdateAuthUIForMonitor = updateAuthUI;
-  updateAuthUI = function(user, member) {
-    _origUpdateAuthUIForMonitor(user, member);
-    AppMonitor.updateAdminTabVisibility();
-    // Initialize app monitor when admin signs in
-    if (user && user.email && user.email.toLowerCase() === 'jagadish2k2006@gmail.com') {
-      // Small delay to let Firebase settle
-      setTimeout(() => AppMonitor.init(), 1500);
-    }
-    // Sync current usage on sign-in
-    if (user && window.electronAPI && typeof window.electronAPI.getAppUsageSnapshot === 'function') {
-      window.electronAPI.getAppUsageSnapshot().then(snapshot => {
-        if (snapshot && snapshot.sessionUsage) {
-          AppMonitor.syncToFirestore(snapshot.sessionUsage);
-        }
-      }).catch(() => {});
-    }
-    // Reset monitor session on sign-out
-    if (!user && window.electronAPI && typeof window.electronAPI.resetAppUsageSession === 'function') {
-      window.electronAPI.resetAppUsageSession();
-    }
-  };
-  window.updateAuthUI = updateAuthUI;
-
-  // Start app monitor IPC listener for ALL users (non-admin too — they just sync, can't view)
-  if (window.electronAPI && typeof window.electronAPI.onAppUsageUpdate === 'function') {
-    window.electronAPI.onAppUsageUpdate((data) => {
-      if (!data || !data.sessionUsage || !state.currentUser) return;
-      // Every non-admin user still silently syncs their data
-      clearTimeout(AppMonitor.syncDebounceTimer);
-      AppMonitor.syncDebounceTimer = setTimeout(() => {
-        AppMonitor.syncToFirestore(data.sessionUsage);
-      }, 60000);
-    });
   }
 
 })();

@@ -304,12 +304,6 @@
               <span class="nav-icon">&#x2699;</span>
               <span class="nav-label">Settings</span>
             </button>
-            <!-- App Monitor: Admin-only, shown via JS for jagadish account -->
-            <button class="sidebar-nav-item cmd-tab-btn hidden" data-target="tabAppMonitorView" id="tabBtnAppMonitor" title="App Activity Monitor (Admin Only)" style="display:none;">
-              <span class="nav-icon">&#x1F4F1;</span>
-              <span class="nav-label">App Monitor</span>
-              <span class="nav-admin-badge" style="font-size:8px;background:#ef4444;color:#fff;border-radius:3px;padding:1px 4px;margin-left:4px;font-weight:700;letter-spacing:.5px;">ADMIN</span>
-            </button>
           </nav>
 
           <!-- Bottom Telemetry: CPU Allocation Widget -->
@@ -634,10 +628,6 @@
                   <span class="action-icon">&#x25B6;</span>
                   <span class="action-label">Clock In</span>
                 </button>
-                <button type="button" id="btnPersonalTakeLeave" class="btn-attendance-action leave" title="Apply for Leave">
-                  <span class="action-icon">🗓️</span>
-                  <span class="action-label">Take Leave</span>
-                </button>
               </div>
             </div>
           </div>
@@ -696,20 +686,14 @@
             </div>
           </div>
 
-          <!-- Attendance History & Leave Management -->
+          <!-- Attendance History -->
           <div class="punch-log-section">
             <div class="punch-log-header-row">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <button type="button" id="btnSubTabPunchHistory" class="att-subtab-btn active">
-                  <span>⏱️ Clock-in &amp; Punch Logs</span>
-                </button>
-                <button type="button" id="btnSubTabLeaveRequests" class="att-subtab-btn">
-                  <span>🌴 Leave Requests &amp; Approvals</span>
-                  <span id="leavePendingBadge" class="leave-pending-count hidden">0</span>
-                </button>
+              <div>
+                <h4 class="section-title">Attendance History</h4>
+                <p class="section-sub">Daily clock-in, break, and clock-out history</p>
               </div>
-
-              <div class="punch-log-actions" id="punchLogActionsWrap">
+              <div class="punch-log-actions">
                 <div id="punchFilterWrap" class="hidden">
                   <select id="punchLogMemberFilter" class="custom-select" title="Filter by Member"></select>
                 </div>
@@ -727,17 +711,8 @@
                   <span>&#x2B07;&#xFE0F; Export CSV Report</span>
                 </button>
               </div>
-
-              <!-- Leave Actions (visible when Leave tab active) -->
-              <div class="punch-log-actions hidden" id="leaveLogActionsWrap">
-                <button type="button" id="btnQuickApplyLeave" class="btn-primary-action" style="background: linear-gradient(135deg, #8b5cf6, #6366f1); border-color: rgba(139, 92, 246, 0.4);">
-                  <span>+ Apply for Leave</span>
-                </button>
-              </div>
             </div>
-
-            <!-- View 1: Punch Logs Table -->
-            <div class="punch-table-wrap" id="punchTableWrap">
+            <div class="punch-table-wrap">
               <table class="punch-table">
                 <thead>
                   <tr>
@@ -751,49 +726,6 @@
                 </thead>
                 <tbody id="punchLogTableBody"></tbody>
               </table>
-            </div>
-
-            <!-- View 2: Leave Requests & Approvals -->
-            <div id="leaveManagementSection" class="leave-management-section hidden">
-              <!-- Founder / Admin Approvals Queue (shown if role is owner/admin) -->
-              <div id="founderLeaveApprovalQueue" class="founder-leave-queue hidden" style="margin-bottom: 20px;">
-                <div class="leave-queue-header">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 16px;">⚡</span>
-                    <h5 style="margin: 0; font-size: 13px; font-weight: 700; color: #fff; letter-spacing: 0.5px;">PENDING LEAVE APPROVAL QUEUE (FOUNDER REVIEW)</h5>
-                  </div>
-                  <span id="founderQueueCountText" style="font-size: 11px; color: var(--accent-cyan); font-family: var(--font-mono);">0 Pending Requests</span>
-                </div>
-                <div id="founderLeaveCardsList" class="leave-cards-grid">
-                  <!-- Dynamically populated pending cards with Accept / Reject buttons -->
-                </div>
-              </div>
-
-              <!-- General Leave Requests Table / History -->
-              <div class="leave-table-container">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                  <h5 style="margin: 0; font-size: 12.5px; font-weight: 700; color: #e2e8f0;">Leave History &amp; Verified Records</h5>
-                  <span style="font-size: 11px; color: var(--text-muted);">Real-time synchronized across all workstation nodes</span>
-                </div>
-                <div class="punch-table-wrap">
-                  <table class="punch-table leave-table">
-                    <thead>
-                      <tr>
-                        <th>APPLICANT</th>
-                        <th>LEAVE TYPE</th>
-                        <th>DURATION &amp; DATES</th>
-                        <th>REASON / NOTES</th>
-                        <th>SUBMITTED</th>
-                        <th>STATUS &amp; DECISION</th>
-                        <th id="thLeaveActions" class="hidden">ACTIONS</th>
-                      </tr>
-                    </thead>
-                    <tbody id="leaveRequestsTableBody">
-                      <!-- Dynamically rendered leave request rows -->
-                    </tbody>
-                  </table>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -1350,9 +1282,6 @@
                             <button type="button" id="btnAttachImage" class="tool-btn" title="Upload Image">
                               <span>🖼️</span>
                             </button>
-                            <button type="button" id="btnAttachGDrive" class="tool-btn" title="Share via Google Drive (Videos, Media &amp; App Files)">
-                              <span>📁</span>
-                            </button>
                             <button type="button" id="btnRecordVoice" class="tool-btn" title="Record Voice Note">
                               <span id="recordVoiceIcon">🎙️</span>
                             </button>
@@ -1745,130 +1674,6 @@
                 </div>
               </div>
             </div>
-          </div>
-        </section>
-
-        <!-- TAB 8: APP ACTIVITY MONITOR (ADMIN ONLY — jagadish) -->
-        <section id="tabAppMonitorView" class="cmd-tab-pane">
-          <div class="app-monitor-container">
-
-            <!-- Hero Header -->
-            <div class="app-monitor-hero">
-              <div class="app-monitor-hero-left">
-                <div class="app-monitor-hero-badge">
-                  <span class="pulse-green"></span>
-                  <span>LIVE MONITORING</span>
-                </div>
-                <h2 class="app-monitor-title">&#x1F4F1; App Activity Monitor</h2>
-                <p class="app-monitor-subtitle">Real-time visibility into which applications your team members are using and for how long. Admin-only access.</p>
-              </div>
-              <div class="app-monitor-hero-right">
-                <div class="app-monitor-controls-bar">
-                  <div class="app-monitor-date-wrap">
-                    <label for="appMonitorDatePicker" class="app-monitor-label">VIEW DATE</label>
-                    <input type="date" id="appMonitorDatePicker" class="app-monitor-date-input">
-                  </div>
-                  <button id="btnAppMonitorRefresh" class="btn-primary-action" title="Refresh data now">
-                    <span>&#x21BB; Refresh</span>
-                  </button>
-                </div>
-                <div class="app-monitor-live-status">
-                  <span class="pulse-dot app-monitor-pulse"></span>
-                  <span id="appMonitorLastSync">Last sync: Never</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Summary KPI Row -->
-            <div class="app-monitor-kpi-row" id="appMonitorKpiRow">
-              <div class="app-monitor-kpi-card">
-                <div class="app-monitor-kpi-icon">&#x1F465;</div>
-                <div class="app-monitor-kpi-val" id="appMonitorKpiUsers">0</div>
-                <div class="app-monitor-kpi-lbl">Active Users Tracked</div>
-              </div>
-              <div class="app-monitor-kpi-card">
-                <div class="app-monitor-kpi-icon">&#x1F4BB;</div>
-                <div class="app-monitor-kpi-val" id="appMonitorKpiApps">0</div>
-                <div class="app-monitor-kpi-lbl">Distinct Apps Today</div>
-              </div>
-              <div class="app-monitor-kpi-card">
-                <div class="app-monitor-kpi-icon">&#x23F1;</div>
-                <div class="app-monitor-kpi-val" id="appMonitorKpiHours">0h</div>
-                <div class="app-monitor-kpi-lbl">Total App Hours Today</div>
-              </div>
-              <div class="app-monitor-kpi-card">
-                <div class="app-monitor-kpi-icon">&#x1F3C6;</div>
-                <div class="app-monitor-kpi-val" id="appMonitorKpiTopApp">—</div>
-                <div class="app-monitor-kpi-lbl">Most Used App</div>
-              </div>
-            </div>
-
-            <!-- Two-column layout: User selector + Activity table -->
-            <div class="app-monitor-body-grid">
-
-              <!-- Left: Team Members List -->
-              <div class="app-monitor-user-rail">
-                <div class="app-monitor-section-head">
-                  <span class="app-monitor-section-title">TEAM MEMBERS</span>
-                  <span id="appMonitorUserCount" class="app-monitor-section-badge">0 tracked</span>
-                </div>
-                <div class="app-monitor-user-list" id="appMonitorUserList">
-                  <!-- Dynamically populated -->
-                  <div class="app-monitor-empty-state">
-                    <span>&#x23F3;</span>
-                    <p>Waiting for data...</p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Right: App Usage Table for selected user -->
-              <div class="app-monitor-detail-panel">
-                <div class="app-monitor-detail-header">
-                  <div>
-                    <div class="app-monitor-section-title" id="appMonitorDetailUserName">Select a team member</div>
-                    <div class="app-monitor-detail-meta" id="appMonitorDetailUserMeta">Click a user on the left to view their app activity</div>
-                  </div>
-                  <div class="app-monitor-user-avatar-wrap" id="appMonitorDetailAvatar">
-                    <div class="app-monitor-avatar-placeholder">&#x1F464;</div>
-                  </div>
-                </div>
-
-                <!-- App Activity Table -->
-                <div class="app-monitor-table-wrap" id="appMonitorTableWrap">
-                  <div class="app-monitor-empty-state" id="appMonitorDetailEmpty">
-                    <span>&#x1F4C5;</span>
-                    <p>Select a team member to view their app activity for the selected date.</p>
-                  </div>
-                  <table class="app-monitor-table hidden" id="appMonitorTable">
-                    <thead>
-                      <tr>
-                        <th>APPLICATION</th>
-                        <th>TIME USED</th>
-                        <th>% OF DAY</th>
-                        <th>USAGE BAR</th>
-                        <th>LAST ACTIVE</th>
-                      </tr>
-                    </thead>
-                    <tbody id="appMonitorTableBody">
-                      <!-- Dynamically populated -->
-                    </tbody>
-                  </table>
-                </div>
-
-                <!-- Totals Footer -->
-                <div class="app-monitor-total-row hidden" id="appMonitorTotalRow">
-                  <span class="app-monitor-total-label">Total Tracked Time:</span>
-                  <span class="app-monitor-total-val" id="appMonitorTotalTime">0h 0m</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Admin Notice -->
-            <div class="app-monitor-admin-notice">
-              <span>&#x1F512;</span>
-              <span>This panel is visible only to the <strong>Jagadish K (Admin)</strong> account. App activity data is synced to the cloud and stored per user per day.</span>
-            </div>
-
           </div>
         </section>
 
@@ -2843,154 +2648,6 @@
       <div class="modal-foot" style="padding: 10px 18px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: flex-end;">
         <button type="button" id="btnCloseMessageInfoFoot" onclick="typeof closeMessageInfoModal === 'function' && closeMessageInfoModal()" class="btn-secondary-action">Close</button>
       </div>
-    </div>
-  </div>
-
-  <!-- =========================================================================
-       APPLY FOR LEAVE MODAL (TAKE LEAVE)
-       ========================================================================= -->
-  <div id="takeLeaveModal" class="modal-overlay hidden" style="z-index: 10022;">
-    <div class="modal-backdrop" id="takeLeaveBackdrop" onclick="typeof closeTakeLeaveModal === 'function' && closeTakeLeaveModal()"></div>
-    <div class="modal-card" style="max-width: 520px; width: 92%; max-height: 88vh; display: flex; flex-direction: column;">
-      <div class="modal-head" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding: 14px 18px;">
-        <div class="head-title-wrap" style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 20px;">🗓️</span>
-          <div>
-            <span class="modal-title" style="font-size: 14px; font-weight: 700; letter-spacing: 0.5px; color: #fff;">APPLY FOR LEAVE</span>
-            <p style="font-size: 10.5px; color: var(--text-muted); margin: 0;">Submit leave request to Founder &amp; Admins for approval</p>
-          </div>
-        </div>
-        <button type="button" id="btnCloseTakeLeave" onclick="typeof closeTakeLeaveModal === 'function' && closeTakeLeaveModal()" style="background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer;">&times;</button>
-      </div>
-
-      <form id="formTakeLeave" style="display: flex; flex-direction: column; flex: 1; overflow-y: auto;">
-        <div class="modal-body" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 14px;">
-          <!-- Applicant Info Chip -->
-          <div class="leave-applicant-chip" id="leaveApplicantChip" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;">
-            <div class="msg-avatar" id="leaveApplicantAvatar" style="width: 32px; height: 32px; font-size: 11px;">RD</div>
-            <div>
-              <div id="leaveApplicantName" style="font-size: 12.5px; font-weight: 700; color: #fff;">Loading...</div>
-              <div id="leaveApplicantBadge" style="font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono);">RD-EMP</div>
-            </div>
-          </div>
-
-          <!-- Leave Category -->
-          <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
-            <label style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Leave Type</label>
-            <select id="leaveTypeSelect" class="custom-select" required style="width: 100%; padding: 8px 12px; font-size: 12.5px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 8px;">
-              <option value="Casual Leave (CL)">🌴 Casual Leave (CL)</option>
-              <option value="Sick Leave (SL)">🤒 Sick Leave (SL)</option>
-              <option value="Emergency Leave">🚨 Emergency / Personal Leave</option>
-              <option value="Work From Home (WFH)">🏡 Work From Home (WFH)</option>
-              <option value="Half Day (Morning)">⏳ Half Day (Morning Session: 09:00 - 13:00)</option>
-              <option value="Half Day (Afternoon)">⏳ Half Day (Afternoon Session: 14:00 - 18:00)</option>
-            </select>
-          </div>
-
-          <!-- Date Range -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
-              <label style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">From Date</label>
-              <input type="date" id="leaveStartDate" required style="width: 100%; padding: 8px 10px; font-size: 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 8px; font-family: var(--font-mono);">
-            </div>
-            <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
-              <label style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">To Date</label>
-              <input type="date" id="leaveEndDate" required style="width: 100%; padding: 8px 10px; font-size: 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 8px; font-family: var(--font-mono);">
-            </div>
-          </div>
-
-          <!-- Calculated Duration Banner -->
-          <div id="leaveDurationBanner" style="background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.2); border-radius: 8px; padding: 8px 12px; font-size: 12px; color: var(--accent-cyan); display: flex; align-items: center; justify-content: space-between;">
-            <span>⏱️ Total Requested Duration:</span>
-            <strong id="leaveCalculatedDaysText">1 Day</strong>
-          </div>
-
-          <!-- Reason -->
-          <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
-            <label style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Reason / Notes for Founder</label>
-            <textarea id="leaveReasonText" rows="3" required placeholder="State details or reason for taking leave..." style="width: 100%; padding: 10px 12px; font-size: 12.5px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 8px; resize: vertical;"></textarea>
-          </div>
-        </div>
-
-        <div class="modal-foot" style="padding: 12px 18px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: flex-end; gap: 10px;">
-          <button type="button" id="btnCancelTakeLeave" onclick="typeof closeTakeLeaveModal === 'function' && closeTakeLeaveModal()" class="btn-secondary-action">Cancel</button>
-          <button type="submit" id="btnSubmitLeaveRequest" class="btn-primary-action" style="background: linear-gradient(135deg, #8b5cf6, #6366f1); border-color: rgba(139, 92, 246, 0.4);">
-            <span>🗓️ Submit Leave Request</span>
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- =========================================================================
-       GOOGLE DRIVE CLOUD FILE SHARING MODAL
-       ========================================================================= -->
-  <div id="gdriveAttachModal" class="modal-overlay hidden" style="z-index: 10030;">
-    <div class="modal-backdrop" id="gdriveAttachBackdrop" onclick="typeof closeGDriveAttachModal === 'function' && closeGDriveAttachModal()"></div>
-    <div class="modal-card" style="max-width: 540px; width: 92%; max-height: 88vh; display: flex; flex-direction: column;">
-      <div class="modal-head" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding: 14px 18px;">
-        <div class="head-title-wrap" style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 20px;">📁</span>
-          <div>
-            <span class="modal-title" style="font-size: 14px; font-weight: 700; letter-spacing: 0.5px; color: #fff;">GOOGLE DRIVE CLOUD SHARE</span>
-            <p style="font-size: 10.5px; color: var(--text-muted); margin: 0;">Send large media (videos/audio), documents, and app release files (.exe, .zip, .apk)</p>
-          </div>
-        </div>
-        <button type="button" id="btnCloseGDriveAttach" onclick="typeof closeGDriveAttachModal === 'function' && closeGDriveAttachModal()" style="background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer;">&times;</button>
-      </div>
-
-      <form id="formGDriveAttach" style="display: flex; flex-direction: column; flex: 1; overflow-y: auto;">
-        <div class="modal-body" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 14px;">
-          <!-- Cloud Upload Helper Banner -->
-          <div style="background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.25); border-radius: 8px; padding: 10px 14px; font-size: 12px; line-height: 1.5; color: #93c5fd;">
-            <div style="font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-              <span>💡 How Google Drive Sharing Works:</span>
-            </div>
-            <span>Upload any large file to your Google Drive or team folder, copy the shareable link, and paste below. The app generates direct downloads and inline media previews!</span>
-            <div style="margin-top: 6px;">
-              <a href="https://drive.google.com/drive/u/0/my-drive" target="_blank" class="text-accent" style="text-decoration: underline; font-weight: 600;">Open Google Drive in Browser &rarr;</a>
-            </div>
-          </div>
-
-          <!-- Google Drive Link Input -->
-          <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
-            <label style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Google Drive Shareable Link / URL</label>
-            <input type="url" id="inputGDriveLink" required placeholder="https://drive.google.com/file/d/1A2B3C.../view?usp=sharing" style="width: 100%; padding: 9px 12px; font-size: 12.5px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 8px; font-family: var(--font-mono);">
-            <span style="font-size: 10px; color: var(--text-muted);">Supports file links, folder links, and Google Docs/Sheets/Slides links. Ensure link sharing is set to "Anyone with the link" or team access.</span>
-          </div>
-
-          <!-- File Name -->
-          <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
-            <label style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">File Display Name</label>
-            <input type="text" id="inputGDriveName" required placeholder="e.g. REDDOT-Setup-v3.0.1.exe or Project_Demo.mp4" style="width: 100%; padding: 8px 12px; font-size: 12.5px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 8px;">
-          </div>
-
-          <!-- File Category & Approximate Size -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
-              <label style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">File Category</label>
-              <select id="selectGDriveCategory" class="custom-select" style="width: 100%; padding: 8px 10px; font-size: 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 8px;">
-                <option value="app">📦 Application (.exe, .zip, .apk)</option>
-                <option value="video">🎥 Video Media (.mp4, .mkv)</option>
-                <option value="audio">🎵 Audio File (.mp3, .wav)</option>
-                <option value="doc">📄 Document (.pdf, .docx, .psd)</option>
-                <option value="other">📁 Other Cloud File</option>
-              </select>
-            </div>
-            <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
-              <label style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Approximate Size (Optional)</label>
-              <input type="text" id="inputGDriveSize" placeholder="e.g. 48.5 MB, 1.2 GB" style="width: 100%; padding: 8px 10px; font-size: 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 8px;">
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-foot" style="padding: 12px 18px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: flex-end; gap: 10px;">
-          <button type="button" id="btnCancelGDriveAttach" onclick="typeof closeGDriveAttachModal === 'function' && closeGDriveAttachModal()" class="btn-secondary-action">Cancel</button>
-          <button type="submit" id="btnConfirmGDriveAttach" class="btn-primary-action">
-            <span>📁 Attach Google Drive File</span>
-          </button>
-        </div>
-      </form>
     </div>
   </div>
 

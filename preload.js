@@ -150,22 +150,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('ota-download-complete', listener);
       return () => ipcRenderer.removeListener('ota-download-complete', listener);
     }
-  },
-
-  // App Activity Monitor
-  onAppUsageUpdate: (callback) => {
-    if (typeof callback === 'function') {
-      const listener = (_event, data) => {
-        if (data && typeof data === 'object') callback(data);
-      };
-      ipcRenderer.on('app-usage-update', listener);
-      return () => ipcRenderer.removeListener('app-usage-update', listener);
-    }
-  },
-  getAppUsageSnapshot: () => {
-    return ipcRenderer.invoke('get-app-usage-snapshot');
-  },
-  resetAppUsageSession: () => {
-    ipcRenderer.send('reset-app-usage-session');
   }
 });

@@ -11,7 +11,7 @@ const os = require('os');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
-const { spawn, exec } = require('child_process');
+const { spawn } = require('child_process');
 
 let mainWindow = null;
 let tray = null;
@@ -19,274 +19,6 @@ let isTrayActive = false;
 let metricsInterval = null;
 let localServer = null;
 let localServerPort = 0;
-
-// --- APP ACTIVITY MONITOR ---
-let appMonitorInterval = null;
-let appUsageSession = {}; // { appName: totalSecondsThisSession }
-let lastPollTime = null;
-const APP_MONITOR_POLL_INTERVAL_MS = 30000; // 30 seconds
-
-// System processes to filter out (not user-facing)
-const SYSTEM_PROCESS_BLACKLIST = new Set([
-  'system', 'idle', 'registry', 'smss', 'csrss', 'wininit', 'winlogon',
-  'services', 'lsass', 'svchost', 'fontdrvhost', 'dwm', 'audiodg',
-  'sihost', 'taskhostw', 'runtimebroker', 'searchindexer', 'searchhost',
-  'securityhealthservice', 'securityhealthsystray', 'sgrmbroker',
-  'ctfmon', 'spoolsv', 'wudfhost', 'conhost', 'dllhost', 'msdtc',
-  'vmmemwsl', 'wslhost', 'wsl', 'consent', 'unsecapp', 'wmiprvse',
-  'sppsvc', 'msiexec', 'taskmgr', 'cmd', 'powershell', 'windowsterminal',
-  'applicationframehost', 'shellexperiencehost', 'startmenuexperiencehost',
-  'lockapp', 'logonui', 'textinputhost', 'systemsettings', 'gamingservicesnet',
-  'reddot workstation', 'electron', 'node',
-]);
-
-function sanitizeAppName(rawName) {
-  if (!rawName) return null;
-  const name = rawName.trim().toLowerCase();
-  // Filter known system processes
-  for (const blocked of SYSTEM_PROCESS_BLACKLIST) {
-    if (name.includes(blocked)) return null;
-  }
-  // Clean up display name — prettify common apps
-  const prettyMap = {
-    'chrome': 'Google Chrome',
-    'msedge': 'Microsoft Edge',
-    'firefox': 'Mozilla Firefox',
-    'brave': 'Brave Browser',
-    'opera': 'Opera Browser',
-    'code': 'VS Code',
-    'code - insiders': 'VS Code Insiders',
-    'devenv': 'Visual Studio',
-    'idea64': 'IntelliJ IDEA',
-    'pycharm64': 'PyCharm',
-    'webstorm64': 'WebStorm',
-    'clion64': 'CLion',
-    'rider64': 'JetBrains Rider',
-    'notepad': 'Notepad',
-    'notepad++': 'Notepad++',
-    'notepad++(64-bit x86)': 'Notepad++',
-    'sublime_text': 'Sublime Text',
-    'atom': 'Atom Editor',
-    'figma': 'Figma',
-    'xd': 'Adobe XD',
-    'illustrator': 'Adobe Illustrator',
-    'photoshop': 'Adobe Photoshop',
-    'afterfx': 'Adobe After Effects',
-    'premiere': 'Adobe Premiere Pro',
-    'acrobat': 'Adobe Acrobat',
-    'acrord32': 'Adobe Acrobat Reader',
-    'winword': 'Microsoft Word',
-    'excel': 'Microsoft Excel',
-    'powerpnt': 'Microsoft PowerPoint',
-    'outlook': 'Microsoft Outlook',
-    'onenote': 'Microsoft OneNote',
-    'teams': 'Microsoft Teams',
-    'slack': 'Slack',
-    'discord': 'Discord',
-    'zoom': 'Zoom',
-    'skype': 'Skype',
-    'telegram': 'Telegram',
-    'whatsapp': 'WhatsApp',
-    'spotify': 'Spotify',
-    'vlc': 'VLC Media Player',
-    'mpc-be': 'MPC-BE',
-    'mpc-hc': 'MPC-HC',
-    'obs64': 'OBS Studio',
-    'obs32': 'OBS Studio',
-    'postman': 'Postman',
-    'insomnia': 'Insomnia',
-    'gimp-2.10': 'GIMP',
-    'inkscape': 'Inkscape',
-    'blender': 'Blender',
-    'unity': 'Unity',
-    'unreal': 'Unreal Engine',
-    'godot': 'Godot Engine',
-    'steam': 'Steam',
-    'epicgameslauncher': 'Epic Games Launcher',
-    'explorer': 'Windows Explorer',
-    'calculator': 'Calculator',
-    'mspaint': 'MS Paint',
-    'snippingtool': 'Snipping Tool',
-    'screenclippinghost': 'Snipping Tool',
-    'wt': 'Windows Terminal',
-    'git-bash': 'Git Bash',
-    'putty': 'PuTTY',
-    'filezilla': 'FileZilla',
-    'winscp': 'WinSCP',
-    'anydesk': 'AnyDesk',
-    'teamviewer': 'TeamViewer',
-    'dbeaver': 'DBeaver',
-    'heidiql': 'HeidiSQL',
-    'mongodb compass': 'MongoDB Compass',
-    'docker desktop': 'Docker Desktop',
-    'vmware': 'VMware',
-    'virtualbox': 'VirtualBox',
-    'androidstudio64': 'Android Studio',
-    'xcode': 'Xcode',
-    'nvim': 'Neovim',
-    'vim': 'Vim',
-    'emacs': 'Emacs',
-  };
-  // Check pretty map by raw process name
-  if (prettyMap[name]) return prettyMap[name];
-  // Return capitalized process name as fallback
-  return rawName.trim().charAt(0).toUpperCase() + rawName.trim().slice(1);
-}
-
-const USER_FACING_PROCESS_NAMES = {
-  'chrome.exe': 'Google Chrome',
-  'msedge.exe': 'Microsoft Edge',
-  'brave.exe': 'Brave Browser',
-  'firefox.exe': 'Mozilla Firefox',
-  'opera.exe': 'Opera Browser',
-  'code.exe': 'VS Code',
-  'code - insiders.exe': 'VS Code Insiders',
-  'devenv.exe': 'Visual Studio',
-  'idea64.exe': 'IntelliJ IDEA',
-  'pycharm64.exe': 'PyCharm',
-  'webstorm64.exe': 'WebStorm',
-  'clion64.exe': 'CLion',
-  'rider64': 'JetBrains Rider',
-  'winword.exe': 'Microsoft Word',
-  'excel.exe': 'Microsoft Excel',
-  'powerpnt.exe': 'Microsoft PowerPoint',
-  'outlook.exe': 'Microsoft Outlook',
-  'onenote.exe': 'Microsoft OneNote',
-  'teams.exe': 'Microsoft Teams',
-  'ms-teams.exe': 'Microsoft Teams',
-  'slack.exe': 'Slack',
-  'discord.exe': 'Discord',
-  'zoom.exe': 'Zoom',
-  'spotify.exe': 'Spotify',
-  'figma.exe': 'Figma',
-  'photoshop.exe': 'Adobe Photoshop',
-  'illustrator.exe': 'Adobe Illustrator',
-  'acrobat.exe': 'Adobe Acrobat',
-  'acrord32.exe': 'Adobe Acrobat Reader',
-  'notepad.exe': 'Notepad',
-  'notepad++.exe': 'Notepad++',
-  'whatsapp.exe': 'WhatsApp',
-  'whatsapp.root.exe': 'WhatsApp',
-  'chatgpt.exe': 'ChatGPT',
-  'chatgpt (beta).exe': 'ChatGPT',
-  'vlc.exe': 'VLC Media Player',
-  'postman.exe': 'Postman',
-  'insomnia.exe': 'Insomnia',
-  'steam.exe': 'Steam',
-  'obs64.exe': 'OBS Studio',
-  'obs32.exe': 'OBS Studio',
-  'blender.exe': 'Blender',
-  'antigravity ide.exe': 'Antigravity IDE',
-};
-
-const IGNORED_TITLES = new Set([
-  'n/a', '', 'olemainthreadwndname', 'olechannelwnd', 'task host window',
-  'default ime', 'msctfime ui', 'dpm_window', 'gdi+ window', 'broadcast',
-  'windows input experience', 'quick settings', 'start', 'search',
-  'program manager', 'system', 'settings'
-]);
-
-function pollRunningApps() {
-  return new Promise((resolve) => {
-    exec('tasklist /v /fo csv', { maxBuffer: 10 * 1024 * 1024, windowsHide: true }, (err, stdout) => {
-      if (err || !stdout) return resolve([]);
-      const lines = stdout.split('\r\n').filter(Boolean);
-      const appMap = new Map();
-
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        const match = line.match(/^"([^"]+)","([^"]+)","([^"]+)","([^"]+)","([^"]+)","([^"]+)","([^"]+)","([^"]+)","(.*)"$/);
-        if (!match) continue;
-
-        const rawImage = match[1].toLowerCase().trim();
-        const rawTitle = match[9].trim();
-        const lowTitle = rawTitle.toLowerCase();
-
-        // Check if known app
-        if (USER_FACING_PROCESS_NAMES[rawImage]) {
-          const appName = USER_FACING_PROCESS_NAMES[rawImage];
-          if (!appMap.has(appName)) {
-            appMap.set(appName, { Name: appName, MainWindowTitle: rawTitle !== 'N/A' ? rawTitle : '' });
-          }
-          continue;
-        }
-
-        // Check if it has a real non-internal window title
-        if (rawTitle && rawTitle !== 'N/A') {
-          let ignore = false;
-          for (const ig of IGNORED_TITLES) {
-            if (lowTitle.includes(ig)) { ignore = true; break; }
-          }
-          if (!ignore && lowTitle.length > 2) {
-            const cleanName = rawImage.replace(/\.exe$/i, '');
-            const prettyName = sanitizeAppName(cleanName);
-            if (prettyName && !appMap.has(prettyName)) {
-              appMap.set(prettyName, { Name: prettyName, MainWindowTitle: rawTitle });
-            }
-          }
-        }
-      }
-
-      resolve(Array.from(appMap.values()));
-    });
-  });
-}
-
-async function sampleAppUsage() {
-  const now = Date.now();
-  const secondsElapsed = lastPollTime ? Math.round((now - lastPollTime) / 1000) : APP_MONITOR_POLL_INTERVAL_MS / 1000;
-  lastPollTime = now;
-
-  let processes = [];
-  try {
-    processes = await pollRunningApps();
-  } catch (_) {
-    return;
-  }
-
-  const seenApps = new Set();
-  const activeApps = [];
-
-  for (const proc of processes) {
-    const rawName = proc.Name || proc.name || '';
-    const cleanName = sanitizeAppName(rawName);
-    if (!cleanName) continue;
-    if (seenApps.has(cleanName)) continue;
-    seenApps.add(cleanName);
-
-    if (!appUsageSession[cleanName]) {
-      appUsageSession[cleanName] = 0;
-    }
-    appUsageSession[cleanName] += secondsElapsed;
-    activeApps.push(cleanName);
-  }
-
-  // Send update to renderer
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('app-usage-update', {
-      sessionUsage: { ...appUsageSession },
-      activeApps,
-      timestamp: now,
-      secondsElapsed
-    });
-  }
-}
-
-function startAppMonitor() {
-  if (appMonitorInterval) return;
-  lastPollTime = Date.now();
-  // First poll after a short delay to let app settle
-  setTimeout(sampleAppUsage, 5000);
-  appMonitorInterval = setInterval(sampleAppUsage, APP_MONITOR_POLL_INTERVAL_MS);
-  console.log('[APP MONITOR] App activity monitor started (30s poll interval)');
-}
-
-function stopAppMonitor() {
-  if (appMonitorInterval) {
-    clearInterval(appMonitorInterval);
-    appMonitorInterval = null;
-  }
-}
 
 // Semantic version comparator: returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
 function compareSemver(v1, v2) {
@@ -1556,23 +1288,6 @@ ipcMain.on('show-native-notification', (event, payload) => {
   }
 });
 
-// IPC: Get current in-memory app usage snapshot
-ipcMain.handle('get-app-usage-snapshot', (event) => {
-  if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
-  return {
-    sessionUsage: { ...appUsageSession },
-    timestamp: Date.now()
-  };
-});
-
-// IPC: Reset session usage (called on sign-out)
-ipcMain.on('reset-app-usage-session', (event) => {
-  if (!isTrustedSender(event)) return;
-  appUsageSession = {};
-  lastPollTime = Date.now();
-  console.log('[APP MONITOR] Session usage reset.');
-});
-
 // Incoming Call Native Alert & Window Focus
 ipcMain.on('incoming-call-alert', (event, payload) => {
   if (!isTrustedSender(event) || !payload || typeof payload !== 'object') return;
@@ -1675,7 +1390,6 @@ if (!gotTheLock) {
 
     createWallpaperWindow();
     createTrayIcon();
-    startAppMonitor();
 
     // Power and Presence Monitoring
     powerMonitor.on('lock-screen', () => {
@@ -1700,7 +1414,6 @@ if (!gotTheLock) {
   });
 
   app.on('window-all-closed', () => {
-    stopAppMonitor();
     if (process.platform !== 'darwin') {
       app.quit();
     }
