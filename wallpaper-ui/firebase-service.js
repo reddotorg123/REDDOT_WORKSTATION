@@ -1976,6 +1976,106 @@
         : '• Performance enhancements and stability upgrades';
       const text = `📢 **REDDOT Workstation OS v${version} is now available!**\n\n${summary}\n\n👉 Click **⚡ UPDATE** in the top header or go to **Database > OTA Updater** to hotpatch now!`;
       return this.sendMessage('general', text);
+    },
+
+    // =========================================================================
+    // REAL-TIME LEAVE REQUEST & APPROVAL WORKFLOW
+    // Scoped to: organizations/reddot/leave_requests
+    // =========================================================================
+    subscribeLeaveRequests(callback) {
+      if (!this.db) return () => {};
+      try {
+        const unsub = this.db.collection('organizations').doc(ORG_ID).collection('leave_requests')
+          .orderBy('submittedAt', 'desc')
+          .onSnapshot((snapshot) => {
+            const list = [];
+            snapshot.forEach(doc => {
+              list.push({ id: doc.id, ...doc.data() });
+            });
+            callback(list);
+          }, (err) => {
+            console.warn('[FIREBASE] subscribeLeaveRequests notice:', err.message);
+          });
+        this.listeners.push(unsub);
+        return unsub;
+      } catch (e) {
+        console.warn('[FIREBASE] subscribeLeaveRequests error:', e);
+        return () => {};
+      }
+    },
+
+    async submitLeaveRequest(leaveData) {
+      const leaveId = leaveData.id || ('leave_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+      const payload = {
+        id: leaveId,
+        uid: leaveData.uid || this.currentUser?.uid || 'EMP_USER',
+        empId: leaveData.empId || 'RD-EMP',
+        employeeName: leaveData.employeeName || this.currentUser?.displayName || 'Teammate',
+        employeeEmail: leaveData.employeeEmail || this.currentUser?.email || '',
+        employeePhoto: leaveData.employeePhoto || this.currentUser?.photoURL || '',
+        leaveType: leaveData.leaveType || 'Casual Leave',
+        startDate: leaveData.startDate,
+        endDate: leaveData.endDate,
+        totalDays: Number(leaveData.totalDays) || 1,
+        reason: leaveData.reason || '',
+        status: 'PENDING',
+        submittedAt: Date.now(),
+        updatedAt: Date.now(),
+        approvedAt: null,
+        approvedBy: null,
+        rejectedAt: null,
+        rejectedBy: null,
+        rejectionReason: null
+      };
+
+      if (this.db) {
+        try {
+          await this.db.collection('organizations').doc(ORG_ID).collection('leave_requests').doc(leaveId).set(payload);
+          await this.logAudit('LEAVE_SUBMITTED', `Leave requested by ${payload.employeeName} (${payload.leaveType}: ${payload.startDate} to ${payload.endDate})`, payload.uid);
+        } catch (e) {
+          console.warn('[FIREBASE] submitLeaveRequest cloud write failed, fallback to local:', e.message);
+        }
+      }
+      return payload;
+    },
+
+    async approveLeaveRequest(leaveId, approvedByName = 'Founder Jagadish K') {
+      const updateData = {
+        status: 'APPROVED',
+        approvedAt: Date.now(),
+        approvedBy: approvedByName,
+        updatedAt: Date.now()
+      };
+
+      if (this.db) {
+        try {
+          await this.db.collection('organizations').doc(ORG_ID).collection('leave_requests').doc(leaveId).update(updateData);
+          await this.logAudit('LEAVE_APPROVED', `Leave request ${leaveId} approved by ${approvedByName}`, this.currentUser?.uid);
+        } catch (e) {
+          console.warn('[FIREBASE] approveLeaveRequest cloud write failed:', e.message);
+        }
+      }
+      return updateData;
+    },
+
+    async rejectLeaveRequest(leaveId, rejectedByName = 'Founder Jagadish K', reason = '') {
+      const updateData = {
+        status: 'REJECTED',
+        rejectedAt: Date.now(),
+        rejectedBy: rejectedByName,
+        rejectionReason: reason || 'Not specified',
+        updatedAt: Date.now()
+      };
+
+      if (this.db) {
+        try {
+          await this.db.collection('organizations').doc(ORG_ID).collection('leave_requests').doc(leaveId).update(updateData);
+          await this.logAudit('LEAVE_REJECTED', `Leave request ${leaveId} rejected by ${rejectedByName}`, this.currentUser?.uid);
+        } catch (e) {
+          console.warn('[FIREBASE] rejectLeaveRequest cloud write failed:', e.message);
+        }
+      }
+      return updateData;
     }
   };
 

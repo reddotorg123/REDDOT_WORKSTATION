@@ -1,15 +1,16 @@
 {
-  "version": "3.2.0",
-  "releaseDate": "2026-09-17",
+  "version": "3.3.0",
+  "releaseDate": "2026-09-18",
   "minRequiredVersion": "2.0.0",
   "changelog": [
-    "WhatsApp Status Ticks Overhaul: Past messages and answered conversation messages now accurately display WhatsApp Double Green Ticks (✓✓). Delivered cloud messages display Double Grey Ticks (✓✓).",
-    "Message Info & Read Receipts Audit: Message Info modal and direct tick clicks display full delivery receipts and read participants with exact timestamps.",
-    "Enterprise Role Standardization: Streamlined all company structures to 4 strict roles: Founder, CEO, Manager, and Employee.",
-    "Strict Attendance Access: Full attendance telemetry, member filtering, and ledger exports restricted strictly to CEO and Founder. Managers and Employees have access only to their own attendance.",
-    "Author-Only Message Deletion: Strict author validation ensures users can only delete their own chat messages across cloud and local storage.",
-    "Real-Time Online Presence Fixes: Seamless live presence synchronization across Direct Messages, Team Members, and Chat header.",
-    "Secure Boot Screen & Auth Guard: Shielded workstation startup with authenticated boot screen, preventing unauthenticated sessions or fake ID message broadcasting."
+    "App Activity Monitor (Admin Only): Owner Jagadish can now see exactly which applications each team member is running and for how long — Chrome, Brave, VS Code, WhatsApp, Figma, and 40+ more apps tracked in real-time.",
+    "Per-User App Breakdown: Full detail panel per team member showing app name, total time used, % of workday bar, and last active timestamp — all with live auto-refresh.",
+    "Fleet KPIs: Dashboard cards for Active Users Tracked, Distinct Apps Today, Total App Hours Today, and Most Used App across the entire team.",
+    "Date History View: Browse any past date to see historical app usage for each team member.",
+    "Reliable App Detection: Uses native tasklist CSV scanner for accurate cross-app detection — Chrome, VS Code, WhatsApp, Antigravity IDE, Brave, Figma, Discord, Teams, and more.",
+    "Strict Owner-Only Access: App Monitor tab is completely hidden for all non-admin users. Only jagadish2k2006@gmail.com can access it.",
+    "Background Silent Sync: All users silently sync their own usage to cloud every 60 seconds — data is visible only to the owner.",
+    "Fix: Resolved JavaScript function hoisting recursion bug in updateAuthUI that caused Maximum call stack size exceeded on auth."
   ],
   "downloadUrl": "https://github.com/reddotorg123/REDDOT_WORKSTATION/releases/download/v3.1.0/REDDOT-Workstation-OS-Setup.exe",
   "mandatory": false

@@ -10,11 +10,11 @@ const PROJECT_ID = 'reddot-workspace';
 const ORG_ID = 'reddot';
 const CHANNEL_ID = 'general';
 
-const msgId = 'msg_ota_v320_' + Date.now();
+const msgId = 'msg_ota_v330_' + Date.now();
 const postUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/organizations/${ORG_ID}/channels/${CHANNEL_ID}/messages/${msgId}?key=${API_KEY}`;
 const channelMetaUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/organizations/${ORG_ID}/channels/${CHANNEL_ID}?updateMask.fieldPaths=lastMessageText&updateMask.fieldPaths=lastMessageSender&updateMask.fieldPaths=lastMessageTime&updateMask.fieldPaths=updatedAt&key=${API_KEY}`;
 
-const announcementText = `📢 **[SYSTEM UPDATE] REDDOT Workstation v3.2.0 is now LIVE!**\n\n✨ **What's New in Workstation v3.2.0:**\n• **WhatsApp Status Ticks Overhaul**: Past messages and answered conversation messages now accurately display WhatsApp Double Green Ticks (✓✓). Delivered cloud messages display Double Grey Ticks (✓✓).\n• **Message Seen & Delivery Audit**: WhatsApp-style Message Info modal displaying read-by participants and delivery receipts with exact timestamps.\n• **Enterprise Role Standardization**: Streamlined all company structures to 4 strict roles: Founder, CEO, Manager, and Employee.\n• **Strict Attendance Access**: Full attendance telemetry, member filtering, and ledger exports restricted strictly to CEO and Founder. Managers and Employees have access only to their own attendance.\n• **Author-Only Message Deletion**: Strict author validation ensures users can only delete their own chat messages across cloud and local storage.\n• **Real-Time Online Presence Fixes**: Seamless live presence synchronization across Direct Messages, Team Members, and Chat header.\n• **Secure Boot Screen & Auth Guard**: Shielded workstation startup with authenticated boot screen, preventing unauthenticated sessions or fake ID message broadcasting.\n\n👉 **How to Update:**\nSimply click the glowing **⚡ UPDATE** button in your top header, or go to **Database & Storage Hub > ⚡ 1-Click Fast Cloud Update**!`;
+const announcementText = `📢 **[SYSTEM UPDATE] REDDOT Workstation v3.3.0 is now LIVE!**\n\n✨ **What's New in Workstation v3.3.0:**\n• **📱 App Activity Monitor (Admin Only)**: Jagadish can now see exactly which applications every team member is running — Chrome, Brave, VS Code, WhatsApp, Figma, Discord, Teams, and 40+ more apps tracked live.\n• **Per-User App Breakdown**: Full detail panel per team member showing app name, total time used, % of workday bar, and last active timestamp with live auto-refresh.\n• **Fleet KPIs Dashboard**: Cards for Active Users Tracked, Distinct Apps Today, Total App Hours, and Most Used App across the entire fleet.\n• **Date History View**: Browse any past date to see historical app usage for any team member.\n• **Reliable App Detection**: Uses native tasklist scanner — accurately detects 40+ apps including Chrome, VS Code, WhatsApp, Antigravity IDE, Brave, Discord, Teams, and more.\n• **Background Silent Sync**: Usage syncs automatically every 60 seconds for all users, visible only to the owner.\n\n👉 **How to Update:**\nSimply click the glowing **⚡ UPDATE** button in your top header, or go to **Database & Storage Hub > ⚡ 1-Click Fast Cloud Update**!`;
 
 const payload = JSON.stringify({
   fields: {
@@ -66,7 +66,7 @@ function postJson(url, data, method = 'PATCH') {
 }
 
 async function main() {
-  console.log('📡 Broadcasting v3.0.0 OTA Release Announcement to team chat channel [#general]...');
+  console.log('📡 Broadcasting v3.3.0 OTA Release Announcement to team chat channel [#general]...');
 
   // 1. Post announcement message
   await postJson(postUrl, payload, 'PATCH');
@@ -75,7 +75,7 @@ async function main() {
   // 2. Update channel metadata
   const channelMetaPayload = JSON.stringify({
     fields: {
-      lastMessageText: { stringValue: '📢 REDDOT Workstation v3.0 is now LIVE! Click ⚡ UPDATE' },
+      lastMessageText: { stringValue: '📢 REDDOT Workstation v3.3.0 is now LIVE! App Monitor + more. Click ⚡ UPDATE' },
       lastMessageSender: { stringValue: 'REDDOT System Bot ⚡' },
       lastMessageTime: { integerValue: String(Date.now()) },
       updatedAt: { integerValue: String(Date.now()) }
