@@ -13,6 +13,20 @@ const http = require('http');
 const https = require('https');
 const { spawn } = require('child_process');
 
+// V8 and Chromium performance & memory optimization switches
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=1024 --expose-gc');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('enable-features', 'CanvasOopRasterization,SmoothScrolling');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
+app.commandLine.appendSwitch('enable-accelerated-video-decode');
+
+// Standard desktop Chrome User-Agent to ensure Google OAuth & Firebase SSO are never blocked
+const CHROME_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+app.userAgentFallback = CHROME_USER_AGENT;
+
 let mainWindow = null;
 let tray = null;
 let isTrayActive = false;
@@ -60,7 +74,8 @@ function getActiveVersionInfo() {
     try {
       const vData = JSON.parse(fs.readFileSync(hotpatchVJson, 'utf8'));
       if (vData && vData.version) {
-        if (compareSemver(vData.version, baseVersion) >= 0) {
+        // Hotpatch must be strictly newer than the base installed version
+        if (compareSemver(vData.version, baseVersion) > 0) {
           return {
             version: vData.version,
             isHotpatched: true,
@@ -68,6 +83,12 @@ function getActiveVersionInfo() {
             releaseDate: vData.releaseDate || '2026-09-05',
             appliedAt: vData.appliedAt || null
           };
+        } else {
+          // Installed version is equal or newer! Stale hotpatch must be purged to prevent stuck/corrupt loading.
+          try {
+            fs.rmSync(getHotpatchDir(), { recursive: true, force: true });
+            console.log(`[HOTPATCH] Cleaned up obsolete hotpatch directory (installed: ${baseVersion}, hotpatch: ${vData.version})`);
+          } catch (_) {}
         }
       }
     } catch (_) {}
@@ -82,7 +103,7 @@ function getActiveVersionInfo() {
 }
 
 // Local loopback server to serve UI with http:// protocol for full Firebase Web Auth compliance
-// Automatically checks user-writable hotpatch directory first, falling back to bundled assets in app.asar
+// Automatically checks user-writable hotpatch directory first (if active & newer), falling back to bundled assets in app.asar
 function startLocalServer() {
   return new Promise((resolve, reject) => {
     localServer = http.createServer((req, res) => {
@@ -90,19 +111,23 @@ function startLocalServer() {
       if (reqPath === '/' || reqPath === '') reqPath = '/index.html';
       const safePath = path.normalize(reqPath).replace(/^(\.\.[\/\\])+/, '');
 
+      const activeInfo = getActiveVersionInfo();
       let filePath = null;
 
       // Special case: version manifest
       if (safePath === '\\version.json' || safePath === '/version.json' || safePath === 'version.json') {
         const hotpatchVJson = path.join(getHotpatchDir(), 'version.json');
-        filePath = fs.existsSync(hotpatchVJson) ? hotpatchVJson : path.join(__dirname, 'version.json');
+        filePath = (activeInfo.isHotpatched && fs.existsSync(hotpatchVJson)) ? hotpatchVJson : path.join(__dirname, 'version.json');
       } else {
-        // Priority 1: Check hotpatch folder in user data
-        const hotpatchFilePath = path.join(getHotpatchUiDir(), safePath);
-        if (fs.existsSync(hotpatchFilePath) && !fs.statSync(hotpatchFilePath).isDirectory()) {
-          filePath = hotpatchFilePath;
-        } else {
-          // Priority 2: Bundled UI folder in app package
+        // Priority 1: Check hotpatch folder in user data ONLY IF active and strictly newer
+        if (activeInfo.isHotpatched) {
+          const hotpatchFilePath = path.join(getHotpatchUiDir(), safePath);
+          if (fs.existsSync(hotpatchFilePath) && !fs.statSync(hotpatchFilePath).isDirectory()) {
+            filePath = hotpatchFilePath;
+          }
+        }
+        // Priority 2: Bundled UI folder in app package
+        if (!filePath) {
           filePath = path.join(__dirname, 'wallpaper-ui', safePath);
         }
       }
@@ -160,9 +185,94 @@ function startLocalServer() {
   });
 }
 
+// =============================================================================
+// REDDOT ATTACHMENT GATEWAY & GOOGLE DRIVE BACKEND CONTROLLER (Port 5050)
+// =============================================================================
+let backendProcess = null;
+
+function checkBackendHealth(timeoutMs = 800) {
+  return new Promise((resolve) => {
+    const req = http.get('http://127.0.0.1:5050/api/health', (res) => {
+      let body = '';
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(body);
+          resolve({ online: res.statusCode === 200, ...json });
+        } catch (_) {
+          resolve({ online: res.statusCode === 200 });
+        }
+      });
+    });
+    req.on('error', () => resolve({ online: false }));
+    req.setTimeout(timeoutMs, () => {
+      req.destroy();
+      resolve({ online: false });
+    });
+  });
+}
+
+async function startBackendService() {
+  const health = await checkBackendHealth(500);
+  if (health.online) {
+    console.log('[BACKEND] Attachment backend already running on port 5050.');
+    return true;
+  }
+
+  const backendCandidates = [
+    path.resolve(__dirname, '..', 'backend', 'server.js'),
+    path.resolve(__dirname, 'backend', 'server.js'),
+    path.resolve(process.resourcesPath || '', 'backend', 'server.js'),
+    path.resolve(__dirname, '..', 'attachment-service', 'server.js')
+  ];
+
+  const backendScript = backendCandidates.find(p => fs.existsSync(p));
+  if (!backendScript) {
+    console.warn('[BACKEND] No backend server script found in paths.');
+    return false;
+  }
+
+  console.log('[BACKEND] Auto-spawning REDDOT Attachment Gateway:', backendScript);
+  try {
+    const nodeBin = process.execPath;
+    backendProcess = spawn(nodeBin, [backendScript], {
+      cwd: path.dirname(backendScript),
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PORT: '5050' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true
+    });
+
+    backendProcess.stdout?.on('data', (d) => {
+      const msg = d.toString().trim();
+      if (msg) console.log('[BACKEND]', msg);
+    });
+    backendProcess.stderr?.on('data', (d) => {
+      const msg = d.toString().trim();
+      if (msg) console.warn('[BACKEND ERR]', msg);
+    });
+    backendProcess.on('exit', (code) => {
+      console.log(`[BACKEND] Process exited with code ${code}`);
+      backendProcess = null;
+    });
+
+    const start = Date.now();
+    while (Date.now() - start < 3500) {
+      await new Promise(r => setTimeout(r, 200));
+      const check = await checkBackendHealth(300);
+      if (check.online) {
+        console.log('[BACKEND] Attachment gateway online on http://127.0.0.1:5050');
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn('[BACKEND] Error starting gateway process:', err.message);
+  }
+  return false;
+}
+
 // App settings
 const config = {
-  theme: 'obsidian',
+  theme: 'light',
   powerProfile: 'balanced',
   cleanView: false,
   autoStart: false
@@ -194,10 +304,33 @@ function loadDatabaseFromDisk() {
   if (fs.existsSync(filePath)) {
     try {
       const raw = fs.readFileSync(filePath, 'utf8');
-      return JSON.parse(raw);
+      if (raw && raw.trim().length > 0) {
+        return JSON.parse(raw.trim());
+      }
     } catch (e) {
-      console.warn('[DB] Could not parse disk database, starting fresh:', e);
+      console.warn('[DB] Could not parse disk database, attempting recovery:', e.message);
     }
+  }
+  
+  // Safe Recovery: find the most recent valid .tmp or .bak file in storage directory
+  try {
+    const dir = getDbDir();
+    const files = fs.readdirSync(dir).filter(f => (f.startsWith('reddot_database.json.') && (f.endsWith('.tmp') || f.endsWith('.bak'))) || f === 'reddot_database.json.bak');
+    for (const f of files.reverse()) {
+      try {
+        const candidate = fs.readFileSync(path.join(dir, f), 'utf8');
+        if (candidate && candidate.trim().length > 10) {
+          const parsed = JSON.parse(candidate.trim());
+          if (parsed && typeof parsed === 'object' && (parsed.members || parsed.tasks || parsed.chats)) {
+            console.log('[DB] Recovered valid database from backup:', f);
+            fs.writeFileSync(filePath, JSON.stringify(parsed, null, 2), 'utf8');
+            return parsed;
+          }
+        }
+      } catch (_) {}
+    }
+  } catch (err) {
+    console.warn('[DB] Recovery scan error:', err);
   }
   return null;
 }
@@ -220,8 +353,13 @@ function drainDbSaveQueue() {
 
   try {
     const filePath = getDbPath();
-    const payload = JSON.stringify(dataToWrite, null, 2);
+    const payload = JSON.stringify(dataToWrite);
+    if (!payload || payload.length < 10) {
+      isDbSaving = false;
+      return;
+    }
     const tmpPath = `${filePath}.${Date.now()}_${Math.random().toString(36).slice(2, 6)}.tmp`;
+    const bakPath = `${filePath}.bak`;
 
     fs.writeFile(tmpPath, payload, 'utf8', (err) => {
       if (err) {
@@ -235,11 +373,13 @@ function drainDbSaveQueue() {
           // Fallback if rename fails due to transient Windows file handle lock
           fs.writeFile(filePath, payload, 'utf8', () => {
             try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch (_) {}
+            try { fs.writeFileSync(bakPath, payload, 'utf8'); } catch (_) {}
             isDbSaving = false;
             if (pendingDbPayload) drainDbSaveQueue();
           });
           return;
         }
+        try { fs.writeFileSync(bakPath, payload, 'utf8'); } catch (_) {}
         isDbSaving = false;
         if (pendingDbPayload) drainDbSaveQueue();
       });
@@ -328,8 +468,14 @@ function sampleSystemMetrics() {
     uptimeSec: Math.floor(os.uptime()),
     platform: `${os.type()} ${os.arch()}`,
     appVersion: app.getVersion() || '2.4.0',
-    autoStart: getAutoStartStatus()
+    autoStart: getAutoStartStatus(),
+    runningApps: Array.isArray(cachedRunningApps) ? cachedRunningApps : []
   };
+
+  // Keep running apps cache fresh
+  if (typeof scanRunningApplications === 'function') {
+    scanRunningApplications().catch(() => {});
+  }
 
 
 
@@ -383,7 +529,7 @@ function createWallpaperWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true,
+      sandbox: false,
       webSecurity: true,
       allowRunningInsecureContent: false,
       backgroundThrottling: false
@@ -411,6 +557,7 @@ function createWallpaperWindow() {
           autoHideMenuBar: true,
           alwaysOnTop: true,
           center: true,
+          userAgent: CHROME_USER_AGENT,
           webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -464,18 +611,13 @@ function createWallpaperWindow() {
 
   const showAndActivate = () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setSkipTaskbar(false);
       if (!mainWindow.isVisible()) mainWindow.show();
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.maximize();
       mainWindow.show();
       mainWindow.focus();
       mainWindow.moveTop();
-      mainWindow.setAlwaysOnTop(true);
-      setTimeout(() => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.setAlwaysOnTop(false);
-        }
-      }, 1000);
     }
   };
 
@@ -483,7 +625,7 @@ function createWallpaperWindow() {
     showAndActivate();
     config.autoStart = getAutoStartStatus();
     sampleSystemMetrics();
-    if (!metricsInterval) metricsInterval = setInterval(sampleSystemMetrics, 1500);
+    if (!metricsInterval) metricsInterval = setInterval(sampleSystemMetrics, 8000);
   });
 
   mainWindow.webContents.once('did-finish-load', () => {
@@ -491,6 +633,27 @@ function createWallpaperWindow() {
   });
 
   setTimeout(showAndActivate, 800);
+
+  mainWindow.on('close', async (e) => {
+    if (!mainWindow._clockedOutOnClose) {
+      e.preventDefault();
+      mainWindow._clockedOutOnClose = true;
+      try {
+        await mainWindow.webContents.executeJavaScript(`
+          if (typeof autoPerformExitClockOut === 'function') {
+            autoPerformExitClockOut();
+          }
+        `);
+      } catch (err) {
+        console.warn('[EXIT] Auto clock-out on window close error:', err);
+      }
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.destroy();
+        }
+      }, 350);
+    }
+  });
 
   mainWindow.on('closed', () => {
     if (metricsInterval) clearInterval(metricsInterval);
@@ -716,6 +879,136 @@ ipcMain.handle('window-is-pinned', (event) => {
 });
 
 // IPC Handlers with Strict Validation
+// --- Backend Attachment Service & Google Drive Gateway IPC ---
+ipcMain.handle('get-backend-status', async (event) => {
+  if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
+  try {
+    return await checkBackendHealth(1200);
+  } catch (err) {
+    return { online: false, error: err.message };
+  }
+});
+
+ipcMain.handle('fetch-backend-attachments', async (event) => {
+  if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
+  return new Promise((resolve) => {
+    http.get('http://127.0.0.1:5050/api/attachments', (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          resolve({ success: false, error: 'Parse error', raw: data });
+        }
+      });
+    }).on('error', (err) => {
+      resolve({ success: false, error: err.message, attachments: [] });
+    });
+  });
+});
+
+ipcMain.handle('delete-backend-attachment', async (event, attachmentId) => {
+  if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
+  return new Promise((resolve) => {
+    const req = http.request({
+      hostname: '127.0.0.1',
+      port: 5050,
+      path: '/api/attachments/' + encodeURIComponent(attachmentId),
+      method: 'DELETE'
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); } catch (_) { resolve({ success: res.statusCode === 200 }); }
+      });
+    });
+    req.on('error', (err) => resolve({ success: false, error: err.message }));
+    req.end();
+  });
+});
+
+ipcMain.handle('select-and-upload-file', async (event, options = {}) => {
+  if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: options.title || 'Select File to Upload to REDDOT Cloud',
+    filters: options.filters || [
+      { name: 'All Files', extensions: ['*'] }
+    ],
+    properties: ['openFile']
+  });
+
+  if (result.canceled || !result.filePaths.length) {
+    return { canceled: true };
+  }
+
+  const selectedPath = result.filePaths[0];
+  try {
+    const stats = fs.statSync(selectedPath);
+    if (stats.size > 25 * 1024 * 1024) {
+      return { canceled: false, error: 'File exceeds 25MB maximum limit.' };
+    }
+
+    const fileName = path.basename(selectedPath);
+    const channelId = options.channelId || 'general';
+    const uploaderId = options.uploaderId || 'RD-EMP';
+
+    const boundary = '----WebKitFormBoundary' + Math.random().toString(36).substring(2);
+    const fileBuf = fs.readFileSync(selectedPath);
+    const ext = path.extname(selectedPath).toLowerCase();
+    const mimeTypes = {
+      '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
+      '.pdf': 'application/pdf', '.txt': 'text/plain', '.json': 'application/json', '.zip': 'application/zip'
+    };
+    const mimeType = mimeTypes[ext] || 'application/octet-stream';
+
+    const header = Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
+      'utf8'
+    );
+    const footer = Buffer.from(
+      `\r\n--${boundary}\r\nContent-Disposition: form-data; name="channelId"\r\n\r\n${channelId}\r\n--${boundary}\r\nContent-Disposition: form-data; name="uploaderId"\r\n\r\n${uploaderId}\r\n--${boundary}--\r\n`,
+      'utf8'
+    );
+
+    const fullPayload = Buffer.concat([header, fileBuf, footer]);
+
+    return new Promise((resolve) => {
+      const postReq = http.request({
+        hostname: '127.0.0.1',
+        port: 5050,
+        path: '/api/attachments/upload',
+        method: 'POST',
+        headers: {
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          'Content-Length': fullPayload.length,
+          'x-reddot-user-id': uploaderId,
+          'x-reddot-channel-id': channelId
+        }
+      }, (res) => {
+        let respData = '';
+        res.on('data', chunk => { respData += chunk; });
+        res.on('end', () => {
+          try {
+            resolve({ canceled: false, success: res.statusCode >= 200 && res.statusCode < 300, ...JSON.parse(respData) });
+          } catch (_) {
+            resolve({ canceled: false, success: res.statusCode === 201, raw: respData });
+          }
+        });
+      });
+
+      postReq.on('error', (err) => {
+        resolve({ canceled: false, error: 'Backend error: ' + err.message });
+      });
+
+      postReq.write(fullPayload);
+      postReq.end();
+    });
+  } catch (err) {
+    return { canceled: false, error: err.message };
+  }
+});
+
 ipcMain.handle('get-auto-start', (event) => {
   if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
   return getAutoStartStatus();
@@ -794,7 +1087,32 @@ ipcMain.handle('db-select-photo', async (event) => {
   }
 });
 
-// Database Diagnostics Runner
+// Native System Command Execution for Workstation Terminal
+ipcMain.handle('execute-terminal-command', async (event, cmdStr) => {
+  if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
+  if (!cmdStr || typeof cmdStr !== 'string') return { stdout: '', stderr: 'No command provided', exitCode: 1 };
+
+  return new Promise((resolve) => {
+    const { exec } = require('child_process');
+    const userWorkspace = path.resolve(__dirname, '..');
+    exec(cmdStr, {
+      cwd: userWorkspace,
+      timeout: 20000,
+      maxBuffer: 1024 * 1024 * 4,
+      env: { ...process.env }
+    }, (error, stdout, stderr) => {
+      resolve({
+        success: !error,
+        stdout: stdout || '',
+        stderr: stderr || (error ? error.message : ''),
+        exitCode: error ? (error.code || 1) : 0
+      });
+    });
+  });
+});
+
+
+
 ipcMain.handle('db-diagnostics', async (event) => {
   if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
   const start = performance.now();
@@ -830,6 +1148,69 @@ ipcMain.handle('db-diagnostics', async (event) => {
 });
 
 // Open External Links (Calls & Meetings) in Default Browser
+
+// --- DEDICATED HIGH-PERFORMANCE CALLING & MEETING WINDOW ENGINE ---
+let activeCallWindow = null;
+ipcMain.handle('open-call-window', async (event, payload) => {
+  if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
+  const { url, title = 'REDDOT Workstation - Meeting' } = payload || {};
+  if (!url || typeof url !== 'string') {
+    return { success: false, error: 'Invalid call URL' };
+  }
+
+  if (activeCallWindow && !activeCallWindow.isDestroyed()) {
+    activeCallWindow.loadURL(url);
+    activeCallWindow.show();
+    activeCallWindow.focus();
+    return { success: true };
+  }
+
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize || primaryDisplay.bounds;
+
+  activeCallWindow = new BrowserWindow({
+    title: title,
+    width: Math.min(1280, Math.round(screenWidth * 0.85)),
+    height: Math.min(800, Math.round(screenHeight * 0.85)),
+    center: true,
+    backgroundColor: '#0b0f19',
+    autoHideMenuBar: true,
+    show: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      backgroundThrottling: false
+    }
+  });
+
+  activeCallWindow.setMenu(null);
+  activeCallWindow.setMenuBarVisibility(false);
+
+  // Auto-grant camera, microphone, screen capture for crystal clear calling
+  activeCallWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    callback(true);
+  });
+  activeCallWindow.webContents.session.setPermissionCheckHandler(() => true);
+
+  // Modern desktop Chrome User-Agent
+  activeCallWindow.webContents.setUserAgent(CHROME_USER_AGENT);
+
+  activeCallWindow.once('ready-to-show', () => {
+    activeCallWindow.show();
+    activeCallWindow.focus();
+  });
+
+  activeCallWindow.on('closed', () => {
+    activeCallWindow = null;
+  });
+
+  activeCallWindow.loadURL(url);
+  return { success: true };
+});
+
 ipcMain.handle('open-external', async (event, url) => {
   if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
   if (typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://'))) {
@@ -837,6 +1218,68 @@ ipcMain.handle('open-external', async (event, url) => {
     return true;
   }
   return false;
+});
+
+// Native File Download & Save Dialog Engine
+ipcMain.handle('save-file-dialog', async (event, payload) => {
+  if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
+  try {
+    const { defaultName = 'download', dataUrl = '', bufferBase64 = '' } = payload || {};
+    const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+    
+    // Default to user's Downloads folder
+    const downloadsFolder = app.getPath('downloads');
+    const defaultPath = path.join(downloadsFolder, path.basename(defaultName));
+
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Download & Save Attachment - REDDOT Workstation',
+      defaultPath: defaultPath,
+      properties: ['showOverwriteConfirmation', 'createDirectory']
+    });
+
+    if (canceled || !filePath) {
+      return { success: false, canceled: true };
+    }
+
+    let fileBuffer = null;
+    if (bufferBase64) {
+      fileBuffer = Buffer.from(bufferBase64, 'base64');
+    } else if (dataUrl && dataUrl.startsWith('data:')) {
+      const commaIdx = dataUrl.indexOf(',');
+      if (commaIdx !== -1) {
+        fileBuffer = Buffer.from(dataUrl.slice(commaIdx + 1), 'base64');
+      }
+    } else if (dataUrl && (dataUrl.startsWith('http://') || dataUrl.startsWith('https://'))) {
+      const client = dataUrl.startsWith('https:') ? https : http;
+      await new Promise((resolve, reject) => {
+        client.get(dataUrl, (res) => {
+          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            return client.get(res.headers.location, (r2) => {
+              const fileStream = fs.createWriteStream(filePath);
+              r2.pipe(fileStream);
+              fileStream.on('finish', () => { fileStream.close(); resolve(); });
+              fileStream.on('error', reject);
+            });
+          }
+          const fileStream = fs.createWriteStream(filePath);
+          res.pipe(fileStream);
+          fileStream.on('finish', () => { fileStream.close(); resolve(); });
+          fileStream.on('error', reject);
+        }).on('error', reject);
+      });
+      return { success: true, filePath };
+    }
+
+    if (fileBuffer) {
+      fs.writeFileSync(filePath, fileBuffer);
+      return { success: true, filePath };
+    }
+
+    return { success: false, error: 'No data payload found' };
+  } catch (err) {
+    console.error('[DOWNLOAD] Save file dialog error:', err);
+    return { success: false, error: err.message };
+  }
 });
 
 // --- OVER-THE-AIR (OTA) CLOUD UPDATER ENGINE ---
@@ -1261,6 +1704,156 @@ ipcMain.handle('ota-install-update', async (event) => {
   }
 });
 
+// Cached running apps detector (10-second TTL to keep CPU at near-zero)
+let cachedRunningApps = [];
+let lastRunningAppsScan = 0;
+let isScanningApps = false;
+
+function scanRunningApplications() {
+  return new Promise((resolve) => {
+    const now = Date.now();
+    if (cachedRunningApps.length > 0 && (now - lastRunningAppsScan) < 4000) {
+      return resolve(cachedRunningApps);
+    }
+    if (isScanningApps) {
+      return resolve(cachedRunningApps);
+    }
+    isScanningApps = true;
+
+    const { exec } = require('child_process');
+
+    // ONLY true interactive desktop applications that live in the Windows taskbar
+    const TASKBAR_DESKTOP_APPS = {
+      'antigravity ide.exe': { name: 'Antigravity IDE', icon: 'antigravity', category: 'Development' },
+      'antigravity.exe': { name: 'Antigravity IDE', icon: 'antigravity', category: 'Development' },
+      'cursor.exe': { name: 'Cursor Editor', icon: 'vscode', category: 'Development' },
+      'sublime_text.exe': { name: 'Sublime Text', icon: 'default', category: 'Development' },
+      'windowsterminal.exe': { name: 'Windows Terminal', icon: 'terminal', category: 'Development' },
+      'wt.exe': { name: 'Windows Terminal', icon: 'terminal', category: 'Development' },
+      'powershell.exe': { name: 'PowerShell', icon: 'terminal', category: 'Development' },
+      'pwsh.exe': { name: 'PowerShell Core', icon: 'terminal', category: 'Development' },
+      'cmd.exe': { name: 'Command Prompt', icon: 'terminal', category: 'Development' },
+      'alacritty.exe': { name: 'Alacritty Terminal', icon: 'terminal', category: 'Development' },
+      'wezterm-gui.exe': { name: 'WezTerm', icon: 'terminal', category: 'Development' },
+      'git-bash.exe': { name: 'Git Bash', icon: 'terminal', category: 'Development' },
+      'canva.exe': { name: 'Canva', icon: 'figma', category: 'Design' },
+      'opera.exe': { name: 'Opera Browser', icon: 'chrome', category: 'Research & Tools' },
+      'vivaldi.exe': { name: 'Vivaldi Browser', icon: 'chrome', category: 'Research & Tools' },
+      'arc.exe': { name: 'Arc Browser', icon: 'brave', category: 'Research & Tools' },
+      'outlook.exe': { name: 'Microsoft Outlook', icon: 'word', category: 'Communication' },
+      'thunderbird.exe': { name: 'Mozilla Thunderbird', icon: 'default', category: 'Communication' },
+      'skype.exe': { name: 'Skype', icon: 'teams', category: 'Communication' },
+      'anydesk.exe': { name: 'AnyDesk Remote', icon: 'deskflow', category: 'Tools & Utilities' },
+      'teamviewer.exe': { name: 'TeamViewer', icon: 'deskflow', category: 'Tools & Utilities' },
+      'vlc.exe': { name: 'VLC Media Player', icon: 'spotify', category: 'Media & Audio' },
+      'insomnia.exe': { name: 'Insomnia REST', icon: 'postman', category: 'Testing & API' },
+      'python.exe': { name: 'Python Workload', icon: 'default', category: 'Development' },
+      'py.exe': { name: 'Python Workload', icon: 'default', category: 'Development' },
+      'node.exe': { name: 'Node.js Engine', icon: 'default', category: 'Development' },
+      'deskflow.exe': { name: 'Deskflow', icon: 'deskflow', category: 'Tools & Utilities' },
+      'deskflow-core.exe': { name: 'Deskflow', icon: 'deskflow', category: 'Tools & Utilities' },
+      'brave.exe': { name: 'Brave Browser', icon: 'brave', category: 'Research & Tools' },
+      'whatsapp.exe': { name: 'WhatsApp', icon: 'whatsapp', category: 'Communication' },
+      'whatsapp.root.exe': { name: 'WhatsApp', icon: 'whatsapp', category: 'Communication' },
+      'spotifylauncher.exe': { name: 'Spotify', icon: 'spotify', category: 'Media & Audio' },
+      'spotify.exe': { name: 'Spotify', icon: 'spotify', category: 'Media & Audio' },
+      'arduino ide.exe': { name: 'Arduino IDE', icon: 'arduino', category: 'Development' },
+      'shotcut.exe': { name: 'Shotcut', icon: 'shotcut', category: 'Design & Media' },
+      'code.exe': { name: 'VS Code', icon: 'vscode', category: 'Development' },
+      'devenv.exe': { name: 'Visual Studio', icon: 'vstudio', category: 'Development' },
+      'studio64.exe': { name: 'Android Studio', icon: 'android', category: 'Development' },
+      'idea64.exe': { name: 'IntelliJ IDEA', icon: 'intellij', category: 'Development' },
+      'pycharm64.exe': { name: 'PyCharm', icon: 'pycharm', category: 'Development' },
+      'webstorm64.exe': { name: 'WebStorm', icon: 'webstorm', category: 'Development' },
+      'chrome.exe': { name: 'Google Chrome', icon: 'chrome', category: 'Research & Tools' },
+      'firefox.exe': { name: 'Mozilla Firefox', icon: 'firefox', category: 'Research & Tools' },
+      'msedge.exe': { name: 'Microsoft Edge', icon: 'edge', category: 'Research & Tools' },
+      'figma.exe': { name: 'Figma', icon: 'figma', category: 'Design' },
+      'photoshop.exe': { name: 'Adobe Photoshop', icon: 'photoshop', category: 'Design' },
+      'illustrator.exe': { name: 'Adobe Illustrator', icon: 'illustrator', category: 'Design' },
+      'blender.exe': { name: 'Blender 3D', icon: 'blender', category: '3D & Engineering' },
+      'notepad++.exe': { name: 'Notepad++', icon: 'notepadpp', category: 'Development' },
+      'postman.exe': { name: 'Postman', icon: 'postman', category: 'Testing & API' },
+      'docker desktop.exe': { name: 'Docker Desktop', icon: 'docker', category: 'DevOps & Containers' },
+      'teams.exe': { name: 'Microsoft Teams', icon: 'teams', category: 'Communication' },
+      'ms-teams.exe': { name: 'Microsoft Teams', icon: 'teams', category: 'Communication' },
+      'slack.exe': { name: 'Slack', icon: 'slack', category: 'Communication' },
+      'discord.exe': { name: 'Discord', icon: 'discord', category: 'Communication' },
+      'telegram.exe': { name: 'Telegram', icon: 'telegram', category: 'Communication' },
+      'zoom.exe': { name: 'Zoom', icon: 'zoom', category: 'Communication' },
+      'winword.exe': { name: 'Microsoft Word', icon: 'word', category: 'Documentation' },
+      'excel.exe': { name: 'Microsoft Excel', icon: 'excel', category: 'Documentation' },
+      'powerpnt.exe': { name: 'PowerPoint', icon: 'powerpoint', category: 'Documentation' },
+      'notion.exe': { name: 'Notion', icon: 'notion', category: 'Documentation' },
+      'obsidian.exe': { name: 'Obsidian', icon: 'obsidian', category: 'Documentation' },
+      'tableplus.exe': { name: 'TablePlus', icon: 'default', category: 'Database' },
+      'dbeaver.exe': { name: 'DBeaver', icon: 'default', category: 'Database' }
+    };
+
+    exec('tasklist /fo csv /nh', { windowsHide: true }, (err, stdout) => {
+      isScanningApps = false;
+      if (err || !stdout) return resolve(cachedRunningApps);
+
+      const lines = stdout.split('\r\n').filter(Boolean);
+      const appMap = new Map();
+
+      for (const line of lines) {
+        const parts = line.split(',');
+        if (!parts || parts.length < 2) continue;
+        const rawExe = parts[0].replace(/^"|"$/g, '').toLowerCase().trim();
+
+        if (TASKBAR_DESKTOP_APPS[rawExe]) {
+          const meta = TASKBAR_DESKTOP_APPS[rawExe];
+          if (!appMap.has(meta.name)) {
+            appMap.set(meta.name, {
+              appName: meta.name,
+              exe: rawExe,
+              icon: meta.icon,
+              category: meta.category,
+              title: meta.name
+            });
+          }
+        }
+      }
+
+      cachedRunningApps = Array.from(appMap.values());
+      lastRunningAppsScan = Date.now();
+      resolve(cachedRunningApps);
+    });
+  });
+}
+
+ipcMain.handle('get-running-work-apps', async (event) => {
+  if (!isTrustedSender(event)) return [];
+  try {
+    return await scanRunningApplications();
+  } catch (_) {
+    return [];
+  }
+});
+
+ipcMain.handle('get-shift-integrity-status', async (event) => {
+  if (!isTrustedSender(event)) return { monotonicUptime: 0, systemIdleSec: 0, timestamp: Date.now() };
+  try {
+    return {
+      monotonicUptime: Math.floor(process.uptime()),
+      systemIdleSec: powerMonitor.getSystemIdleTime(),
+      timestamp: Date.now()
+    };
+  } catch (_) {
+    return { monotonicUptime: 0, systemIdleSec: 0, timestamp: Date.now() };
+  }
+});
+
+ipcMain.handle('get-system-idle-time', async (event) => {
+  if (!isTrustedSender(event)) return 0;
+  try {
+    return powerMonitor.getSystemIdleTime();
+  } catch (_) {
+    return 0;
+  }
+});
+
 // Native Desktop Notifications
 ipcMain.on('show-native-notification', (event, payload) => {
   if (!isTrustedSender(event) || !payload || typeof payload !== 'object') return;
@@ -1276,12 +1869,18 @@ ipcMain.on('show-native-notification', (event, payload) => {
       silent: false
     });
     notification.on('click', () => {
-      if (mainWindow) {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setSkipTaskbar(false);
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        if (!mainWindow.isVisible()) mainWindow.show();
         mainWindow.show();
         mainWindow.focus();
-        if (payload.targetTab) {
-          mainWindow.webContents.send('open-tab', payload.targetTab);
-        }
+        mainWindow.moveTop();
+        mainWindow.setAlwaysOnTop(true);
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(false);
+        }, 800);
+        mainWindow.webContents.send('navigate-notification', payload);
       }
     });
     notification.show();
@@ -1312,11 +1911,18 @@ ipcMain.on('incoming-call-alert', (event, payload) => {
     });
     notification.on('click', () => {
       if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setSkipTaskbar(false);
         if (mainWindow.isMinimized()) mainWindow.restore();
         if (!mainWindow.isVisible()) mainWindow.show();
         mainWindow.focus();
         mainWindow.moveTop();
         mainWindow.flashFrame(false);
+        mainWindow.setAlwaysOnTop(true);
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(false);
+        }, 800);
+        mainWindow.webContents.send('open-tab', 'chat');
+        mainWindow.webContents.send('navigate-notification', { type: 'call', targetTab: 'chat', callerName });
       }
     });
     notification.show();
@@ -1351,21 +1957,28 @@ if (!gotTheLock) {
       Menu.setApplicationMenu(null);
     } catch (_) {}
 
-    // Allow WebRTC audio/video call media permissions automatically
+    // Allow WebRTC audio/video call media permissions automatically (including microphone for voice messages)
     session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-      if (['media', 'notifications', 'pointerLock', 'fullscreen', 'display-capture'].includes(permission)) {
-        callback(true);
-      } else {
-        callback(true);
-      }
+      // Grant all permissions including microphone, camera, and media capture
+      callback(true);
+    });
+
+    // Explicitly allow all permission checks (required for getUserMedia in Electron)
+    session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+      // Allow microphone and all media permissions
+      return true;
     });
 
     // Strip Referer and Origin on Google user content / Drive requests to bypass 429/403 anti-hotlink blocks
+    // Ensure Google OAuth never sees Electron user-agent header
     session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
       const url = details.url || '';
       if (url.includes('googleusercontent.com') || url.includes('drive.google.com')) {
         delete details.requestHeaders['Referer'];
         delete details.requestHeaders['Origin'];
+      }
+      if (details.requestHeaders['User-Agent'] && details.requestHeaders['User-Agent'].includes('Electron')) {
+        details.requestHeaders['User-Agent'] = CHROME_USER_AGENT;
       }
       callback({ cancel: false, requestHeaders: details.requestHeaders });
     });
@@ -1376,11 +1989,17 @@ if (!gotTheLock) {
         responseHeaders: {
           ...details.responseHeaders,
           'Content-Security-Policy': [
-            "default-src 'self' http://127.0.0.1:* http://localhost:*; script-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://www.gstatic.com https://apis.google.com https://accounts.google.com https://meet.jit.si https://*.8x8.vc; style-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://fonts.googleapis.com; font-src 'self' http://127.0.0.1:* http://localhost:* https://fonts.gstatic.com data:; img-src 'self' http://127.0.0.1:* http://localhost:* data: blob: https:; connect-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com https://*.google.com https://meet.jit.si https://*.jit.si https://*.8x8.vc wss://*.jit.si; object-src 'none'; base-uri 'none'; frame-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseapp.com https://accounts.google.com https://*.google.com https://meet.jit.si https://*.jit.si https://*.8x8.vc;"
+            "default-src 'self' http://127.0.0.1:* http://localhost:*; script-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://www.gstatic.com https://apis.google.com https://accounts.google.com https://meet.jit.si https://*.8x8.vc; style-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* https://fonts.googleapis.com; font-src 'self' http://127.0.0.1:* http://localhost:* https://fonts.gstatic.com data:; img-src 'self' http://127.0.0.1:* http://localhost:* data: blob: https:; media-src 'self' http://127.0.0.1:* http://localhost:* data: blob: https:; connect-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com https://*.google.com https://meet.jit.si https://*.jit.si https://*.8x8.vc wss://*.jit.si; object-src 'none'; base-uri 'none'; frame-src 'self' http://127.0.0.1:* http://localhost:* https://*.firebaseapp.com https://accounts.google.com https://*.google.com https://meet.jit.si https://*.jit.si https://*.8x8.vc;"
           ]
         }
       });
     });
+
+    try {
+      await startBackendService();
+    } catch (e) {
+      console.warn('[BACKEND] Startup note:', e);
+    }
 
     try {
       await startLocalServer();
@@ -1398,19 +2017,37 @@ if (!gotTheLock) {
     });
 
     powerMonitor.on('unlock-screen', () => {
-      mainWindow?.webContents.send('power-state-changed', 'active');
+      mainWindow?.webContents.send('power-state-changed', 'unlocked');
       mainWindow?.webContents.send('set-power-profile', 'balanced');
     });
 
     powerMonitor.on('suspend', () => {
-      mainWindow?.webContents.send('power-state-changed', 'away');
+      mainWindow?.webContents.send('power-state-changed', 'suspend');
       mainWindow?.webContents.send('set-power-profile', 'eco');
     });
 
     powerMonitor.on('resume', () => {
-      mainWindow?.webContents.send('power-state-changed', 'active');
+      mainWindow?.webContents.send('power-state-changed', 'resume');
       mainWindow?.webContents.send('set-power-profile', 'balanced');
     });
+  });
+
+  app.on('before-quit', () => {
+    if (backendProcess) {
+      try { backendProcess.kill(); } catch (_) {}
+      backendProcess = null;
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow._clockedOutOnClose) {
+      mainWindow._clockedOutOnClose = true;
+      try {
+        mainWindow.webContents.executeJavaScript(`
+          if (typeof autoPerformExitClockOut === 'function') {
+            autoPerformExitClockOut();
+          }
+        `);
+      } catch (_) {}
+    }
   });
 
   app.on('window-all-closed', () => {

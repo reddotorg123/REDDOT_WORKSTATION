@@ -1,0 +1,1095 @@
+/**
+ * ============================================================================
+ * REDDOT WORKSTATION OS • MASTER TECHNICAL BLUEPRINT DESIGN SYSTEM (v3.12.0)
+ * High-Density Technical Monochrome Workstation Palette
+ * Canvas: #F5F6F7 | Panels: #FFFFFF | Borders: #D5D9DE | Charcoal: #17191C
+ * Pure Technical Typography: JetBrains Mono & Space Mono
+ * ============================================================================
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  /* --- MONOCHROME TECHNICAL BLUEPRINT PALETTE --- */
+  --rd-bg-base: #F5F6F7;
+  --rd-bg-surface: #FFFFFF;
+  --rd-bg-card: #FFFFFF;
+  --rd-bg-panel: #FFFFFF;
+  --rd-bg-sidebar: #FFFFFF;
+  --rd-bg-header: #FFFFFF;
+  --rd-bg-elevated: #F1F3F5;
+  --rd-bg-hover: #ECEFF1;
+  --rd-bg-selected: #E3E6E9;
+  --rd-bg-overlay: rgba(23, 25, 28, 0.45);
+
+  --rd-border-subtle: #E8EAED;
+  --rd-border-standard: #D5D9DE;
+  --rd-border-strong: #AEB4BB;
+  --rd-border-focus: #17191C;
+
+  --rd-text-primary: #17191C;
+  --rd-text-secondary: #515860;
+  --rd-text-muted: #777F88;
+  --rd-text-faint: #9CA3AF;
+  --rd-text-inverse: #FFFFFF;
+
+  --rd-btn-primary-bg: #17191C;
+  --rd-btn-primary-text: #FFFFFF;
+  --rd-btn-primary-border: #17191C;
+  --rd-btn-primary-hover: #26292E;
+
+  --rd-btn-secondary-bg: #FFFFFF;
+  --rd-btn-secondary-text: #17191C;
+  --rd-btn-secondary-border: #D5D9DE;
+  --rd-btn-secondary-hover: #F1F3F5;
+
+  /* Status Tokens */
+  --rd-status-success: #10B981;
+  --rd-status-success-bg: rgba(16, 185, 129, 0.12);
+  --rd-status-success-border: rgba(16, 185, 129, 0.28);
+
+  --rd-status-warning: #F59E0B;
+  --rd-status-warning-bg: rgba(245, 158, 11, 0.12);
+  --rd-status-warning-border: rgba(245, 158, 11, 0.28);
+
+  --rd-status-error: #EF4444;
+  --rd-status-error-bg: rgba(239, 68, 68, 0.12);
+  --rd-status-error-border: rgba(239, 68, 68, 0.28);
+
+  --rd-status-info: #2563EB;
+  --rd-status-info-bg: rgba(37, 99, 235, 0.12);
+  --rd-status-info-border: rgba(37, 99, 235, 0.28);
+
+  /* Typography Scale */
+  --rd-font-mono: 'JetBrains Mono', 'Space Mono', SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --rd-font-sans: 'JetBrains Mono', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --rd-font-display: 'JetBrains Mono', 'Space Mono', monospace;
+
+  /* Spacing Scale */
+  --rd-space-1: 4px;
+  --rd-space-2: 8px;
+  --rd-space-3: 12px;
+  --rd-space-4: 16px;
+  --rd-space-5: 20px;
+  --rd-space-6: 24px;
+  --rd-space-8: 32px;
+
+  /* Radii Scale */
+  --rd-radius-xs: 3px;
+  --rd-radius-sm: 4px;
+  --rd-radius-md: 6px;
+  --rd-radius-lg: 8px;
+  --rd-radius-xl: 12px;
+  --rd-radius-pill: 9999px;
+
+  /* Shadows */
+  --rd-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --rd-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --rd-shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.12);
+
+  /* Legacy Variable Overrides (ensures 100% style.css compatibility) */
+  --bg-color: #F5F6F7 !important;
+  --panel-bg: #FFFFFF !important;
+  --card-bg: #FFFFFF !important;
+  --card-border: #D5D9DE !important;
+  --text-primary: #17191C !important;
+  --text-secondary: #515860 !important;
+  --text-muted: #777F88 !important;
+  --text-white: #17191C !important;
+  --accent-cyan: #17191C !important;
+  --accent-red: #17191C !important;
+}
+
+/* =========================================================================
+   GLOBAL RESET & TECHNICAL TYPOGRAPHY
+   ========================================================================= */
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--rd-font-mono) !important;
+  background-color: var(--rd-bg-base) !important;
+  color: var(--rd-text-primary) !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Technical Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--rd-border-standard);
+  border-radius: var(--rd-radius-xs);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--rd-border-strong);
+}
+
+/* Hide Wallpaper Elements when Workstation Mode is Active */
+body.mode-command #wallpaperContainer,
+body.mode-command .wallpaper-bg-layer,
+body.mode-command .wallpaper-clock-canvas,
+body.mode-command .dock-wrapper,
+body.mode-command #lanyardCard,
+body.mode-command #dock {
+  display: none !important;
+}
+
+/* =========================================================================
+   1. FULL-WINDOW WORKSTATION DESKTOP SHELL
+   ========================================================================= */
+#commandCenterDrawer,
+.command-center-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  background: var(--rd-bg-base) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: flex !important;
+  z-index: 100 !important;
+}
+
+.command-center-shell {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  border-radius: 0 !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: var(--rd-bg-base) !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* =========================================================================
+   2. TECHNICAL TOP HEADER
+   ========================================================================= */
+.command-header.workstation-top-header {
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: 0 var(--rd-space-5) !important;
+  background: var(--rd-bg-header) !important;
+  border-bottom: 1px solid var(--rd-border-standard) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: var(--rd-space-4) !important;
+  color: var(--rd-text-primary) !important;
+  -webkit-app-region: drag;
+  z-index: 1000;
+  box-shadow: none !important;
+}
+
+.command-header button,
+.command-header input,
+.command-header a,
+.command-header .header-user-profile,
+.command-header .omnibox-search-bar {
+  -webkit-app-region: no-drag !important;
+}
+
+.command-header .header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--rd-space-3);
+  flex-shrink: 0;
+}
+
+.command-header .cmd-brand-icon {
+  width: 28px !important;
+  height: 28px !important;
+  background: var(--rd-text-primary) !important;
+  border-radius: var(--rd-radius-sm) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF !important;
+  font-family: var(--rd-font-mono) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  letter-spacing: 0.5px;
+  box-shadow: none !important;
+}
+
+.command-header .cmd-title {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: var(--rd-text-primary) !important;
+  font-family: var(--rd-font-mono) !important;
+  letter-spacing: 0.2px !important;
+  margin: 0 !important;
+}
+
+.command-header .connected-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  color: var(--rd-text-primary) !important;
+  background: var(--rd-bg-elevated) !important;
+  border: 1px solid var(--rd-border-standard) !important;
+  padding: 2px 7px !important;
+  border-radius: var(--rd-radius-xs) !important;
+  font-family: var(--rd-font-mono) !important;
+}
+
+.command-header .connected-badge .pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rd-status-success);
+}
+
+/* Omnibox Search Bar */
+.command-header .omnibox-search-bar {
+  flex: 1;
+  max-width: 420px;
+  height: 32px;
+  background: var(--rd-bg-elevated) !important;
+  border: 1px solid var(--rd-border-standard) !important;
+  border-radius: var(--rd-radius-sm) !important;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--rd-space-3);
+  gap: var(--rd-space-2);
+  transition: border-color 0.15s ease;
+}
+
+.command-header .omnibox-search-bar:focus-within,
+.command-header .omnibox-search-bar:hover {
+  border-color: var(--rd-border-focus) !important;
+  background: #FFFFFF !important;
+}
+
+.command-header .omnibox-input {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  color: var(--rd-text-primary) !important;
+  font-family: var(--rd-font-mono) !important;
+  font-size: 12px !important;
+  width: 100%;
+}
+
+.command-header .omnibox-kbd {
+  font-family: var(--rd-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  background: var(--rd-bg-surface);
+  border: 1px solid var(--rd-border-standard);
+  border-radius: var(--rd-radius-xs);
+  color: var(--rd-text-muted);
+}
+
+/* Header Right Area */
+.command-header .header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--rd-space-2);
+  flex-shrink: 0;
+}
+
+.btn-header-tool {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--rd-radius-sm);
+  border: 1px solid var(--rd-border-standard) !important;
+  background: var(--rd-bg-surface) !important;
+  color: var(--rd-text-secondary) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.btn-header-tool:hover {
+  background: var(--rd-bg-elevated) !important;
+  color: var(--rd-text-primary) !important;
+  border-color: var(--rd-border-strong) !important;
+}
+
+.btn-notif-bell .bell-badge {
+  background: var(--rd-text-primary) !important;
+  color: #FFFFFF !important;
+  font-family: var(--rd-font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  min-width: 15px;
+  height: 15px;
+  border-radius: var(--rd-radius-pill);
+}
+
+.header-user-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--rd-space-2);
+  padding: 3px 8px;
+  background: var(--rd-bg-surface) !important;
+  border: 1px solid var(--rd-border-standard) !important;
+  border-radius: var(--rd-radius-sm) !important;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.header-user-profile:hover {
+  background: var(--rd-bg-elevated) !important;
+  border-color: var(--rd-border-focus) !important;
+}
+
+.header-user-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--rd-radius-xs);
+  object-fit: cover;
+  border: 1px solid var(--rd-border-standard);
+}
+
+.header-user-name {
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  font-family: var(--rd-font-mono) !important;
+  color: var(--rd-text-primary) !important;
+}
+
+.header-user-role {
+  font-size: 10px !important;
+  color: var(--rd-text-muted) !important;
+  font-family: var(--rd-font-mono) !important;
+}
+
+.btn-outline-action {
+  height: 30px !important;
+  padding: 0 10px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  font-family: var(--rd-font-mono) !important;
+  border-radius: var(--rd-radius-sm) !important;
+  border: 1px solid var(--rd-border-standard) !important;
+  background: var(--rd-bg-surface) !important;
+  color: var(--rd-text-primary) !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.12s ease;
+}
+
+.btn-outline-action:hover {
+  background: var(--rd-bg-elevated) !important;
+  border-color: var(--rd-border-focus) !important;
+}
+
+.cmd-win-ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+}
+
+.cmd-win-btn, .drawer-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--rd-radius-xs);
+  border: none;
+  background: transparent;
+  color: var(--rd-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--rd-font-mono);
+  font-size: 14px;
+  transition: all 0.12s ease;
+}
+
+.cmd-win-btn:hover {
+  background: var(--rd-bg-elevated);
+  color: var(--rd-text-primary);
+}
+
+.drawer-close-btn:hover {
+  background: var(--rd-status-error) !important;
+  color: #FFFFFF !important;
+}
+
+/* =========================================================================
+   3. LEFT WORKSTATION SIDEBAR
+   ========================================================================= */
+.workstation-body-layout {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  background: var(--rd-bg-base) !important;
+}
+
+.workstation-sidebar {
+  width: 210px !important;
+  min-width: 210px !important;
+  background: var(--rd-bg-sidebar) !important;
+  border-right: 1px solid var(--rd-border-standard) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  padding: var(--rd-space-4) var(--rd-space-2) !important;
+  box-shadow: none !important;
+}
+
+.sidebar-section-label {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.8px !important;
+  color: var(--rd-text-muted) !important;
+  padding: 0 var(--rd-space-3) var(--rd-space-2) !important;
+  text-transform: uppercase !important;
+  font-family: var(--rd-font-mono) !important;
+}
+
+.sidebar-nav-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+}
+
+.sidebar-nav-item.cmd-tab-btn {
+  height: 36px !important;
+  padding: 0 var(--rd-space-3) !important;
+  border-radius: var(--rd-radius-sm) !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: var(--rd-text-secondary) !important;
+  font-family: var(--rd-font-mono) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--rd-space-3) !important;
+  cursor: pointer !important;
+  position: relative !important;
+  transition: all 0.12s ease !important;
+  width: 100% !important;
+  text-align: left !important;
+}
+
+.sidebar-nav-item.cmd-tab-btn:hover:not(.active) {
+  background: var(--rd-bg-hover) !important;
+  color: var(--rd-text-primary) !important;
+}
+
+.sidebar-nav-item.cmd-tab-btn.active {
+  background: var(--rd-bg-selected) !important;
+  color: var(--rd-text-primary) !important;
+  border-color: var(--rd-border-standard) !important;
+  font-weight: 700 !important;
+}
+
+.sidebar-nav-item.cmd-tab-btn.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 var(--rd-radius-xs) var(--rd-radius-xs) 0;
+  background: var(--rd-text-primary) !important;
+}
+
+.sidebar-nav-item .nav-icon {
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--rd-text-secondary);
+}
+
+.sidebar-nav-item.active .nav-icon {
+  color: var(--rd-text-primary) !important;
+}
+
+.sidebar-nav-item .nav-label {
+  flex: 1;
+}
+
+/* Sidebar Footer Telemetry Widget */
+.sidebar-footer-widget {
+  padding: 10px !important;
+  background: var(--rd-bg-surface) !important;
+  border: 1px solid var(--rd-border-standard) !important;
+  border-radius: var(--rd-radius-md) !important;
+  box-shadow: none !important;
+}
+
+.cpu-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10.5px;
+  font-family: var(--rd-font-mono);
+  margin-bottom: 6px;
+}
+
+.cpu-label {
+  color: var(--rd-text-muted);
+  font-weight: 600;
+}
+
+.cpu-val {
+  font-weight: 700;
+  color: var(--rd-status-success);
+}
+
+.cpu-bar-track {
+  height: 4px;
+  background: var(--rd-bg-elevated);
+  border-radius: var(--rd-radius-pill);
+  overflow: hidden;
+}
+
+.cpu-bar-fill {
+  height: 100%;
+  background: var(--rd-status-success);
+  border-radius: var(--rd-radius-pill);
+  transition: width 0.3s ease;
+}
+
+/* =========================================================================
+   4. MAIN COMMAND BODY & TABS
+   ========================================================================= */
+.command-body {
+  background: var(--rd-bg-base) !important;
+  padding: var(--rd-space-6) !important;
+  overflow-y: auto !important;
+  flex: 1;
+}
+
+.cmd-tab-pane {
+  display: none !important;
+}
+
+.cmd-tab-pane.active {
+  display: block !important;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* =========================================================================
+   5. EXECUTIVE DASHBOARD TAB
+   ========================================================================= */
+.dash-exec-header {
+  margin-bottom: var(--rd-space-5);
+}
+
+.dash-exec-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: var(--rd-font-mono);
+  color: var(--rd-text-primary);
+  background: var(--rd-bg-surface);
+  border: 1px solid var(--rd-border-standard);
+  padding: 3px 8px;
+  border-radius: var(--rd-radius-xs);
+  margin-bottom: var(--rd-space-2);
+}
+
+.pulse-green {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rd-status-success);
+}
+
+.dash-exec-main-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--rd-space-4);
+}
+
+.dash-exec-greeting {
+  font-size: 22px !important;
+  font-weight: 800 !important;
+  font-family: var(--rd-font-mono) !important;
+  color: var(--rd-text-primary) !important;
+  letter-spacing: -0.3px !important;
+  margin: 0 0 4px 0 !important;
+}
+
+.dash-exec-sub {
+  font-size: 12px !important;
+  font-family: var(--rd-font-mono) !important;
+  color: var(--rd-text-muted) !important;
+  margin: 0 !important;
+}
+
+.dash-exec-actions {
+  display: flex;
+  gap: var(--rd-space-2);
+}
+
+/* Master Action Button Classes */
+.btn-dash-action,
+.btn-primary-action,
+.btn-secondary-action {
+  height: 34px !important;
+  padding: 0 14px !important;
+  border-radius: var(--rd-radius-sm) !important;
+  font-family: var(--rd-font-mono) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  transition: all 0.12s ease !important;
+}
+
+.btn-dash-action.primary,
+.btn-primary-action {
+  background: var(--rd-btn-primary-bg) !important;
+  color: var(--rd-btn-primary-text) !important;
+  border: 1px solid var(--rd-btn-primary-border) !important;
+  box-shadow: none !important;
+}
+
+.btn-dash-action.primary:hover,
+.btn-primary-action:hover {
+  background: var(--rd-btn-primary-hover) !important;
+  border-color: var(--rd-btn-primary-hover) !important;
+}
+
+.btn-dash-action.secondary,
+.btn-secondary-action {
+  background: var(--rd-btn-secondary-bg) !important;
+  color: var(--rd-btn-secondary-text) !important;
+  border: 1px solid var(--rd-btn-secondary-border) !important;
+  box-shadow: none !important;
+}
+
+.btn-dash-action.secondary:hover,
+.btn-secondary-action:hover {
+  background: var(--rd-btn-secondary-hover) !important;
+  border-color: var(--rd-border-strong) !important;
+}
+
+/* 4 KPI Grid Cards */
+.dash-kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: var(--rd-space-4) !important;
+  margin-bottom: var(--rd-space-5) !important;
+}
+
+.dash-kpi-card {
+  background: var(--rd-bg-card) !important;
+  border: 1px solid var(--rd-border-standard) !important;
+  border-radius: var(--rd-radius-md) !important;
+  padding: var(--rd-space-4) !important;
+  box-shadow: var(--rd-shadow-sm) !important;
+  transition: border-color 0.12s ease, transform 0.12s ease !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  min-height: 110px !important;
+}
+
+.dash-kpi-card:hover {
+  border-color: var(--rd-border-focus) !important;
+  transform: translateY(-1px);
+}
+
+.dash-kpi-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--rd-space-2);
+}
+
+.dash-kpi-label {
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  font-family: var(--rd-font-mono) !important;
+  color: var(--rd-text-muted) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.dash-kpi-icon {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.dash-kpi-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: var(--rd-space-2);
+}
+
+.dash-kpi-val {
+  font-size: 24px !important;
+  font-weight: 800 !important;
+  font-family: var(--rd-font-mono) !important;
+  color: var(--rd-text-primary) !important;
+  letter-spacing: -0.5px;
+}
+
+.dash-kpi-unit {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--rd-font-mono);
+  color: var(--rd-text-secondary);
+}
+
+.dash-kpi-sub {
+  font-size: 11px !important;
+  font-family: var(--rd-font-mono) !important;
+  color: var(--rd-text-muted) !important;
+}
+
+.dash-kpi-bar-wrap {
+  position: relative;
+  height: 5px;
+  background: var(--rd-bg-elevated);
+  border-radius: var(--rd-radius-pill);
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.dash-kpi-bar {
+  height: 100%;
+  background: var(--rd-text-primary) !important;
+  border-radius: var(--rd-radius-pill);
+}
+
+/* =========================================================================
+   6. TASKS & KANBAN BOARDS
+   ========================================================================= */
+.task-column-card, .kanban-column {
+  background: var(--rd-bg-panel) !important;
+  border: 1px solid var(--rd-border-standard) !important;
+  border-radius: var(--rd-radius-md) !important;
+  padding: var(--rd-space-4) !important;
+  box-shadow: none !important;
+}
+
+.task-item-card, .workspace-task-card {
+  background: var(--rd-bg-card) !important;
+  border: 1px solid var(--rd-border-standard) !important;
+  border-radius: var(--rd-radius-sm) !important;
+  padding: var(--rd-space-3) !important;
+  box-shadow: var(--rd-shadow-sm) !important;
+  transition: all 0.12s ease !important;
+  cursor: pointer;
+  margin-bottom: var(--rd-space-2);
+}
+
+.task-item-card:hover, .workspace-task-card:hover {
+  border-color: var(--rd-border-focus) !important;
+  transform: translateY(-1px);
+}
+
+.priority-pill {
+  font-size: 9.5px;
+  font-weight: 700;
+  font-family: var(--rd-font-mono);
+  padding: 1px 6px;
+  border-radius: var(--rd-radius-xs);
+  text-transform: uppercase;
+}
+
+.priority-pill.urgent {
+  background: var(--rd-status-error-bg);
+  color: var(--rd-status-error);
+  border: 1px solid var(--rd-status-error-border);
+}
+.priority-pill.high {
+  background: var(--rd-status-warning-bg);
+  color: var(--rd-status-warning);
+  border: 1px solid var(--rd-status-warning-border);
+}
+.priority-pill.medium {
+  background: var(--rd-status-info-bg);
+  color: var(--rd-status-info);
+  border: 1px solid var(--rd-status-info-border);
+}
+.priority-pill.normal {
+  background: var(--rd-status-success-bg);
+  color: var(--rd-status-success);
+  border: 1px solid var(--rd-status-success-border);
+}
+
+/* =========================================================================
+   7. TEAM & WORKERS DIRECTORY
+   ========================================================================= */
+.worker-card, .team-member-card {
+  background: var(--rd-bg-card) !important;
+  border: 1px solid var(--rd-border-standard) !important;
+  border-radius: var(--rd-radius-md) !important;
+  padding: var(--rd-space-4) !important;
+  box-shadow: var(--rd-shadow-sm) !important;
+  transition: all 0.12s ease !important;
+}
+
+.worker-card:hover, .team-member-card:hover {
+  border-color: var(--rd-border-focus) !important;
+  transform: translateY(-1px);
+}
+
+/* =========================================================================
+   8. TIMESHEETS & ATTENDANCE
+   ========================================================================= */
+.punch-table, .timesheet-table, .tech-table, .analytics-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--rd-bg-panel) !important;
+  border: 1px solid var(--rd-border-standard) !important;
+  border-radius: var(--rd-radius-md) !important;
+  overflow: hidden;
+}
+
+.punch-table th, .timesheet-table th, .tech-table th, .analytics-table th {
+  background: var(--rd-bg-elevated) !important;
+  color: var(--rd-text-secondary) !important;
+  font-family: var(--rd-font-mono) !important;
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 14px !important;
+  border-bottom: 1px solid var(--rd-border-standard) !important;
+  text-align: left;
+}
+
+.punch-table td, .timesheet-table td, .tech-table td, .analytics-table td {
+  padding: 10px 14px !important;
+  border-bottom: 1px solid var(--rd-border-subtle) !important;
+  color: var(--rd-text-primary) !important;
+  font-family: var(--rd-font-mono) !important;
+  font-size: 12px !important;
+  background: #FFFFFF !important;
+}
+
+.punch-table tr:hover td,
+.timesheet-table tr:hover td,
+.tech-table tr:hover td,
+.analytics-table tr:hover td {
+  background: var(--rd-bg-elevated) !important;
+}
+
+.punch-table tr:last-child td,
+.timesheet-table tr:last-child td,
+.tech-table tr:last-child td,
+.analytics-table tr:last-child td {
+  border-bottom: none !important;
+}
+
+/* =========================================================================
+   9. MODALS & DIALOG ARCHITECTURE
+   ========================================================================= */
+.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: var(--rd-space-4) !important;
+}
+
+.modal-overlay.hidden {
+  display: none !important;
+}
+
+.modal-backdrop {
+  position: absolute !important;
+  inset: 0 !important;
+  background: var(--rd-bg-overlay) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  z-index: 0 !important;
+}
+
+.modal-card, .modal-box {
+  position: relative !important;
+  z-index: 10 !important;
+  background: var(--rd-bg-panel) !important;
+  border: 1px solid var(--rd-border-standard) !important;
+  border-radius: var(--rd-radius-lg) !important;
+  box-shadow: var(--rd-shadow-lg) !important;
+  width: 100% !important;
+  max-width: 560px !important;
+  max-height: 90vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  color: var(--rd-text-primary) !important;
+}
+
+.modal-head {
+  padding: 14px 18px !important;
+  background: var(--rd-bg-surface) !important;
+  border-bottom: 1px solid var(--rd-border-standard) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.modal-title {
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  font-family: var(--rd-font-mono) !important;
+  color: var(--rd-text-primary) !important;
+}
+
+.modal-close-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--rd-radius-xs);
+  border: none;
+  background: transparent;
+  color: var(--rd-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.12s ease;
+}
+
+.modal-close-btn:hover {
+  background: var(--rd-bg-elevated);
+  color: var(--rd-text-primary);
+}
+
+.modal-body {
+  padding: var(--rd-space-5) !important;
+  overflow-y: auto !important;
+  background: #FFFFFF !important;
+}
+
+.modal-foot {
+  padding: 12px 18px !important;
+  background: var(--rd-bg-elevated) !important;
+  border-top: 1px solid var(--rd-border-standard) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: var(--rd-space-2) !important;
+}
+
+/* Form Inputs & Controls */
+.custom-input, .custom-select, .custom-textarea, input[type="text"], input[type="password"], input[type="email"], select, textarea {
+  width: 100% !important;
+  height: 34px;
+  padding: 0 10px !important;
+  background: #FFFFFF !important;
+  border: 1px solid var(--rd-border-standard) !important;
+  border-radius: var(--rd-radius-xs) !important;
+  color: var(--rd-text-primary) !important;
+  font-family: var(--rd-font-mono) !important;
+  font-size: 12px !important;
+  outline: none !important;
+  box-sizing: border-box;
+  transition: border-color 0.12s ease;
+}
+
+textarea.custom-textarea, textarea {
+  height: auto !important;
+  min-height: 80px;
+  padding: 8px 10px !important;
+}
+
+.custom-input:focus, .custom-select:focus, .custom-textarea:focus,
+input[type="text"]:focus, input[type="password"]:focus, select:focus, textarea:focus {
+  border-color: var(--rd-border-focus) !important;
+  box-shadow: 0 0 0 1px var(--rd-border-focus) !important;
+}
+
+/* =========================================================================
+   10. CHAT & MESSAGING PANE
+   ========================================================================= */
+.teams-app-rail,
+.teams-sidebar-pane {
+  background: #FFFFFF !important;
+  border-right: 1px solid var(--rd-border-standard) !important;
+}
+
+.chat-channel-item, .chat-dm-item {
+  color: var(--rd-text-secondary) !important;
+  font-family: var(--rd-font-mono) !important;
+  font-size: 12px !important;
+  border-radius: var(--rd-radius-xs) !important;
+  padding: 6px 10px !important;
+}
+
+.chat-channel-item:hover, .chat-dm-item:hover {
+  background: var(--rd-bg-hover) !important;
+  color: var(--rd-text-primary) !important;
+}
+
+.chat-channel-item.active, .chat-dm-item.active {
+  background: var(--rd-bg-selected) !important;
+  color: var(--rd-text-primary) !important;
+  font-weight: 600 !important;
+}
+
+.chat-msg-bubble {
+  border-radius: var(--rd-radius-sm) !important;
+  font-family: var(--rd-font-mono) !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+
+.chat-msg-bubble.outgoing {
+  background: var(--rd-text-primary) !important;
+  color: #FFFFFF !important;
+  border: 1px solid var(--rd-text-primary) !important;
+}
+
+.chat-msg-bubble.incoming {
+  background: var(--rd-bg-elevated) !important;
+  color: var(--rd-text-primary) !important;
+  border: 1px solid var(--rd-border-standard) !important;
+}
+
+/* Call Conference Modal */
+#outgoingCallModal, #incomingCallModal, #meetingModal, #callModal {
+  z-index: 9999 !important;
+}

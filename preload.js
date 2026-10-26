@@ -18,7 +18,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dbSelectPhoto: () => {
     return ipcRenderer.invoke('db-select-photo');
   },
-  dbDiagnostics: () => {
+    executeTerminalCommand: (cmdStr) => {
+    return ipcRenderer.invoke('execute-terminal-command', cmdStr);
+  },
+dbDiagnostics: () => {
     return ipcRenderer.invoke('db-diagnostics');
   },
 
@@ -150,5 +153,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('ota-download-complete', listener);
       return () => ipcRenderer.removeListener('ota-download-complete', listener);
     }
+  },
+
+  // Running Desktop Applications & System Telemetry
+  getRunningWorkApps: () => {
+    return ipcRenderer.invoke('get-running-work-apps');
+  },
+  getShiftIntegrityStatus: () => {
+    return ipcRenderer.invoke('get-shift-integrity-status');
+  },
+  getSystemIdleTime: () => {
+    return ipcRenderer.invoke('get-system-idle-time');
+  },
+  openCallWindow: (payload) => {
+    return ipcRenderer.invoke('open-call-window', payload);
+  },
+  saveFileDialog: (payload) => {
+    return ipcRenderer.invoke('save-file-dialog', payload);
+  },
+  getBackendStatus: () => {
+    return ipcRenderer.invoke('get-backend-status');
+  },
+  selectAndUploadFile: (options) => {
+    return ipcRenderer.invoke('select-and-upload-file', options);
+  },
+  fetchBackendAttachments: () => {
+    return ipcRenderer.invoke('fetch-backend-attachments');
+  },
+  deleteBackendAttachment: (attachmentId) => {
+    return ipcRenderer.invoke('delete-backend-attachment', attachmentId);
+  },
+  incomingCallAlert: (payload) => {
+    ipcRenderer.send('incoming-call-alert', payload);
   }
 });

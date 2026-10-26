@@ -24,6 +24,7 @@
     currentMember: null,
     presenceRef: null,
     listeners: [],
+    _authListeners: [],
 
     unsubscribeAll() {
       if (this.listeners && this.listeners.length > 0) {
@@ -36,32 +37,103 @@
       }
     },
 
-    init() {
-      if (this.initialized) return;
+    loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${src}"]`);
+        if (existing) {
+          if (existing.getAttribute('data-loaded') === 'true' || window.firebase) return resolve();
+          existing.addEventListener('load', resolve, { once: true });
+          existing.addEventListener('error', reject, { once: true });
+          return;
+        }
+        const s = document.createElement('script');
+        s.src = src;
+        s.async = false;
+        s.onload = () => { s.setAttribute('data-loaded', 'true'); resolve(); };
+        s.onerror = (e) => {
+          console.warn(`[FIREBASE] Script failed to load: ${src}`, e);
+          reject(e);
+        };
+        document.head.appendChild(s);
+      });
+    },
 
-      const config = window.REDDOT_FIREBASE_CONFIG;
-      if (!config || !window.firebase) {
-        console.warn('[FIREBASE] Firebase SDK not loaded or config missing. Check internet connection or CSP.');
+    async ensureReady(timeoutMs = 6000) {
+      if (this.initialized && this.auth && this.db) return true;
+
+      const start = Date.now();
+
+      // Step 1: Wait up to 1.5s for local vendor scripts or in-flight scripts
+      while ((!window.firebase || typeof window.firebase.initializeApp !== 'function') && (Date.now() - start < 1500)) {
+        await new Promise(r => setTimeout(r, 60));
+      }
+
+      // Step 2: If still missing, dynamically fetch from Google CDN fallback
+      if (!window.firebase || typeof window.firebase.initializeApp !== 'function') {
+        try {
+          console.warn('[FIREBASE] Local SDK not detected, injecting CDN scripts fallback...');
+          await this.loadScript('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
+          await this.loadScript('https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js');
+          await this.loadScript('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js');
+        } catch (e) {
+          console.error('[FIREBASE] CDN script fallback error:', e);
+        }
+      }
+
+      // Step 3: Wait for auth and firestore plugins to attach
+      const maxWait = Date.now() + Math.max(1200, timeoutMs - (Date.now() - start));
+      while (Date.now() < maxWait) {
+        if (window.firebase && typeof window.firebase.auth === 'function' && typeof window.firebase.firestore === 'function') {
+          break;
+        }
+        await new Promise(r => setTimeout(r, 60));
+      }
+
+      this.init();
+      return this.initialized && !!this.auth;
+    },
+
+    init() {
+      if (this.initialized && this.auth && this.db) return;
+
+      const config = window.REDDOT_FIREBASE_CONFIG || {
+        apiKey: "AIzaSyBpjenDcXDREseIDv5NfgpDo2fAk_gUhdk",
+        authDomain: "reddot-workspace.firebaseapp.com",
+        projectId: "reddot-workspace",
+        databaseURL: "",
+        storageBucket: "reddot-workspace.firebasestorage.app",
+        messagingSenderId: "346765054940",
+        appId: "1:346765054940:web:f2feb5855e0131ac383519"
+      };
+
+      if (!config || !window.firebase || typeof window.firebase.initializeApp !== 'function') {
+        console.warn('[FIREBASE] Firebase SDK not ready yet. Awaiting initialization...');
         return;
       }
 
       try {
-        if (!firebase.apps.length) {
+        if (!firebase.apps || !firebase.apps.length) {
           this.app = firebase.initializeApp(config);
         } else {
           this.app = firebase.app();
         }
 
-        this.auth = firebase.auth();
-        this.db = firebase.firestore();
+        if (typeof firebase.auth === 'function') {
+          this.auth = firebase.auth();
+        }
+        if (typeof firebase.firestore === 'function') {
+          this.db = firebase.firestore();
+        }
 
         // Enable offline persistence for Firestore
         try {
-          this.db.enablePersistence({ synchronizeTabs: true }).catch(err => {
-            if (err.code === 'failed-precondition' || err.code === 'unimplemented') {
-              // Persistence not supported in multi-tab or environment
-            }
-          });
+          if (this.db) {
+            this.db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+              if (err.code === 'failed-precondition' || err.code === 'unimplemented') {
+                // Persistence not supported in multi-tab or environment
+              }
+            });
+          }
         } catch (_) {}
 
         if (firebase.database && config.databaseURL && typeof config.databaseURL === 'string' && config.databaseURL.startsWith('http')) {
@@ -70,9 +142,18 @@
           } catch (_) {}
         }
 
-        this.initialized = true;
-        console.log('[FIREBASE] Production Firebase initialized for organization:', ORG_ID);
-        this.ensureKnownTeamMembers().catch(() => {});
+        if (this.auth && this.db) {
+          this.initialized = true;
+          console.log('[FIREBASE] Production Firebase initialized for organization:', ORG_ID);
+          this.ensureKnownTeamMembers().catch(() => {});
+
+          // Flush any queued auth listeners
+          if (this._authListeners && this._authListeners.length > 0) {
+            const queued = [...this._authListeners];
+            this._authListeners = [];
+            queued.forEach(cb => this.onAuthStateChanged(cb));
+          }
+        }
       } catch (err) {
         console.error('[FIREBASE] Initialization error:', err.message);
       }
@@ -104,7 +185,7 @@
             email: 'jagadish2k2006@gmail.com',
             displayName: 'JAGADISH K',
             name: 'JAGADISH K',
-            role: 'owner',
+            role: 'Founder',
             isOwner: true,
             dept: 'Hardware Architecture',
             id: 'RD-FOUNDER-001',
@@ -123,13 +204,28 @@
     // --- AUTHENTICATION ---
     onAuthStateChanged(callback) {
       if (!this.auth) {
-        setTimeout(() => callback(null, null), 100);
-        return () => {};
+        this._authListeners.push(callback);
+        this.ensureReady().catch(() => {});
+        return () => {
+          const idx = this._authListeners.indexOf(callback);
+          if (idx !== -1) this._authListeners.splice(idx, 1);
+        };
       }
 
       return this.auth.onAuthStateChanged(async (user) => {
         this.currentUser = user;
         if (user) {
+          // Strict Resignation Check: Immediately terminate session if marked resigned
+          const isResigned = await this.isMemberResigned(user.uid, user.email);
+          if (isResigned) {
+            console.warn('[AUTH] Resigned user session detected and terminated:', user.email);
+            await this.signOut();
+            callback(null, null);
+            if (typeof window.showResignedBanNotice === 'function') {
+              window.showResignedBanNotice(user.email);
+            }
+            return;
+          }
           try {
             this.currentMember = await this.syncMemberProfile(user);
             this.initPresence(user.uid, this.currentMember.displayName || user.email);
@@ -146,10 +242,133 @@
       });
     },
 
+    async isMemberResigned(identifier, optionalEmail = '') {
+      if (!identifier && !optionalEmail) return false;
+      const cleanIdent = String(identifier || '').toLowerCase().trim();
+      const cleanEmail = String(optionalEmail || (cleanIdent.includes('@') ? cleanIdent : '')).toLowerCase().trim();
+
+      // 1. Check local WorkspaceDB cache
+      const localResigned = window.WorkspaceDB?.data?.resignedMembers || [];
+      if (localResigned.includes(cleanIdent) || (cleanEmail && localResigned.includes(cleanEmail))) {
+        return true;
+      }
+
+      if (!this.db) return false;
+
+      try {
+        // 2. Check Firestore resignedMembers collection by UID
+        if (cleanIdent && !cleanIdent.includes('@')) {
+          const snap = await this.db.collection('organizations/' + ORG_ID + '/resignedMembers').doc(cleanIdent).get();
+          if (snap.exists) return true;
+        }
+
+        // 3. Check Firestore resignedMembers collection by sanitized email
+        if (cleanEmail) {
+          const emailKey = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
+          const emailSnap = await this.db.collection('organizations/' + ORG_ID + '/resignedMembers').doc(emailKey).get();
+          if (emailSnap.exists) return true;
+        }
+
+        // 4. Check member profile document
+        if (cleanIdent) {
+          const mSnap = await this.db.collection('organizations/' + ORG_ID + '/members').doc(cleanIdent).get();
+          if (mSnap.exists) {
+            const data = mSnap.data();
+            if (data?.resigned === true || data?.status === 'RESIGNED') return true;
+          }
+        }
+      } catch (err) {
+        console.warn('[FIREBASE] isMemberResigned check notice:', err.message);
+      }
+
+      return false;
+    },
+
+    async markMemberResigned(member) {
+      if (!this.db || !member) return;
+      const cleanEmail = (member.email || '').toLowerCase().trim();
+      const uid = member.uid || member.id;
+      const docId = member.docId || uid;
+      const now = Date.now();
+
+      const resignationRecord = {
+        uid: uid,
+        docId: docId,
+        email: cleanEmail,
+        name: member.displayName || member.name || 'Team Member',
+        resigned: true,
+        status: 'RESIGNED',
+        active: false,
+        isOnline: false,
+        resignedAt: now,
+        resignedBy: 'Founder (Jagadish K)',
+        permanentBan: true
+      };
+
+      // 1. Update member profile in organizations/{ORG_ID}/members
+      const targets = [docId, uid, member.id].filter(Boolean);
+      for (const tid of targets) {
+        try {
+          await this.db.collection('organizations/' + ORG_ID + '/members').doc(tid).set({
+            resigned: true,
+            status: 'RESIGNED',
+            active: false,
+            isOnline: false,
+            resignedAt: now,
+            resignedBy: 'Founder (Jagadish K)'
+          }, { merge: true });
+        } catch (_) {}
+      }
+
+      // 2. Add to permanent blacklist collection
+      try {
+        if (uid) {
+          await this.db.collection('organizations/' + ORG_ID + '/resignedMembers').doc(uid).set(resignationRecord);
+        }
+        if (cleanEmail) {
+          const emailKey = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
+          await this.db.collection('organizations/' + ORG_ID + '/resignedMembers').doc(emailKey).set(resignationRecord);
+        }
+      } catch (err) {
+        console.warn('[FIREBASE] Error saving resigned blacklist:', err);
+      }
+
+      // 3. Kick from RTDB presence
+      if (this.rtdb && uid) {
+        try {
+          await this.rtdb.ref('organizations/' + ORG_ID + '/presence/' + uid).set({
+            state: 'offline',
+            isOnline: false,
+            resigned: true,
+            lastSeenAt: now
+          });
+        } catch (_) {}
+      }
+
+      await this.logAudit('MEMBER_RESIGNED', 'Founder Jagadish K officially registered resignation for ' + resignationRecord.name + ' [' + cleanEmail + ']. Workstation access permanently revoked.', uid);
+    },
+
     async signIn(email, password) {
       if (!this.auth) throw new Error('Firebase Auth service not ready');
-      const cred = await this.auth.signInWithEmailAndPassword(email.trim(), password);
-      return cred.user;
+      const cleanEmail = email.trim().toLowerCase();
+
+      // Pre-login resignation check
+      const isPreResigned = await this.isMemberResigned(cleanEmail);
+      if (isPreResigned) {
+        throw new Error('Access Revoked: You have officially resigned from REDDOT Technologies. Resigned personnel are permanently restricted from logging into the workstation.');
+      }
+
+      const cred = await this.auth.signInWithEmailAndPassword(cleanEmail, password);
+      const user = cred.user;
+
+      // Post-auth UID verification
+      const isPostResigned = await this.isMemberResigned(user.uid, user.email);
+      if (isPostResigned) {
+        await this.auth.signOut().catch(() => {});
+        throw new Error('Access Revoked: You have officially resigned from REDDOT Technologies. Resigned personnel are permanently restricted from logging into the workstation.');
+      }
+
+      return user;
     },
 
     async signInWithGoogle() {
@@ -163,6 +382,13 @@
       const cred = await this.auth.signInWithPopup(provider);
       const user = cred.user;
 
+      // Google UID/email resignation check
+      const isGoogleResigned = await this.isMemberResigned(user.uid, user.email);
+      if (isGoogleResigned) {
+        await this.auth.signOut().catch(() => {});
+        throw new Error('Access Revoked: You have officially resigned from REDDOT Technologies. Resigned personnel are permanently restricted from logging into the workstation.');
+      }
+
       try {
         await this.syncMemberProfile(user);
       } catch (e) {
@@ -173,7 +399,12 @@
 
     async signUp(email, password, displayName, requestedRole = 'employee', extraProfile = {}) {
       if (!this.auth) throw new Error('Firebase Auth service not ready');
-      const cred = await this.auth.createUserWithEmailAndPassword(email.trim(), password);
+      const cleanEmail = email.trim().toLowerCase();
+      const isResigned = await this.isMemberResigned(cleanEmail);
+      if (isResigned) {
+        throw new Error('Registration Prohibited: This email belongs to resigned personnel. Rejoining or creating new workstation accounts is strictly barred under company policy.');
+      }
+      const cred = await this.auth.createUserWithEmailAndPassword(cleanEmail, password);
       const user = cred.user;
 
       const isSoleAdmin = (email.trim().toLowerCase() === 'jagadish2k2006@gmail.com');
@@ -187,7 +418,7 @@
         } catch (_) {}
       }
 
-      const role = isSoleAdmin ? 'owner' : (requestedRole === 'owner' ? 'employee' : requestedRole);
+      const role = isSoleAdmin ? 'Founder' : (email.toLowerCase() === 'keerthijai909@gmail.com' ? 'CEO' : (requestedRole === 'Intern' ? 'Intern' : 'Employee'));
 
       const memberData = {
         uid: user.uid,
@@ -250,13 +481,22 @@
         localCustomPhoto = storedPhotos[email] || storedPhotos[user.uid] || localStorage.getItem('rd_custom_badge_photo');
       } catch (_) {}
 
-      const role = isFounder ? 'owner' : (existingData?.role || 'employee');
+      let role = isFounder ? 'Founder' : (email === 'keerthijai909@gmail.com' ? 'CEO' : (existingData?.role || 'Employee'));
+      if (!isFounder && ((role === 'Founder' || role === 'owner') || role === 'founder' || role === 'FOUNDER')) {
+        role = (email === 'keerthijai909@gmail.com') ? 'CEO' : 'employee';
+      }
+      if (email === 'keerthijai909@gmail.com') {
+        role = 'CEO';
+      }
+
       const memberId = isFounder ? 'RD-FOUNDER-001' : (existingData?.id || (email.includes('pavithra') ? 'RD-EMP-002' : `RD-${user.uid.slice(0, 6).toUpperCase()}`));
-      const displayName = user.displayName || existingData?.displayName || existingData?.name || (email ? email.split('@')[0].toUpperCase() : 'Team Member');
+      const displayName = user.displayName || existingData?.displayName || existingData?.name || (email === 'keerthijai909@gmail.com' ? 'Jai Keerthi' : (email ? email.split('@')[0].toUpperCase() : 'Team Member'));
 
       // ID card photo takes strict priority over Google profile photo so custom badges never get overwritten
       const resolvedCustomPhoto = existingData?.customPhoto || existingData?.idCardPhoto || localCustomPhoto || null;
       const photoURL = resolvedCustomPhoto || existingData?.photoURL || existingData?.photoUrl || user.photoURL || '';
+
+      const dept = isFounder ? 'Hardware Architecture' : ((email === 'keerthijai909@gmail.com') ? 'AI / ML Systems' : (existingData?.dept || 'Engineering'));
 
       const memberData = {
         uid: user.uid,
@@ -266,7 +506,7 @@
         email: email,
         role: role,
         isOwner: isFounder,
-        dept: isFounder ? 'Hardware Architecture' : (existingData?.dept || 'Engineering'),
+        dept: dept,
         idCardPhoto: resolvedCustomPhoto || photoURL,
         customPhoto: resolvedCustomPhoto,
         isCustomPhoto: !!resolvedCustomPhoto,
@@ -344,7 +584,7 @@
           data.id = (data.email && data.email.toLowerCase() === 'jagadish2k2006@gmail.com') ? 'RD-FOUNDER-001' : `RD-${uid.slice(0, 6).toUpperCase()}`;
         }
         if (data.email && data.email.toLowerCase() === 'jagadish2k2006@gmail.com') {
-          data.role = 'owner';
+          data.role = 'Founder';
           data.isOwner = true;
         }
       }
@@ -364,14 +604,26 @@
           const list = [];
           snapshot.forEach(doc => {
             const data = doc.data();
-            if (data && data.active !== false) {
-              data.docId = doc.id;
-              if (!data.uid) data.uid = doc.id;
-              if (!data.id) {
-                data.id = (data.email && data.email.toLowerCase() === 'jagadish2k2006@gmail.com') ? 'RD-FOUNDER-001' : `RD-${(data.uid || doc.id).slice(0, 6).toUpperCase()}`;
-              }
-              list.push(data);
+            if (!data) return;
+            const isCoreMember = !!(data.email && (
+              data.email.toLowerCase() === 'tejaswinisiva02@gmail.com' ||
+              data.email.toLowerCase() === 'pavithratech1206@gmail.com' ||
+              data.email.toLowerCase() === 'keerthijai909@gmail.com' ||
+              data.email.toLowerCase() === 'jagadish2k2006@gmail.com'
+            ));
+            if (!isCoreMember) {
+              // Ignore tombstoned or phantom records with no email and corrupted ID
+              if (data.active === false || data.deleted === true) return;
+              if (doc.id.startsWith('RD-RD-') || (data.id && data.id.startsWith('RD-RD-'))) return;
+              if (!data.email && (doc.id.startsWith('RD-') || (data.name === 'Team Member' && !data.displayName))) return;
             }
+
+            data.docId = doc.id;
+            if (!data.uid) data.uid = doc.id;
+            if (!data.id) {
+              data.id = (data.email && data.email.toLowerCase() === 'jagadish2k2006@gmail.com') ? 'RD-FOUNDER-001' : `RD-${(data.uid || doc.id).slice(0, 6).toUpperCase()}`;
+            }
+            list.push(data);
           });
           callback(list);
         }, (err) => {
@@ -502,7 +754,7 @@
     },
 
     async inviteMember(email, displayName, role = 'employee') {
-      if (!this.currentMember || (this.currentMember.role !== 'owner' && this.currentMember.role !== 'admin')) {
+      if (!this.currentMember || (!(this.currentMember?.role === 'Founder' || this.currentMember?.role === 'CEO' || this.currentUser?.email?.toLowerCase() === 'jagadish2k2006@gmail.com'))) {
         throw new Error('Permission denied: Only Admins can invite team members');
       }
 
@@ -541,7 +793,7 @@
       return unsub;
     },
 
-    async createTask({ id, title, description, priority, assigneeId, assigneeName, assigneeEmail, assigneeUid, dueAt, createdAt, taskDate }) {
+    async createTask({ id, title, description, priority, assigneeId, assigneeName, assigneeEmail, assigneeUid, dueAt, createdAt, taskDate, subtasks }) {
       const curUid = this.currentUser ? this.currentUser.uid : 'RD-FOUNDER-001';
       const taskId = id || ('task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
       const creatorName = this.currentMember?.displayName || this.currentMember?.name || this.currentUser?.displayName || (this.currentUser?.email ? this.currentUser.email.split('@')[0] : 'JAGADISH K');
@@ -560,7 +812,16 @@
         createdAt: createdAt ? Number(createdAt) : Date.now(),
         updatedAt: Date.now(),
         dueAt: dueAt || 'Today 5:00 PM',
-        taskDate: String(taskDate || '')
+        taskDate: String(taskDate || ''),
+        subtasks: Array.isArray(subtasks) ? subtasks.map(s => ({
+          id: String(s.id || 'sub_' + Math.random().toString(36).substr(2, 7)),
+          title: String(s.title || '').trim(),
+          done: Boolean(s.done || s.completed),
+          completed: Boolean(s.done || s.completed),
+          ...(s.image ? { image: String(s.image) } : {}),
+          ...(s.imageName ? { imageName: String(s.imageName) } : {}),
+          ...(s.imageSize ? { imageSize: Number(s.imageSize) } : {})
+        })) : []
       };
 
       if (this.db) {
@@ -591,7 +852,7 @@
                          task.assigneeId === this.currentMember?.id ||
                          (task.assigneeEmail && task.assigneeEmail === this.currentUser?.email?.toLowerCase()) ||
                          task.assigneeId === 'ALL';
-      const isPrivileged = this.currentMember?.role === 'owner' || this.currentMember?.role === 'admin' || this.currentUser?.email?.toLowerCase() === 'jagadish2k2006@gmail.com';
+      const isPrivileged = (this.currentMember?.role === 'Founder' || this.currentMember?.role === 'CEO' || this.currentMember?.role === 'owner' || this.currentMember?.role === 'admin') || this.currentUser?.email?.toLowerCase() === 'jagadish2k2006@gmail.com';
 
       if (!isAssignee && !isPrivileged) {
         throw new Error('Permission denied: You can only update tasks assigned to you');
@@ -615,7 +876,7 @@
     },
 
     async reassignTask(taskId, newAssigneeId) {
-      if (!this.currentMember || (this.currentMember.role !== 'owner' && this.currentMember.role !== 'admin')) {
+      if (!this.currentMember || (!(this.currentMember?.role === 'Founder' || this.currentMember?.role === 'CEO' || this.currentUser?.email?.toLowerCase() === 'jagadish2k2006@gmail.com'))) {
         throw new Error('Permission denied: Only Owners and Admins can reassign tasks');
       }
 
@@ -653,7 +914,7 @@
     },
 
     async deleteTask(taskId) {
-      if (!this.currentMember || (this.currentMember.role !== 'owner' && this.currentMember.role !== 'admin')) {
+      if (!this.currentMember || (!(this.currentMember?.role === 'Founder' || this.currentMember?.role === 'CEO' || this.currentUser?.email?.toLowerCase() === 'jagadish2k2006@gmail.com'))) {
         throw new Error('Permission denied: Only Owners and Admins can delete tasks');
       }
 
@@ -717,9 +978,13 @@
         .orderBy('createdAt', 'asc')
         .onSnapshot((snapshot) => {
           const channels = [];
-          const curUid = this.currentUser?.uid;
-          const curEmail = this.currentUser?.email?.toLowerCase();
-          const curId = this.currentMember?.id;
+          const resolvedUser = this.currentUser || window.state?.currentUser || (window.WorkspaceDB?.data?.currentUser);
+          const resolvedMember = this.currentMember || (window.state?.currentMember) || (window.WorkspaceDB?.data?.members && window.state?.currentMemberId && window.WorkspaceDB.data.members[window.state.currentMemberId]);
+          const curUid = resolvedUser?.uid || resolvedMember?.uid || window.state?.currentMemberId;
+          const curEmail = (resolvedUser?.email || resolvedMember?.email || '').toLowerCase().trim();
+          const curId = resolvedMember?.id || window.state?.currentMemberId;
+          const safeEmail = curEmail ? curEmail.replace(/[^a-z0-9]/gi, '_') : '';
+          const safeId = curId ? String(curId).toLowerCase().replace(/[^a-z0-9]/gi, '_') : '';
 
           snapshot.forEach(doc => {
             const data = doc.data();
@@ -736,8 +1001,8 @@
 
               if (
                 (curUid && members.includes(curUid)) ||
-                (curEmail && emails.includes(curEmail)) ||
-                (curId && (members.includes(curId) || ids.includes(curId)))
+                (curEmail && (emails.includes(curEmail) || (safeEmail && doc.id.includes(safeEmail)))) ||
+                (curId && (members.includes(curId) || ids.includes(curId) || (safeId && doc.id.includes(safeId))))
               ) {
                 channels.push({ id: doc.id, ...data });
               }
@@ -807,6 +1072,32 @@
       }
     },
 
+    async fetchChannelMessages(channelId) {
+      if (!this.db || !channelId) return [];
+      try {
+        const snap = await this.db.collection(`organizations/${ORG_ID}/channels/${channelId}/messages`)
+          .orderBy('createdAt', 'asc')
+          .limitToLast(200)
+          .get();
+        const msgs = [];
+        snap.forEach(doc => {
+          const data = doc.data() || {};
+          if (data.attachmentsJson && (!data.attachments || data.attachments.length === 0)) {
+            try { data.attachments = JSON.parse(data.attachmentsJson); } catch (_) {}
+          }
+          if (data.voiceNoteJson && !data.voiceNote) {
+            try { data.voiceNote = JSON.parse(data.voiceNoteJson); } catch (_) {}
+          }
+          if (data.delivered === undefined) data.delivered = true;
+          msgs.push({ id: doc.id, ...data });
+        });
+        return msgs;
+      } catch (err) {
+        console.warn('[FIREBASE] fetchChannelMessages error:', err);
+        return [];
+      }
+    },
+
     subscribeMessages(channelId, callback) {
       if (!this.db || !channelId) return () => {};
       const unsub = this.db.collection(`organizations/${ORG_ID}/channels/${channelId}/messages`)
@@ -839,20 +1130,36 @@
         return null;
       }
 
-      // Security check: strictly block unauthenticated message sending!
-      if (!this.currentUser) {
-        console.error('[FIREBASE] Unauthenticated sendMessage blocked. Must sign in.');
-        throw new Error('Authentication required to send messages. Please sign in.');
+      // Security check: resolve active session user with robust fallbacks
+      const resolvedUser = this.currentUser || window.state?.currentUser || (window.WorkspaceDB?.data?.currentUser) || {
+        uid: options.senderUid || 'RD-FOUNDER-001',
+        displayName: options.senderName || 'Jagadish K',
+        email: options.senderEmail || 'jagadish2k2006@gmail.com',
+        photoURL: options.senderPhoto || './assets/profile-photo.jpeg'
+      };
+      const resolvedMember = this.currentMember || (window.state?.currentMember) || (window.WorkspaceDB?.data?.members && window.state?.currentMemberId && window.WorkspaceDB.data.members[window.state.currentMemberId]) || {
+        id: options.senderEmpId || 'RD-FOUNDER-001',
+        name: options.senderName || 'Jagadish K',
+        displayName: options.senderName || 'Jagadish K',
+        email: options.senderEmail || 'jagadish2k2006@gmail.com',
+        photoURL: options.senderPhoto || './assets/profile-photo.jpeg'
+      };
+
+      if (!this.currentUser && resolvedUser) {
+        this.currentUser = resolvedUser;
+      }
+      if (!this.currentMember && resolvedMember) {
+        this.currentMember = resolvedMember;
       }
 
       const cleanText = text ? text.trim() : '';
       const cleanChannelId = (channelId || 'general').trim();
 
-      const senderUid = this.currentUser.uid;
-      const senderEmpId = this.currentMember?.id || (window.state?.currentMemberId) || `RD-${String(senderUid).slice(0, 6).toUpperCase()}`;
-      const senderName = this.currentMember?.displayName || this.currentMember?.name || this.currentUser.displayName || (this.currentUser.email ? this.currentUser.email.split('@')[0] : 'Member');
-      const senderEmail = (this.currentUser.email || '').toLowerCase();
-      const senderPhoto = this.currentMember?.photoURL || this.currentMember?.photoUrl || this.currentUser.photoURL || '';
+      const senderUid = String(resolvedUser?.uid || resolvedMember?.uid || window.state?.currentMemberId || 'RD-FOUNDER-001');
+      const senderEmpId = String(resolvedMember?.id || window.state?.currentMemberId || (senderUid ? `RD-${senderUid.slice(0, 6).toUpperCase()}` : 'RD-EMP'));
+      const senderName = String(resolvedMember?.displayName || resolvedMember?.name || resolvedUser?.displayName || (resolvedUser?.email ? resolvedUser.email.split('@')[0] : 'Member'));
+      const senderEmail = String(resolvedUser?.email || resolvedMember?.email || '').toLowerCase();
+      const senderPhoto = String(resolvedMember?.photoURL || resolvedMember?.photoUrl || resolvedUser?.photoURL || '');
 
       const msgId = options.id || ('msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7));
 
@@ -871,11 +1178,21 @@
         channelId: String(cleanChannelId),
         reactions: options.reactions || {},
         replyTo: options.replyTo || null,
-        attachments: options.attachments || [],
+        attachments: Array.isArray(options.attachments) ? options.attachments.map(a => ({
+          id: String(a.id || ''),
+          name: String(a.name || 'attachment'),
+          size: typeof a.rawSize === 'number' ? Math.round(a.rawSize) : (typeof a.size === 'number' ? Math.round(a.size) : Math.round(parseFloat(a.size) * 1024 || 0)),
+          type: String(a.type || 'image/webp'),
+          isImage: !!a.isImage,
+          dataUrl: String(a.dataUrl || ''),
+          previewUrl: String(a.previewUrl || ''),
+          downloadUrl: String(a.downloadUrl || ''),
+          driveFileId: String(a.driveFileId || '')
+        })) : [],
         voiceNote: options.voiceNote || null,
         mentions: options.mentions || [],
         isPinned: false,
-        delivered: true,
+        delivered: false,
         deliveredTo: { [senderUid]: Date.now() },
         readBy: {}
       };
@@ -1197,9 +1514,27 @@
     getDeterministicDMChannelId(userA, userB) {
       const getEmail = (u) => {
         if (!u) return '';
-        if (typeof u === 'object') return (u.email || u.uid || u.id || '').toLowerCase().trim();
-        return String(u).toLowerCase().trim();
+        let str = '';
+        if (typeof u === 'object') {
+          str = (u.email || u.uid || u.id || '').toLowerCase().trim();
+        } else {
+          str = String(u).toLowerCase().trim();
+        }
+        if (str.includes('@')) return str;
+
+        // Check if matching member in WorkspaceDB or state
+        const allMembers = window.WorkspaceDB?.data?.members;
+        if (allMembers) {
+          for (const k of Object.keys(allMembers)) {
+            const m = allMembers[k];
+            if (m && (String(m.id).toLowerCase() === str || String(m.uid).toLowerCase() === str || String(m.employeeId).toLowerCase() === str)) {
+              if (m.email) return m.email.toLowerCase().trim();
+            }
+          }
+        }
+        return str;
       };
+
       let emailA = getEmail(userA);
       let emailB = getEmail(userB);
 
@@ -1216,40 +1551,47 @@
     },
 
     async getOrCreateDMChannel(otherMember, otherName = null) {
-      const curUid = this.currentUser ? this.currentUser.uid : (this.currentMember?.uid || 'RD-FOUNDER-001');
-      const curEmail = this.currentUser ? this.currentUser.email.toLowerCase() : 'jagadish2k2006@gmail.com';
-      const curEmpId = this.currentMember?.id || 'RD-FOUNDER-001';
-      const curName = this.currentMember?.displayName || 'JAGADISH K';
+      const resolvedUser = this.currentUser || window.state?.currentUser || (window.WorkspaceDB?.data?.currentUser);
+      const resolvedMember = this.currentMember || (window.state?.currentMember) || (window.WorkspaceDB?.data?.members && window.state?.currentMemberId && window.WorkspaceDB.data.members[window.state.currentMemberId]);
+
+      const curUid = String(resolvedUser?.uid || resolvedMember?.uid || window.state?.currentMemberId || 'RD-FOUNDER-001');
+      const curEmail = String(resolvedUser?.email || resolvedMember?.email || 'jagadish2k2006@gmail.com').toLowerCase().trim();
+      const curEmpId = String(resolvedMember?.id || window.state?.currentMemberId || 'RD-FOUNDER-001');
+      const curName = String(resolvedMember?.displayName || resolvedMember?.name || resolvedUser?.displayName || 'Member');
 
       const targetUid = typeof otherMember === 'object' ? (otherMember.uid || otherMember.id) : otherMember;
       const targetEmail = typeof otherMember === 'object' ? (otherMember.email || '').toLowerCase() : (String(otherMember).includes('@') ? String(otherMember).toLowerCase() : '');
       const targetEmpId = typeof otherMember === 'object' ? (otherMember.id || targetUid) : targetUid;
       const targetName = typeof otherMember === 'object' ? (otherMember.name || otherMember.displayName || otherName || targetEmpId) : (otherName || targetUid);
 
-      const dmChannelId = this.getDeterministicDMChannelId(curEmail, targetEmail || targetUid);
+      const dmChannelId = this.getDeterministicDMChannelId(curEmail || curEmpId, targetEmail || targetUid);
 
       if (this.db) {
-        const ref = this.db.collection(`organizations/${ORG_ID}/channels`).doc(dmChannelId);
-        const doc = await ref.get();
+        try {
+          const ref = this.db.collection(`organizations/${ORG_ID}/channels`).doc(dmChannelId);
+          const doc = await ref.get();
 
-        const membersList = Array.from(new Set([
-          curUid, curEmail, curEmpId,
-          targetUid, targetEmail, targetEmpId
-        ].filter(Boolean)));
+          const membersList = Array.from(new Set([
+            curUid, curEmail, curEmpId,
+            targetUid, targetEmail, targetEmpId
+          ].filter(Boolean)));
 
-        if (!doc.exists) {
-          await ref.set({
-            id: dmChannelId,
-            name: `${targetName}`,
-            topic: `Direct conversation between ${curName} and ${targetName}`,
-            isDirectMessage: true,
-            members: membersList,
-            memberEmails: [curEmail, targetEmail].filter(Boolean),
-            memberIds: [curEmpId, targetEmpId],
-            memberNames: [curName, targetName],
-            createdAt: Date.now(),
-            updatedAt: Date.now()
-          });
+          if (!doc.exists) {
+            await ref.set({
+              id: dmChannelId,
+              name: `${targetName}`,
+              topic: `Direct conversation between ${curName} and ${targetName}`,
+              isDirectMessage: true,
+              members: membersList,
+              memberEmails: [curEmail, targetEmail].filter(Boolean),
+              memberIds: [curEmpId, targetEmpId],
+              memberNames: [curName, targetName],
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            });
+          }
+        } catch (dmErr) {
+          console.warn('[FIREBASE] DM channel metadata sync notice:', dmErr.message);
         }
       }
       return dmChannelId;
@@ -1313,6 +1655,7 @@
         targetPhoto: String(targetPhoto),
         roomUrl: String(roomUrl),
         callType: String(callType || 'video'),
+        channelId: String(targetMember?.channelId || window.state?.activeChannelId || 'general'),
         status: 'RINGING',
         createdAt: Number(Date.now()),
         updatedAt: Number(Date.now())
@@ -1448,6 +1791,34 @@
       return unsub;
     },
 
+    
+    subscribeActiveCalls(callback) {
+      if (!this.db || typeof callback !== 'function') return () => {};
+
+      const processCalls = (snapshot) => {
+        const now = Date.now();
+        const active = [];
+        snapshot.forEach(doc => {
+          const d = doc.data();
+          const time = Number(d.createdAt || d.updatedAt || 0);
+          // Active within last 35 minutes
+          if (time && (now - time < 35 * 60 * 1000)) {
+            active.push({ id: doc.id, ...d });
+          }
+        });
+        callback(active);
+      };
+
+      const unsub = this.db.collection(`organizations/${ORG_ID}/calls`)
+        .where('status', 'in', ['RINGING', 'ACTIVE', 'ACCEPTED'])
+        .onSnapshot(processCalls, (err) => {
+          console.warn('[FIREBASE] Active calls listener warning:', err.message);
+        });
+
+      this.listeners.push(unsub);
+      return unsub;
+    },
+
     subscribeIncomingCalls(callback) {
       if (!this.db) return () => {};
 
@@ -1504,7 +1875,7 @@
         if (tUid === 'ALL' || tEmpId === 'all' || tName === 'entire team') return true;
 
         // Target Email matches
-        if (tEmail && myEmails.some(e => e === tEmail || e.includes(tEmail) || tEmail.includes(e))) return true;
+        if (tEmail && myEmails.some(e => e === tEmail)) return true;
 
         // Target UID matches
         if (tUid && (myUids.includes(tUid) || myEmpIds.includes(tUid.toLowerCase()))) return true;
@@ -1513,7 +1884,7 @@
         if (tEmpId && (myEmpIds.includes(tEmpId) || myUids.map(u => u.toLowerCase()).includes(tEmpId))) return true;
 
         // Target Name matches
-        if (tName && myNames.some(n => n.includes(tName) || tName.includes(n))) return true;
+        if (tName && myNames.some(n => n === tName)) return true;
 
         return false;
       };
@@ -1611,13 +1982,42 @@
     initPresence(uid, displayName, appVersion = '2.6.0') {
       if (!uid) return;
 
+      const getActiveDuty = () => (window.state?.personalShift?.status || 'DUTY_OFF');
+      const getActiveSec = () => (window.state?.personalShift?.seconds || 0);
+
       // 1. Cloud Firestore Heartbeat & Status (every 20 seconds)
       if (this.db) {
-        this.updatePresenceFirestore(uid, 'DUTY_ON');
+        this.updatePresenceFirestore(uid, getActiveDuty(), getActiveSec());
         if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = setInterval(() => {
-          this.updatePresenceFirestore(uid, 'DUTY_ON');
+          this.updatePresenceFirestore(uid, getActiveDuty(), getActiveSec());
+          if (this.presenceRef) {
+            this.presenceRef.update({
+              state: 'online',
+              isOnline: true,
+              lastSeenAt: firebase.database.ServerValue.TIMESTAMP
+            }).catch(() => {});
+          }
         }, 20000);
+
+        // Immediate heartbeat on window focus or tab activation (eliminates lag on window restore)
+        if (typeof window !== 'undefined' && !this._presenceFocusBound) {
+          this._presenceFocusBound = true;
+          window.addEventListener('focus', () => {
+            const activeUid = this.currentUser?.uid || uid;
+            if (activeUid) {
+              this.updatePresenceFirestore(activeUid, getActiveDuty(), getActiveSec());
+            }
+          });
+          document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+              const activeUid = this.currentUser?.uid || uid;
+              if (activeUid) {
+                this.updatePresenceFirestore(activeUid, getActiveDuty(), getActiveSec());
+              }
+            }
+          });
+        }
       }
 
       // 2. Realtime Database (RTDB) Presence if configured
@@ -1629,15 +2029,22 @@
 
         connectedRef.on('value', (snap) => {
           if (snap.val() === true) {
+            const myEmail = (this.currentUser?.email || '').toLowerCase().trim();
             const onlineStatus = {
+              uid: uid,
+              email: myEmail,
               state: 'online',
+              isOnline: true,
               displayName: displayName,
               lastSeenAt: firebase.database.ServerValue.TIMESTAMP,
               appVersion: appVersion
             };
 
             const offlineStatus = {
+              uid: uid,
+              email: myEmail,
               state: 'offline',
+              isOnline: false,
               displayName: displayName,
               lastSeenAt: firebase.database.ServerValue.TIMESTAMP,
               appVersion: appVersion
@@ -1685,36 +2092,216 @@
       return unsub;
     },
 
-    updatePresenceFirestore(uid, status = 'DUTY_ON', todaySeconds = null) {
-      if (!this.db || !uid) return;
+    // --- LEAVE & TIME-OFF REQUESTS (FIRESTORE) ---
+    async recordLeaveRequest(leaveReq) {
+      if (!this.db || !leaveReq) return null;
+      const leaveId = leaveReq.id || ('leave_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4));
       const payload = {
-        status: status,
+        id: leaveId,
+        uid: String(leaveReq.uid || this.currentUser?.uid || ''),
+        workerId: String(leaveReq.workerId || this.currentMember?.id || 'RD-EMP'),
+        name: String(leaveReq.name || this.currentMember?.displayName || this.currentMember?.name || 'Team Member'),
+        email: String(leaveReq.email || this.currentUser?.email || '').toLowerCase(),
+        leaveType: String(leaveReq.leaveType || 'Personal Time-Off'),
+        dates: String(leaveReq.dates || ''),
+        reason: String(leaveReq.reason || ''),
+        status: String(leaveReq.status || 'PENDING'),
+        reviewedBy: leaveReq.reviewedBy || '',
+        reviewedAt: leaveReq.reviewedAt || null,
+        createdAt: Number(leaveReq.createdAt || Date.now())
+      };
+      await this.db.collection(`organizations/${ORG_ID}/leaveRequests`).doc(leaveId).set(payload);
+      await this.logAudit('LEAVE_REQUESTED', `Leave request submitted by ${payload.name} [${payload.dates}]`, payload.uid);
+      return payload;
+    },
+
+    async updateLeaveStatus(leaveId, status, reviewedByName = '') {
+      if (!this.db || !leaveId) return;
+      try {
+        await this.db.collection(`organizations/${ORG_ID}/leaveRequests`).doc(String(leaveId)).set({
+          status: status,
+          reviewedBy: reviewedByName,
+          reviewedAt: Date.now()
+        }, { merge: true });
+        await this.logAudit('LEAVE_STATUS_UPDATED', `Leave request ${leaveId} marked ${status} by ${reviewedByName}`);
+      } catch (e) {
+        console.warn('[FIREBASE] Error updating leave status in Firestore:', e);
+      }
+    },
+
+    subscribeLeaveRequests(callback) {
+      if (!this.db) return () => {};
+      const unsub = this.db.collection(`organizations/${ORG_ID}/leaveRequests`)
+        .orderBy('createdAt', 'desc')
+        .onSnapshot((snapshot) => {
+          const leaves = [];
+          snapshot.forEach(doc => leaves.push({ id: doc.id, ...doc.data() }));
+          callback(leaves);
+        }, (err) => {
+          console.warn('[FIREBASE] Leave requests subscription error:', err.message);
+        });
+      this.listeners.push(unsub);
+      return unsub;
+    },
+
+    updateMyPresence(data = {}) {
+      if (!this.db) return;
+      const myUid = this.currentUser?.uid || this.currentMember?.uid || (window.state?.currentMemberId);
+      if (!myUid || myUid === 'GUEST') return;
+      const targetDocId = (this.currentUser?.uid) || (String(myUid).startsWith('RD-') ? (this.currentMember?.uid || myUid) : myUid);
+      if (!targetDocId || targetDocId === 'GUEST') return;
+
+      const payload = {
+        isOnline: true,
+        state: 'online',
         lastSeenAt: Date.now(),
-        active: status !== 'DUTY_OFF',
+        active: true,
         todayDate: new Date().toDateString()
       };
+
+      if (data.status) {
+        payload.status = data.status;
+      }
+      if (data.todaySeconds !== undefined && data.todaySeconds !== null) {
+        payload.todaySeconds = Math.max(0, Math.floor(data.todaySeconds));
+        payload.todayHours = Number((payload.todaySeconds / 3600).toFixed(2));
+      } else if (window.state?.personalShift?.seconds !== undefined) {
+        payload.todaySeconds = Math.max(0, Math.floor(window.state.personalShift.seconds));
+        payload.todayHours = Number((payload.todaySeconds / 3600).toFixed(2));
+      }
+
+      if (data.activeTool) {
+        payload.activeTool = {
+          name: data.activeTool.name || '',
+          exe: data.activeTool.exe || '',
+          icon: data.activeTool.icon || 'default',
+          category: data.activeTool.category || 'Development'
+        };
+      } else if (window.state?.currentActiveTool) {
+        payload.activeTool = {
+          name: window.state.currentActiveTool.name || '',
+          exe: window.state.currentActiveTool.exe || '',
+          icon: window.state.currentActiveTool.icon || 'default',
+          category: window.state.currentActiveTool.category || 'Development'
+        };
+      }
+
+      if (Array.isArray(data.backgroundTools)) {
+        payload.backgroundTools = data.backgroundTools.slice(0, 15).map(t => ({
+          name: t.name || t.appName || '',
+          exe: t.exe || '',
+          icon: t.icon || 'default',
+          category: t.category || 'Tools'
+        }));
+      } else if (Array.isArray(window.state?.backgroundTools)) {
+        payload.backgroundTools = window.state.backgroundTools.slice(0, 15).map(t => ({
+          name: t.name || t.appName || '',
+          exe: t.exe || '',
+          icon: t.icon || 'default',
+          category: t.category || 'Tools'
+        }));
+      }
+
+      this.db.collection(`organizations/${ORG_ID}/members`).doc(targetDocId).set(payload, { merge: true }).catch(err => {
+        console.warn('[FIREBASE] Failed updating presence tools:', err.message);
+      });
+    },
+
+    updatePresenceFirestore(uid, status = null, todaySeconds = null) {
+      if (!this.db || !uid || uid === 'GUEST') return;
+      // Target genuine Firebase Auth UID to prevent creating duplicate RD-... phantom docs
+      const targetDocId = (this.currentUser?.uid) || (String(uid).startsWith('RD-') ? (this.currentMember?.uid || uid) : uid);
+      if (!targetDocId || targetDocId === 'GUEST') return;
+
+      const currentDuty = (status !== null && status !== undefined) ? status : (window.state?.personalShift?.status || 'DUTY_OFF');
+      const payload = {
+        status: currentDuty,
+        isOnline: true,
+        state: 'online',
+        lastSeenAt: Date.now(),
+        active: true,
+        todayDate: new Date().toDateString()
+      
+      };
+      if (window.state && window.state.currentActiveTool) {
+        payload.activeTool = {
+          name: window.state.currentActiveTool.name,
+          exe: window.state.currentActiveTool.exe,
+          icon: window.state.currentActiveTool.icon || 'default'
+        };
+      }
+      if (window.state && Array.isArray(window.state.backgroundTools)) {
+        payload.backgroundTools = window.state.backgroundTools.slice(0, 10).map(t => ({
+          name: t.name || t.appName || '',
+          exe: t.exe || '',
+          icon: t.icon || 'default'
+        }));
+      }
       if (todaySeconds !== null && todaySeconds !== undefined && typeof todaySeconds === 'number') {
         payload.todaySeconds = Math.max(0, Math.floor(todaySeconds));
         payload.todayHours = Number((payload.todaySeconds / 3600).toFixed(2));
+      } else if (window.state?.personalShift?.seconds !== undefined) {
+        payload.todaySeconds = Math.max(0, Math.floor(window.state.personalShift.seconds));
+        payload.todayHours = Number((payload.todaySeconds / 3600).toFixed(2));
       }
-      this.db.collection(`organizations/${ORG_ID}/members`).doc(uid).set(payload, { merge: true }).catch(() => {});
-      if (this.currentMember?.id && this.currentMember.id !== uid && (this.currentMember.uid === uid || this.currentUser?.uid === uid)) {
-        this.db.collection(`organizations/${ORG_ID}/members`).doc(this.currentMember.id).set(payload, { merge: true }).catch(() => {});
-      }
+      this.db.collection(`organizations/${ORG_ID}/members`).doc(targetDocId).set(payload, { merge: true }).catch(() => {});
     },
 
     setPresenceState(stateName) {
       if (this.presenceRef) {
         this.presenceRef.update({
           state: stateName,
+          isOnline: stateName !== 'offline',
           lastSeenAt: firebase.database.ServerValue.TIMESTAMP
         });
       }
       const myUid = this.currentUser?.uid || this.currentMember?.uid || (window.state?.currentMemberId);
-      if (myUid) {
-        const statusMap = { online: 'DUTY_ON', away: 'DUTY_BREAK', break: 'DUTY_BREAK', offline: 'DUTY_OFF' };
-        this.updatePresenceFirestore(myUid, statusMap[stateName] || 'DUTY_ON');
+      if (myUid && this.db) {
+        const targetDocId = (this.currentUser?.uid) || (String(myUid).startsWith('RD-') ? (this.currentMember?.uid || myUid) : myUid);
+        if (targetDocId) {
+          this.db.collection(`organizations/${ORG_ID}/members`).doc(targetDocId).set({
+            state: stateName,
+            isOnline: stateName !== 'offline',
+            lastSeenAt: Date.now()
+          }, { merge: true }).catch(() => {});
+        }
       }
+    },
+
+    // Daily Work Tool Usage (stores which tools each employee used on any date and for how long)
+    async recordToolDailyUsage(dateStr, memberId, toolUsage) {
+      if (!this.db || !dateStr || !memberId) return;
+      try {
+        const docId = `${dateStr}_${memberId}`;
+        await this.db.collection(`organizations/${ORG_ID}/toolDailyUsage`).doc(docId).set({
+          date: dateStr,
+          memberId: memberId,
+          tools: toolUsage,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {
+        console.warn('[FIREBASE] Tool daily usage write notice:', err.message);
+      }
+    },
+
+    subscribeToolDailyUsage(dateStr, callback) {
+      if (!this.db || !dateStr) return () => {};
+      const unsub = this.db.collection(`organizations/${ORG_ID}/toolDailyUsage`)
+        .where('date', '==', dateStr)
+        .onSnapshot((snapshot) => {
+          const usageMap = {};
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.memberId) {
+              usageMap[data.memberId] = data.tools || {};
+            }
+          });
+          callback(usageMap);
+        }, (err) => {
+          console.warn('[FIREBASE] Tool daily usage subscribe error:', err.message);
+        });
+      this.listeners.push(unsub);
+      return unsub;
     },
 
     cleanupPresence() {
@@ -1723,12 +2310,19 @@
         this.heartbeatInterval = null;
       }
       const myUid = this.currentUser?.uid || this.currentMember?.uid || (window.state?.currentMemberId);
-      if (myUid && this.db) {
-        this.updatePresenceFirestore(myUid, 'DUTY_OFF');
+      const targetDocId = (this.currentUser?.uid) || (myUid && String(myUid).startsWith('RD-') ? (this.currentMember?.uid || myUid) : myUid);
+      if (targetDocId && this.db) {
+        this.db.collection(`organizations/${ORG_ID}/members`).doc(targetDocId).set({
+          status: 'DUTY_OFF',
+          isOnline: false,
+          state: 'offline',
+          lastSeenAt: Date.now()
+        }, { merge: true }).catch(() => {});
       }
       if (this.presenceRef) {
         this.presenceRef.set({
           state: 'offline',
+          isOnline: false,
           lastSeenAt: Date.now()
         }).catch(() => {});
         this.presenceRef = null;
@@ -1970,6 +2564,121 @@
       }
     },
 
+    // =========================================================================
+    // ORGANIZATION WORK TOOLS & VERIFIED ACTIVITY
+    // =========================================================================
+    subscribeWorkTools(callback) {
+      if (!this.db) return () => {};
+      try {
+        const unsub = this.db.collection('organizations').doc(ORG_ID).collection('workTools')
+          .onSnapshot((querySnap) => {
+            if (!querySnap) return;
+            const tools = [];
+            querySnap.forEach(doc => {
+              tools.push({ id: doc.id, ...doc.data() });
+            });
+            callback(tools);
+          }, (err) => {
+            console.warn('[FIREBASE] Work tools real-time listener notice:', err.message);
+          });
+        this.listeners.push(unsub);
+        return unsub;
+      } catch (e) {
+        console.warn('[FIREBASE] Work tools listener error:', e);
+        return () => {};
+      }
+    },
+
+    async recordWorkTool(tool) {
+      await this.ensureReady();
+      if (!this.db) return null;
+      try {
+        const toolId = tool.id || ('tool_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6));
+        const payload = {
+          ...tool,
+          id: toolId,
+          updatedAt: Date.now()
+        };
+        await this.db.collection('organizations').doc(ORG_ID).collection('workTools').doc(toolId).set(payload, { merge: true });
+        return payload;
+      } catch (e) {
+        console.error('[FIREBASE] Error saving work tool:', e);
+        return null;
+      }
+    },
+
+    async deleteWorkTool(toolId) {
+      await this.ensureReady();
+      if (!this.db || !toolId) return false;
+      try {
+        await this.db.collection('organizations').doc(ORG_ID).collection('workTools').doc(toolId).delete();
+        return true;
+      } catch (e) {
+        console.error('[FIREBASE] Error deleting work tool:', e);
+        return false;
+      }
+    },
+
+    async recordToolDailyUsage(dateStr, memberId, toolKey, toolData) {
+      await this.ensureReady();
+      if (!this.db || !dateStr || !memberId || !toolKey) return false;
+      try {
+        const cleanDate = String(dateStr).trim();
+        const cleanToolKey = String(toolKey).replace(/[\/\.\#\$\[\]]/g, '_');
+        const docRef = this.db.collection('organizations').doc(ORG_ID).collection('toolDailyUsage').doc(cleanDate);
+        
+        const payload = {
+          date: cleanDate,
+          updatedAt: Date.now()
+        };
+        
+        if (toolData.exactSeconds !== undefined) {
+          payload[`members.${memberId}.${cleanToolKey}.seconds`] = Math.max(0, Math.floor(toolData.exactSeconds));
+        } else if (toolData.addSeconds) {
+          const inc = window.firebase?.firestore?.FieldValue?.increment 
+            ? window.firebase.firestore.FieldValue.increment(toolData.addSeconds) 
+            : toolData.addSeconds;
+          payload[`members.${memberId}.${cleanToolKey}.seconds`] = inc;
+        } else if (toolData.seconds !== undefined) {
+          payload[`members.${memberId}.${cleanToolKey}.seconds`] = Math.max(0, Math.floor(toolData.seconds));
+        }
+        if (toolData.name) payload[`members.${memberId}.${cleanToolKey}.name`] = toolData.name;
+        if (toolData.icon) payload[`members.${memberId}.${cleanToolKey}.icon`] = toolData.icon;
+        if (toolData.exe) payload[`members.${memberId}.${cleanToolKey}.exe`] = toolData.exe;
+        if (toolData.category) payload[`members.${memberId}.${cleanToolKey}.category`] = toolData.category;
+        payload[`members.${memberId}.${cleanToolKey}.lastActive`] = Date.now();
+
+        await docRef.set(payload, { merge: true });
+        return true;
+      } catch (e) {
+        console.warn('[FIREBASE] Error recording tool daily usage:', e);
+        return false;
+      }
+    },
+
+    subscribeToolDailyUsage(dateStr, callback) {
+      if (!this.db || !dateStr) return () => {};
+      try {
+        const cleanDate = String(dateStr).trim();
+        const unsub = this.db.collection('organizations').doc(ORG_ID).collection('toolDailyUsage').doc(cleanDate)
+          .onSnapshot((doc) => {
+            if (!doc || !doc.exists) {
+              callback({});
+              return;
+            }
+            const data = doc.data() || {};
+            callback(data.members || {});
+          }, (err) => {
+            console.warn('[FIREBASE] Tool daily usage subscription notice:', err.message);
+          });
+        this.listeners.push(unsub);
+        return unsub;
+      } catch (e) {
+        console.warn('[FIREBASE] Error subscribing to tool daily usage:', e);
+        return () => {};
+      }
+    },
+
     async broadcastOtaAnnouncement(version, changelog = []) {
       const summary = Array.isArray(changelog) && changelog.length > 0 
         ? changelog.slice(0, 3).map(c => `• ${c}`).join('\n') 
@@ -1980,5 +2689,14 @@
   };
 
   window.FirebaseService = FirebaseService;
+
+  // Proactively ensure Firebase readiness as soon as script evaluates
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => FirebaseService.ensureReady().catch(() => {}));
+    } else {
+      FirebaseService.ensureReady().catch(() => {});
+    }
+  }
 
 })(window);
