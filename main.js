@@ -1384,6 +1384,33 @@ function downloadBinaryFile(fileUrl, targetPath, onProgress, maxRedirects = 5) {
   });
 }
 
+// Cross-platform tar.gz extractor (uses pure JS 'tar' package with fallback to system tar)
+async function extractTarGzArchive(archivePath, targetDir) {
+  // Method 1: Try built-in pure JS 'tar' package (works on Windows, Linux, macOS identically)
+  try {
+    const tar = require('tar');
+    await tar.x({
+      file: archivePath,
+      cwd: targetDir
+    });
+    return;
+  } catch (tarModuleErr) {
+    console.warn('[OTA] npm tar package extraction notice, trying system tar fallback:', tarModuleErr.message);
+  }
+
+  // Method 2: System tar fallback (tar on Linux/macOS, tar.exe on Windows)
+  await new Promise((resolve, reject) => {
+    const childProcess = require('child_process');
+    const tarCmd = process.platform === 'win32' ? 'tar.exe' : 'tar';
+    childProcess.execFile(tarCmd, ['-xzf', archivePath, '-C', targetDir], (err, stdout, stderr) => {
+      if (err) {
+        return reject(new Error(`Failed to extract OTA package: ${stderr || err.message}`));
+      }
+      resolve();
+    });
+  });
+}
+
 ipcMain.handle('ota-get-info', async (event) => {
   if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
   const activeInfo = getActiveVersionInfo();
@@ -1543,15 +1570,7 @@ ipcMain.handle('ota-apply-hotpatch', async (event, customBundleUrl) => {
     }
     fs.mkdirSync(tempExtractDir, { recursive: true });
 
-    await new Promise((resolve, reject) => {
-      const childProcess = require('child_process');
-      childProcess.execFile('tar.exe', ['-xzf', tempTarGzPath, '-C', tempExtractDir], (err, stdout, stderr) => {
-        if (err) {
-          return reject(new Error(`Failed to extract OTA package: ${stderr || err.message}`));
-        }
-        resolve();
-      });
-    });
+    await extractTarGzArchive(tempTarGzPath, tempExtractDir);
 
     // Verify index.html exists in extracted contents
     const extractedIndex = path.join(tempExtractDir, 'index.html');
@@ -1647,13 +1666,7 @@ async function performAutoHotpatchCheck() {
       }
       fs.mkdirSync(tempExtractDir, { recursive: true });
 
-      await new Promise((resolve, reject) => {
-        const childProcess = require('child_process');
-        childProcess.execFile('tar.exe', ['-xzf', tempTarGzPath, '-C', tempExtractDir], (err, stdout, stderr) => {
-          if (err) return reject(new Error(`Failed to extract OTA package: ${stderr || err.message}`));
-          resolve();
-        });
-      });
+      await extractTarGzArchive(tempTarGzPath, tempExtractDir);
 
       const extractedIndex = path.join(tempExtractDir, 'index.html');
       if (!fs.existsSync(extractedIndex)) {

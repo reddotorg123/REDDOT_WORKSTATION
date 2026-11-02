@@ -117,7 +117,7 @@ export function AuthScreen({ onLoginSuccess }) {
             letterSpacing: '0.04em',
             color: '#FFFFFF'
           }}>
-            REDDOT WORKSTATION
+            REDDOT WS
           </h2>
           <div style={{
             fontSize: 11.5,
@@ -129,7 +129,7 @@ export function AuthScreen({ onLoginSuccess }) {
             gap: 6
           }}>
             <Shield size={12} color="#94A3B8" />
-            <span>v3.0 Enterprise REDDOT WS • Verified Authentication Gate</span>
+            <span>Enterprise REDDOT WS • Verified Authentication Gate</span>
           </div>
         </div>
 
