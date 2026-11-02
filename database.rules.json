@@ -3,9 +3,9 @@
     "organizations": {
       "reddot": {
         "presence": {
-          ".read": "auth != null",
+          ".read": "auth != null && auth.token.email_verified === true && (auth.token.email === 'jagadish2k2006@gmail.com' || auth.token.email === 'keerthijai909@gmail.com' || auth.token.email === 'pavithratech1206@gmail.com' || auth.token.email === 'tejaswinisiva02@gmail.com')",
           "$uid": {
-            ".write": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && auth.token.email_verified === true && (auth.token.email === 'jagadish2k2006@gmail.com' || auth.token.email === 'keerthijai909@gmail.com' || auth.token.email === 'pavithratech1206@gmail.com' || auth.token.email === 'tejaswinisiva02@gmail.com') && auth.uid === $uid",
             ".validate": "newData.hasChildren(['state', 'lastSeenAt']) && newData.child('state').isString() && (newData.child('state').val() == 'online' || newData.child('state').val() == 'offline' || newData.child('state').val() == 'away' || newData.child('state').val() == 'break')"
           }
         }

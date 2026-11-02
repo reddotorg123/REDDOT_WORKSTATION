@@ -6,19 +6,15 @@ Welcome to the **REDDOT Workstation OS & Enterprise Cloud Collaboration Platform
 
 ## 🚀 How to Share with Your Team
 
-The complete application is packaged and ready to share:
+Use the current Windows setup installer:
 
-### Option A: Standard Setup Installer (.exe)
-📦 `app\v2.5.3\REDDOT-Workstation-OS-Setup.exe`
-- Installs desktop shortcut and Start Menu item.
-- Automatically connects to Cloud Over-The-Air pipeline.
-
-### Option B: Standalone Portable App (.exe)
-📦 `app\v2.5.3\REDDOT-Workstation-OS-Portable.exe`
-- No installation required; double-click and run directly from anywhere (USB, desktop, downloads).
+📦 `app\v3.12.0\REDDOT-Workstation-OS-Setup.exe`
+- Installs the app and creates desktop and Start Menu shortcuts.
+- This installer is unsigned, so Windows may show an unknown-publisher warning.
+- Deploy the Firebase security rules before distributing the installer.
 
 ### Steps for Teammates (e.g., Pavithra):
-1. **Send the File**: Share `REDDOT-Workstation-OS-Setup.exe` (or `REDDOT-Workstation-OS-Portable.exe`) via Google Drive, OneDrive, USB pendrive, or chat.
+1. **Send the File**: Share `REDDOT-Workstation-OS-Setup.exe` via Google Drive, OneDrive, USB pendrive, or chat.
 2. **Launch & Sign In**: Double-click the file to open.
    - *No Node.js or complex setup required! It runs out of the box on Windows 10 & 11.*
 
@@ -32,14 +28,29 @@ The complete application is packaged and ready to share:
 - Full admin permissions: Assign roles, create company-wide tasks, manage channels, and supervise presence telemetry.
 
 ### 2. Teammate Account Creation (Self-Service)
-Each of the 4 team members simply launches the app on their PC and clicks **? Connect Cloud Workstation / Sign Up**:
-1. Enter their work/personal email (e.g. colleague1@gmail.com).
+Only approved team email addresses can access the workspace. A new account must verify its email before it can read or change workspace data.
+
+Each approved team member launches the app and clicks **Connect Cloud Workstation / Sign Up**:
+1. Enter the exact email address already approved in the app and Firestore rules.
 2. Enter their Full Name (e.g. Sarah Connor).
 3. Choose their department (e.g. Firmware & Embedded, AI / ML Systems, Robotics & Controls).
 4. (Optional) Select their Badge Photo.
-5. Click **?? Create Official Profile & Connect**.
+5. Click **Create Official Profile & Connect**, then open the verification email.
+6. After verifying the email, return to the app and sign in.
 
-*As soon as they click connect, their badge ID (e.g. RD-ARCH-002, RD-ENG-003), role, and green online status will appear instantly on Jagadish's screen and all other teammates' screens!*
+The member profile and online status appear to teammates after the verified user signs in. To authorize another teammate, update the approved-email checks in `wallpaper-ui/firebase-service.js` and `firestore.rules`, test the rules, and rebuild the installer.
+
+Sign in to Firebase CLI with an authorized project administrator account:
+
+```powershell
+npx firebase-tools@14.12.0 login
+```
+
+After confirming the approved accounts can sign in, deploy the rules from the project folder with:
+
+```powershell
+npx firebase-tools@14.12.0 deploy --only firestore:rules,database --project reddot-workspace
+```
 
 ---
 
@@ -76,5 +87,3 @@ Each of the 4 team members simply launches the app on their PC and clicks **? Co
 - **Latest Releases**: [https://github.com/reddotorg123/REDDOT_WORKSTATION/releases](https://github.com/reddotorg123/REDDOT_WORKSTATION/releases)
 - **Worldwide OTA Channel**: Built-in Fastly CDN distribution for zero-latency team updates across the globe.
 - **Direct Portable Download**: Teammates anywhere in the world can download the latest package directly from GitHub Releases (`REDDOT-Workstation-OS-Portable.zip`).
-
-

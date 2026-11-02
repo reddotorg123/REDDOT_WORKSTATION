@@ -1,15 +1,12 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Search, 
-  Users, 
-  MoreVertical, 
   Paperclip, 
   Send, 
   Smile, 
   CheckCheck,
   Check,
   FileText,
-  Image as ImageIcon,
   Download,
   Info,
   X,
@@ -24,7 +21,6 @@ import {
 } from 'lucide-react';
 import { firebaseBridge } from '../services/firebaseBridge';
 import { backendBridge } from '../services/backendBridge';
-import { electronBridge } from '../services/electronBridge';
 import ImagePreviewModal from './ImagePreviewModal';
 
 const formatMessageDate = (timestamp) => {
@@ -66,7 +62,7 @@ const renderFormattedMessageText = (text, searchQuery) => {
           target="_blank"
           rel="noopener noreferrer"
           style={{
-            color: 'var(--accent-blue, #38bdf8)',
+            color: 'var(--msg-link, #2563eb)',
             textDecoration: 'underline',
             textUnderlineOffset: '3px',
             wordBreak: 'break-all',
@@ -106,6 +102,11 @@ const renderFormattedMessageText = (text, searchQuery) => {
   });
 };
 
+const isCurrentMember = (member, name, email, uid) =>
+  (!!email && member?.email?.toLowerCase() === email.toLowerCase()) ||
+  (!!uid && (member?.uid === uid || member?.id === uid)) ||
+  (!!name && member?.name?.toLowerCase() === name.toLowerCase());
+
 export function MessagesView({ 
   conversations = [], 
   messages = {}, 
@@ -113,18 +114,22 @@ export function MessagesView({
   onDeleteMessage,
   onToggleReaction,
   currentUser = 'Jagadish K',
+  currentUserEmail = '',
+  currentUserUid = '',
+  currentUserEmpId = '',
+  currentUserRole = '',
   onSyncCloudMessages,
   teamMembers = [],
   initialActiveChannelId = null,
   onSelectChannel = null
 }) {
   const [activeChannelId, setActiveChannelId] = useState(initialActiveChannelId || conversations[0]?.id || 'general');
+  const [prevInitialId, setPrevInitialId] = useState(initialActiveChannelId);
 
-  useEffect(() => {
-    if (initialActiveChannelId && initialActiveChannelId !== activeChannelId) {
-      setActiveChannelId(initialActiveChannelId);
-    }
-  }, [initialActiveChannelId]);
+  if (initialActiveChannelId && initialActiveChannelId !== prevInitialId) {
+    setPrevInitialId(initialActiveChannelId);
+    setActiveChannelId(initialActiveChannelId);
+  }
 
   const handleSelectChannel = (id) => {
     setActiveChannelId(id);
@@ -137,7 +142,6 @@ export function MessagesView({
   const [searchMessageQuery, setSearchMessageQuery] = useState('');
   const [showSearchInChat, setShowSearchInChat] = useState(false);
   const [showChannelInfo, setShowChannelInfo] = useState(true);
-  const [typingUser, setTypingUser] = useState(null);
   const [showReactionPickerId, setShowReactionPickerId] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
   const [hoveredMsgId, setHoveredMsgId] = useState(null);
@@ -149,24 +153,252 @@ export function MessagesView({
   const [contactSearch, setContactSearch] = useState('');
   const [newChannelName, setNewChannelName] = useState('');
   const [previewData, setPreviewData] = useState(null);
+  const [showInputEmojiPicker, setShowInputEmojiPicker] = useState(false);
+  const [convFilter, setConvFilter] = useState('all'); // 'all' | 'channels' | 'direct'
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const chatFileInputRef = useRef(null);
+  const currentUserIdentity = currentUserEmail || currentUserUid || currentUser;
+  const selfDirectMessageId = currentUserIdentity
+    ? firebaseBridge.getDeterministicDMChannelId(currentUserIdentity, currentUserIdentity)
+    : '';
+
+  const filteredConversations = useMemo(() => {
+    const channelMap = new Map();
+    conversations.forEach(c => {
+      if (c.id === selfDirectMessageId) return;
+      if (c.id?.includes('___rd_jagadi')) return;
+      if (c.title === 'Direct Message' || c.id.includes('user_a')) return;
+      channelMap.set(c.id, { ...c });
+    });
+
+    // Resolve any generic or unassigned DM titles using teamMembers
+    channelMap.forEach((conv, chanId) => {
+      if (!conv.isGroup) {
+        const lowerChan = chanId.toLowerCase();
+        for (const m of teamMembers) {
+          if (!m || !m.name || isCurrentMember(m, currentUser, currentUserEmail, currentUserUid)) continue;
+          const cleanEmail = (m.email || '').toLowerCase().replace(/[@.]/g, '_');
+          const emailUser = m.email ? m.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
+          const cleanUid = (m.uid || m.id || '').toLowerCase();
+          const mName = m.name.toLowerCase();
+
+          if ((cleanEmail && lowerChan.includes(cleanEmail)) || 
+              (emailUser && emailUser.length > 2 && lowerChan.includes(emailUser)) ||
+              (cleanUid && cleanUid.length > 3 && lowerChan.includes(cleanUid)) ||
+              (lowerChan.includes(mName.replace(/\s+/g, ''))) ||
+              (mName.includes('tejaswini') && lowerChan.includes('tejaswini')) ||
+              (mName.includes('pavithra') && (lowerChan.includes('pavithra') || lowerChan.includes('emp-002') || lowerChan.includes('emp_002')))) {
+            const isSelf = isCurrentMember(m, currentUser, currentUserEmail, currentUserUid);
+            const isTrulyOnline = isSelf || m.isOnline === true;
+            conv.title = m.name;
+            conv.name = m.name;
+            conv.status = isTrulyOnline ? 'Online' : 'Offline';
+            conv.isOnline = isTrulyOnline;
+            conv.avatar = m.avatar || m.photoUrl || m.photoURL || './assets/id-card.png';
+            break;
+          }
+        }
+      }
+    });
+
+    // Ensure every teammate has exactly ONE DM entry
+    teamMembers.forEach(m => {
+      const isSelf = isCurrentMember(m, currentUser, currentUserEmail, currentUserUid);
+      if (isSelf || !m.name || m.name.toLowerCase().includes('teammate')) return;
+
+      const cleanEmail = (m.email || '').toLowerCase().replace(/[@.]/g, '_');
+      const directKey = firebaseBridge.getDeterministicDMChannelId(currentUserIdentity, m.email || m.uid || m.id);
+      const isTrulyOnline = m.isOnline === true;
+
+      let found = false;
+      for (const [k, v] of channelMap.entries()) {
+        const mName = m.name.toLowerCase();
+        if (!v.isGroup && (
+          v.title?.toLowerCase() === mName ||
+          (cleanEmail && k.includes(cleanEmail)) ||
+          (mName.includes('tejaswini') && k.includes('tejaswini')) ||
+          (mName.includes('pavithra') && (k.includes('pavithra') || k.includes('emp-002') || k.includes('emp_002')))
+        )) {
+          found = true;
+          v.title = m.name;
+          v.name = m.name;
+          v.status = isTrulyOnline ? 'Online' : 'Offline';
+          v.isOnline = isTrulyOnline;
+          v.avatar = m.avatar || m.photoUrl || m.photoURL || './assets/id-card.png';
+          break;
+        }
+      }
+
+      if (!found) {
+        channelMap.set(directKey, {
+          id: directKey,
+          title: m.name,
+          name: m.name,
+          status: isTrulyOnline ? 'Online' : 'Offline',
+          isOnline: isTrulyOnline,
+          avatar: m.avatar || m.photoUrl || m.photoURL || './assets/id-card.png',
+          membersCount: 2,
+          time: isTrulyOnline ? 'Now' : (m.lastActive && m.lastActive !== 'Now' ? m.lastActive : 'Offline'),
+          timestamp: 0,
+          isGroup: false,
+          lastMessage: isTrulyOnline ? 'Active now' : 'Start a direct chat'
+        });
+      }
+    });
+
+    // Ensure each channel and DM reflects the latest message timestamp and preview
+    channelMap.forEach((conv, chanId) => {
+      const chanMsgs = messages[chanId];
+      if (Array.isArray(chanMsgs) && chanMsgs.length > 0) {
+        const lastMsg = chanMsgs[chanMsgs.length - 1];
+        const rawCreated = lastMsg.createdAt || lastMsg.timestamp;
+        const lastMsgTime = typeof rawCreated === 'number' ? rawCreated : (rawCreated ? new Date(rawCreated).getTime() : 0);
+        if (lastMsgTime > (conv.timestamp || 0)) {
+          conv.timestamp = lastMsgTime;
+          conv.time = lastMsg.time || conv.time;
+          conv.lastMessage = lastMsg.text || (lastMsg.attachments?.length ? 'Sent an attachment' : conv.lastMessage);
+        }
+      }
+    });
+
+    // Deduplicate so each teammate appears exactly once
+    const seenNames = new Set();
+    const uniqueConversations = [];
+
+    Array.from(channelMap.values())
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+      .forEach(c => {
+        if (c.isGroup) {
+          uniqueConversations.push(c);
+        } else {
+          const key = (c.title || c.name || '').toLowerCase();
+          if (key && !seenNames.has(key) && key !== 'direct message') {
+            seenNames.add(key);
+            uniqueConversations.push(c);
+          }
+        }
+      });
+
+    const groupChannels = [];
+    const directMessages = [];
+
+    uniqueConversations
+      .filter(c => {
+        if (convFilter === 'channels' && !c.isGroup) return false;
+        if (convFilter === 'direct' && c.isGroup) return false;
+        if (!searchChannel.trim()) return true;
+        const q = searchChannel.toLowerCase();
+        return (c.title || '').toLowerCase().includes(q) ||
+               (c.name || '').toLowerCase().includes(q) ||
+               (c.lastMessage && c.lastMessage.toLowerCase().includes(q));
+      })
+      .forEach(c => {
+        if (c.isGroup) groupChannels.push(c);
+        else directMessages.push(c);
+      });
+
+    // 1. Group Channels ranking: # general ALWAYS #1 on top, other groups by recent activity
+    groupChannels.sort((a, b) => {
+      const isAGen = a.id === 'general' || (a.title && a.title.toLowerCase().includes('general'));
+      const isBGen = b.id === 'general' || (b.title && b.title.toLowerCase().includes('general'));
+      if (isAGen && !isBGen) return -1;
+      if (!isAGen && isBGen) return 1;
+      return (b.timestamp || 0) - (a.timestamp || 0);
+    });
+
+    // 2. Direct Messages ranking: sorted by recent activity
+    directMessages.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    if (convFilter === 'channels') return groupChannels;
+    if (convFilter === 'direct') return directMessages;
+
+    // In 'All' view: Groups ranked on top, Personal Direct Messages below
+    return [...groupChannels, ...directMessages];
+  }, [conversations, messages, teamMembers, searchChannel, convFilter, currentUserIdentity, currentUserEmail, currentUserUid, currentUser, selfDirectMessageId]);
 
   const activeChannel = useMemo(() => {
-    const found = conversations.find(c => c.id === activeChannelId) ||
-                  conversations.find(c => c.name?.toLowerCase() === activeChannelId.toLowerCase() || c.title?.toLowerCase() === activeChannelId.toLowerCase()) ||
-                  conversations[0];
-    if (found) return found;
-    return {
-      id: activeChannelId || 'general',
-      title: activeChannelId?.startsWith('#') ? activeChannelId : `# ${activeChannelId || 'general'}`,
-      name: activeChannelId || 'general',
-      membersCount: 6,
-      isGroup: !String(activeChannelId || '').startsWith('dm_')
-    };
-  }, [conversations, activeChannelId]);
+    // 1. Search in filteredConversations first
+    let found = filteredConversations.find(c => c.id === activeChannelId) ||
+                filteredConversations.find(c => c.name?.toLowerCase() === (activeChannelId || '').toLowerCase() || c.title?.toLowerCase() === (activeChannelId || '').toLowerCase());
+
+    // 2. Fallback to raw conversations
+    if (!found) {
+      found = conversations.find(c => c.id === activeChannelId) ||
+              conversations.find(c => c.name?.toLowerCase() === (activeChannelId || '').toLowerCase() || c.title?.toLowerCase() === (activeChannelId || '').toLowerCase());
+    }
+
+    // 3. Fallback to first conversation
+    if (!found) {
+      found = filteredConversations[0] || conversations[0] || {
+        id: activeChannelId || 'general',
+        title: activeChannelId?.startsWith('#') ? activeChannelId : `# ${activeChannelId || 'general'}`,
+        name: activeChannelId || 'general',
+        membersCount: 6,
+        isGroup: !String(activeChannelId || '').startsWith('dm_')
+      };
+    }
+
+    const channelObj = { ...found };
+
+    // 4. If it is a Direct Message or matches a teammate, strictly resolve the teammate
+    const isDM = !channelObj.isGroup || String(channelObj.id || '').startsWith('dm_') || String(activeChannelId || '').startsWith('dm_');
+    if (isDM) {
+      channelObj.isGroup = false;
+      const lowerChan = String(channelObj.id || activeChannelId || '').toLowerCase();
+      const lowerTitle = String(channelObj.title || channelObj.name || '').toLowerCase();
+
+      // Find the teammate who is NOT Jagadish
+      const mate = teamMembers.find(m => {
+        if (!m || !m.name) return false;
+        const isSelf = m.name.toLowerCase().includes('jagadish') || (m.email && m.email.toLowerCase().includes('jagadish'));
+        if (isSelf) return false;
+        const cleanEmail = (m.email || '').toLowerCase().replace(/[@.]/g, '_');
+        const emailUser = m.email ? m.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
+        const cleanUid = (m.uid || m.id || '').toLowerCase();
+        const mName = m.name.toLowerCase();
+
+        return (cleanEmail && lowerChan.includes(cleanEmail)) ||
+               (emailUser && emailUser.length > 2 && lowerChan.includes(emailUser)) ||
+               (cleanUid && cleanUid.length > 3 && lowerChan.includes(cleanUid)) ||
+               (lowerChan.includes(mName.replace(/\s+/g, ''))) ||
+               (lowerTitle.includes(mName)) ||
+               (mName.includes('tejaswini') && (lowerChan.includes('tejaswini') || lowerTitle.includes('tejaswini'))) ||
+               (mName.includes('pavithra') && (lowerChan.includes('pavithra') || lowerChan.includes('emp-002') || lowerChan.includes('emp_002') || lowerTitle.includes('pavithra')));
+      });
+
+      if (mate) {
+        channelObj.title = mate.name;
+        channelObj.name = mate.name;
+        channelObj.avatar = mate.avatar || mate.photoUrl || mate.photoURL || './assets/id-card.png';
+        const mateSelf = (mate.email && mate.email.toLowerCase().includes('jagadish')) || (mate.name && mate.name.toLowerCase().includes('jagadish'));
+        const mateLastSeen = Number(mate.lastSeenAt || 0);
+        const mateOnline = mateSelf || (
+          (mate.status === 'Online' || mate.isOnline) &&
+          mate.status !== 'OFFLINE' &&
+          mate.status !== 'Offline' &&
+          mateLastSeen > 0 &&
+          (Date.now() - mateLastSeen) < 120000
+        );
+        channelObj.status = mateOnline ? 'Online' : 'Offline';
+        channelObj.isOnline = mateOnline;
+        channelObj.member = { ...mate, status: channelObj.status, isOnline: mateOnline };
+      }
+
+      // Safeguard: NEVER let direct message avatar point to Jagadish's photo
+      if (channelObj.avatar && (channelObj.avatar.includes('profile-photo.jpeg') || channelObj.avatar.includes('1aE0qcOkewuGFzXtCTcUCrjOrRc1-6aRq'))) {
+        channelObj.avatar = channelObj.member?.avatar || './assets/id-card.png';
+      }
+
+      // Strip leading '#' if present for DMs
+      if (channelObj.title && channelObj.title.startsWith('#')) {
+        channelObj.title = channelObj.title.replace(/^#\s*/, '');
+      }
+    }
+
+    return channelObj;
+  }, [filteredConversations, conversations, activeChannelId, teamMembers]);
 
   const channelMessages = useMemo(() => {
     if (Array.isArray(messages[activeChannelId]) && messages[activeChannelId].length > 0) {
@@ -199,12 +431,18 @@ export function MessagesView({
     scrollToBottom(false);
   }, [channelMessages.length, activeChannelId]);
 
+  // Stable ref for message synchronization callback
+  const onSyncCloudMessagesRef = useRef(onSyncCloudMessages);
+  useEffect(() => {
+    onSyncCloudMessagesRef.current = onSyncCloudMessages;
+  }, [onSyncCloudMessages]);
+
   // Live Cloud Firestore Channel Messages Subscription
   useEffect(() => {
     if (!activeChannelId) return;
     const unsub = firebaseBridge.subscribeChannelMessages(activeChannelId, (cloudMsgs) => {
-      if (cloudMsgs && Array.isArray(cloudMsgs) && typeof onSyncCloudMessages === 'function') {
-        onSyncCloudMessages(activeChannelId, cloudMsgs);
+      if (cloudMsgs && Array.isArray(cloudMsgs) && typeof onSyncCloudMessagesRef.current === 'function') {
+        onSyncCloudMessagesRef.current(activeChannelId, cloudMsgs);
       }
     });
     return () => {
@@ -311,7 +549,7 @@ export function MessagesView({
               reader.onerror = () => resolve(null);
               reader.readAsDataURL(file);
             });
-          } catch (_) {}
+          } catch {}
         }
 
         try {
@@ -343,7 +581,7 @@ export function MessagesView({
               isImage: true
             });
           }
-        } catch (_) {
+        } catch {
           if (localDataUrl) {
             newItems.push({
               id: `local-${Date.now()}-${Math.random()}`,
@@ -376,8 +614,7 @@ export function MessagesView({
   };
 
   const handleStartDirectChat = (member) => {
-    const cleanEmail = (member.email || '').replace(/[@.]/g, '_');
-    const directKey = `dm_jagadish2k2006_gmail_com___${cleanEmail || member.id}`;
+    const directKey = firebaseBridge.getDeterministicDMChannelId(currentUserIdentity, member.email || member.uid || member.id);
     handleSelectChannel(directKey);
     setShowNewChannelModal(false);
   };
@@ -391,9 +628,10 @@ export function MessagesView({
       id: `msg-${Date.now()}`,
       sender: currentUser,
       senderDisplayName: currentUser,
-      senderEmpId: 'RD-FOUNDER-001',
-      senderEmail: 'jagadish2k2006@gmail.com',
-      senderRoleTag: 'FOUNDER',
+      senderUid: currentUserUid,
+      senderEmpId: currentUserEmpId || currentUserUid,
+      senderEmail: currentUserEmail,
+      senderRoleTag: currentUserRole,
       time: timeStr,
       timestamp: Date.now(),
       createdAt: Date.now(),
@@ -437,124 +675,7 @@ export function MessagesView({
     }
   };
 
-  const [convFilter, setConvFilter] = useState('all'); // 'all' | 'channels' | 'direct'
 
-  const filteredConversations = useMemo(() => {
-    const channelMap = new Map();
-    conversations.forEach(c => {
-      if (c.id === 'dm_jagadish2k2006_gmail_com___jagadish2k2006_gmail_com') return; // skip self DM
-      if (c.title === 'Direct Message' || c.id.includes('user_a') || c.id.includes('Uvhr9MPQ0RODCujtxzUiWcJBzHk2')) return;
-      channelMap.set(c.id, { ...c });
-    });
-
-    // Resolve any generic or unassigned DM titles using teamMembers
-    channelMap.forEach((conv, chanId) => {
-      if (!conv.isGroup) {
-        const lowerChan = chanId.toLowerCase();
-        for (const m of teamMembers) {
-          if (!m || !m.email || m.name?.toLowerCase().includes('jagadish') || m.email?.toLowerCase().includes('jagadish')) continue;
-          const cleanEmail = (m.email || '').toLowerCase().replace(/[@.]/g, '_');
-          const emailUser = m.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '_');
-          const cleanUid = (m.uid || m.id || '').toLowerCase();
-
-          if ((cleanEmail && lowerChan.includes(cleanEmail)) || 
-              (emailUser && emailUser.length > 2 && lowerChan.includes(emailUser)) ||
-              (cleanUid && cleanUid.length > 3 && lowerChan.includes(cleanUid))) {
-            conv.title = m.name;
-            conv.name = m.name;
-            conv.status = m.status;
-            conv.isOnline = m.isOnline;
-            conv.avatar = m.avatar || conv.avatar;
-            break;
-          }
-        }
-      }
-    });
-
-    // Ensure every teammate has exactly ONE DM entry
-    teamMembers.forEach(m => {
-      const isSelf = (m.email && m.email.toLowerCase().includes('jagadish')) ||
-                     (m.name && m.name.toLowerCase().includes('jagadish'));
-      if (isSelf || !m.name || m.name.toLowerCase().includes('teammate')) return;
-
-      const cleanEmail = (m.email || '').replace(/[@.]/g, '_');
-      const directKey = `dm_jagadish2k2006_gmail_com___${cleanEmail || m.id}`;
-
-      let found = false;
-      for (const [k, v] of channelMap.entries()) {
-        if (!v.isGroup && (v.title?.toLowerCase() === m.name.toLowerCase() || (cleanEmail && k.includes(cleanEmail)))) {
-          found = true;
-          v.title = m.name;
-          v.name = m.name;
-          v.status = m.status;
-          v.isOnline = m.isOnline;
-          if (m.avatar) v.avatar = m.avatar;
-          break;
-        }
-      }
-
-      if (!found) {
-        channelMap.set(directKey, {
-          id: directKey,
-          title: m.name,
-          name: m.name,
-          status: m.status,
-          isOnline: m.isOnline,
-          avatar: m.avatar,
-          membersCount: 2,
-          time: m.lastActive || 'Today',
-          timestamp: 0,
-          isGroup: false,
-          lastMessage: m.isOnline ? 'Active now' : 'Start a direct chat'
-        });
-      }
-    });
-
-    // Ensure each channel and DM reflects the latest message timestamp and preview
-    channelMap.forEach((conv, chanId) => {
-      const chanMsgs = messages[chanId];
-      if (Array.isArray(chanMsgs) && chanMsgs.length > 0) {
-        const lastMsg = chanMsgs[chanMsgs.length - 1];
-        const rawCreated = lastMsg.createdAt || lastMsg.timestamp;
-        const lastMsgTime = typeof rawCreated === 'number' ? rawCreated : (rawCreated ? new Date(rawCreated).getTime() : 0);
-        if (lastMsgTime > (conv.timestamp || 0)) {
-          conv.timestamp = lastMsgTime;
-          conv.time = lastMsg.time || conv.time;
-          conv.lastMessage = lastMsg.text || (lastMsg.attachments?.length ? 'Sent an attachment' : conv.lastMessage);
-        }
-      }
-    });
-
-    // Deduplicate so each teammate appears exactly once
-    const seenNames = new Set();
-    const uniqueConversations = [];
-
-    Array.from(channelMap.values())
-      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-      .forEach(c => {
-        if (c.isGroup) {
-          uniqueConversations.push(c);
-        } else {
-          const key = (c.title || c.name || '').toLowerCase();
-          if (key && !seenNames.has(key) && key !== 'direct message') {
-            seenNames.add(key);
-            uniqueConversations.push(c);
-          }
-        }
-      });
-
-    return uniqueConversations
-      .filter(c => {
-        if (convFilter === 'channels' && !c.isGroup) return false;
-        if (convFilter === 'direct' && c.isGroup) return false;
-        if (!searchChannel.trim()) return true;
-        const q = searchChannel.toLowerCase();
-        return (c.title || '').toLowerCase().includes(q) ||
-               (c.name || '').toLowerCase().includes(q) ||
-               (c.lastMessage && c.lastMessage.toLowerCase().includes(q));
-      })
-      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-  }, [conversations, messages, teamMembers, searchChannel, convFilter]);
 
   const displayedMessages = useMemo(() => {
     if (!searchMessageQuery.trim()) return channelMessages;
@@ -654,28 +775,63 @@ export function MessagesView({
                 No conversations found
               </div>
             ) : (
-              filteredConversations.map(conv => {
+              filteredConversations.map((conv, cIdx) => {
                 const isActive = conv.id === activeChannelId;
                 const isDirect = !conv.isGroup;
                 const isOnline = conv.status === 'Online';
+
+                // In 'all' view, render section header when transitioning from groups to DMs or on the first item
+                const showGroupHeader = convFilter === 'all' && cIdx === 0 && conv.isGroup;
+                const prevConv = cIdx > 0 ? filteredConversations[cIdx - 1] : null;
+                const showDmHeader = convFilter === 'all' && isDirect && (cIdx === 0 || (prevConv && prevConv.isGroup));
+
                 return (
-                  <div 
-                    key={conv.id}
-                    onClick={() => handleSelectChannel(conv.id)}
-                    style={{
-                      padding: '10px 12px',
-                      borderBottom: '1px solid var(--border-dim)',
-                      background: isActive ? 'var(--bg-active-nav)' : 'transparent',
-                      cursor: 'pointer',
-                      transition: 'background 0.12s ease',
-                      position: 'relative',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10
-                    }}
-                  >
-                    {/* Avatar / Channel Hash icon */}
-                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <React.Fragment key={conv.id}>
+                    {showGroupHeader && (
+                      <div style={{
+                        padding: '10px 14px 4px 14px',
+                        fontSize: 10,
+                        fontWeight: 800,
+                        letterSpacing: '0.08em',
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                        background: 'var(--bg-subtle, #F8FAFC)',
+                        borderBottom: '1px solid var(--border-dim)'
+                      }}>
+                        Channels &amp; Groups
+                      </div>
+                    )}
+                    {showDmHeader && (
+                      <div style={{
+                        padding: '12px 14px 4px 14px',
+                        fontSize: 10,
+                        fontWeight: 800,
+                        letterSpacing: '0.08em',
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                        background: 'var(--bg-subtle, #F8FAFC)',
+                        borderBottom: '1px solid var(--border-dim)',
+                        borderTop: cIdx > 0 ? '1px solid var(--border-dim)' : 'none'
+                      }}>
+                        Direct Messages
+                      </div>
+                    )}
+                    <div 
+                      onClick={() => handleSelectChannel(conv.id)}
+                      style={{
+                        padding: '10px 12px',
+                        borderBottom: '1px solid var(--border-dim)',
+                        background: isActive ? 'var(--bg-active-nav)' : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'background 0.12s ease',
+                        position: 'relative',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10
+                      }}
+                    >
+                      {/* Avatar / Channel Hash icon */}
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
                       {isDirect ? (
                         <img 
                           src={conv.avatar || './assets/id-card.png'} 
@@ -741,9 +897,10 @@ export function MessagesView({
                       </div>
                     </div>
                   </div>
-                );
-              })
-            )}
+                </React.Fragment>
+              );
+            })
+          )}
           </div>
         </div>
 
@@ -948,19 +1105,18 @@ export function MessagesView({
                       </div>
                     )}
                     <div 
-                      onMouseEnter={() => setHoveredMsgId(msg.id)}
-                      onMouseLeave={() => setHoveredMsgId(null)}
+                      className="chat-message-row"
                       style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: isSelf ? 'flex-end' : 'flex-start',
-                      maxWidth: '85%',
-                      alignSelf: isSelf ? 'flex-end' : 'flex-start',
-                      position: 'relative',
-                      marginTop: 6,
-                      marginBottom: 6
-                    }}
-                  >
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: isSelf ? 'flex-end' : 'flex-start',
+                        maxWidth: '85%',
+                        alignSelf: isSelf ? 'flex-end' : 'flex-start',
+                        position: 'relative',
+                        marginTop: 6,
+                        marginBottom: 6
+                      }}
+                    >
                     {/* Sender Name & Time */}
                     <div style={{
                       display: 'flex',
@@ -987,115 +1143,102 @@ export function MessagesView({
 
                     {/* Relative Container for Bubble and Floating Action Toolbar */}
                     <div style={{ position: 'relative', maxWidth: '100%' }}>
-                      {/* Hover Quick Action Bar floating cleanly ABOVE the bubble */}
-                      {hoveredMsgId === msg.id && (
-                        <div 
-                          style={{
-                            position: 'absolute',
-                            top: -16,
-                            [isSelf ? 'right' : 'left']: 8,
-                            zIndex: 40,
-                            background: 'var(--bg-card)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: 8,
-                            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.22)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 2,
-                            padding: '2px 4px',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          {/* Reaction Picker Button */}
-                          <div style={{ position: 'relative' }}>
-                            <button 
-                              type="button"
-                              className="win-btn" 
-                              style={{ width: 22, height: 22, padding: 0 }}
-                              title="Add Reaction"
-                              onClick={() => setShowReactionPickerId(showReactionPickerId === msg.id ? null : msg.id)}
-                            >
-                              <Smile size={12} />
-                            </button>
-                            {showReactionPickerId === msg.id && (
-                              <div 
-                                style={{
-                                  position: 'absolute',
-                                  bottom: 'calc(100% + 6px)',
-                                  [isSelf ? 'right' : 'left']: 0,
-                                  background: 'var(--bg-surface)',
-                                  border: '1px solid var(--border-color)',
-                                  borderRadius: 16,
-                                  boxShadow: 'var(--shadow-floating)',
-                                  display: 'flex',
-                                  gap: 4,
-                                  padding: '3px 8px',
-                                  zIndex: 50
-                                }}
-                              >
-                                {['👍', '❤️', '🔥', '👏', '🎉', '💡'].map(emoji => (
-                                  <button
-                                    key={emoji}
-                                    type="button"
-                                    className="win-btn"
-                                    style={{ width: 24, height: 24, fontSize: 13, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
-                                    onClick={() => {
-                                      if (typeof onToggleReaction === 'function') {
-                                        onToggleReaction(activeChannelId, msg.id, emoji);
-                                      }
-                                      setShowReactionPickerId(null);
-                                    }}
-                                  >
-                                    {emoji}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Reply button */}
+                      {/* Hover Quick Action Bar floating smoothly without layout shift */}
+                      <div 
+                        className={`chat-message-actions ${showReactionPickerId === msg.id ? 'has-active-picker' : ''}`}
+                        style={{
+                          [isSelf ? 'right' : 'left']: 8
+                        }}
+                      >
+                        {/* Reaction Picker Button */}
+                        <div style={{ position: 'relative' }}>
                           <button 
                             type="button"
                             className="win-btn" 
                             style={{ width: 22, height: 22, padding: 0 }}
-                            title="Reply to message"
-                            onClick={() => {
-                              setReplyingTo(msg);
-                              if (inputRef.current) inputRef.current.focus();
-                            }}
+                            title="Add Reaction"
+                            onClick={() => setShowReactionPickerId(showReactionPickerId === msg.id ? null : msg.id)}
                           >
-                            <CornerUpLeft size={12} />
+                            <Smile size={12} />
                           </button>
-
-                          {/* Copy text button */}
-                          <button 
-                            type="button"
-                            className="win-btn" 
-                            style={{ width: 22, height: 22, padding: 0 }}
-                            title={copiedMsgId === msg.id ? "Copied!" : "Copy message"}
-                            onClick={() => handleCopyText(msg.text, msg.id)}
-                          >
-                            {copiedMsgId === msg.id ? <Check size={12} color="var(--accent-green)" /> : <Copy size={12} />}
-                          </button>
-
-                          {/* Delete message button (if self or founder) */}
-                          {isSelf && (
-                            <button 
-                              type="button"
-                              className="win-btn" 
-                              style={{ width: 22, height: 22, padding: 0, color: 'var(--accent-red)' }}
-                              title="Delete message"
-                              onClick={() => {
-                                if (typeof onDeleteMessage === 'function') {
-                                  onDeleteMessage(activeChannelId, msg.id);
-                                }
+                          {showReactionPickerId === msg.id && (
+                            <div 
+                              style={{
+                                position: 'absolute',
+                                bottom: 'calc(100% + 6px)',
+                                [isSelf ? 'right' : 'left']: 0,
+                                background: 'var(--bg-surface)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: 16,
+                                boxShadow: 'var(--shadow-floating)',
+                                display: 'flex',
+                                gap: 4,
+                                padding: '3px 8px',
+                                zIndex: 50
                               }}
                             >
-                              <Trash2 size={12} />
-                            </button>
+                              {['👍', '❤️', '🔥', '👏', '🎉', '💡'].map(emoji => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  className="win-btn"
+                                  style={{ width: 24, height: 24, fontSize: 13, padding: 0, border: 'none', background: 'transparent', cursor: 'pointer' }}
+                                  onClick={() => {
+                                    if (typeof onToggleReaction === 'function') {
+                                      onToggleReaction(activeChannelId, msg.id, emoji);
+                                    }
+                                    setShowReactionPickerId(null);
+                                  }}
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
                           )}
                         </div>
-                      )}
+
+                        {/* Reply button */}
+                        <button 
+                          type="button"
+                          className="win-btn" 
+                          style={{ width: 22, height: 22, padding: 0 }}
+                          title="Reply to message"
+                          onClick={() => {
+                            setReplyingTo(msg);
+                            if (inputRef.current) inputRef.current.focus();
+                          }}
+                        >
+                          <CornerUpLeft size={12} />
+                        </button>
+
+                        {/* Copy text button */}
+                        <button 
+                          type="button"
+                          className="win-btn" 
+                          style={{ width: 22, height: 22, padding: 0 }}
+                          title={copiedMsgId === msg.id ? "Copied!" : "Copy message"}
+                          onClick={() => handleCopyText(msg.text, msg.id)}
+                        >
+                          {copiedMsgId === msg.id ? <Check size={12} color="var(--accent-green)" /> : <Copy size={12} />}
+                        </button>
+
+                        {/* Delete message button (if self or founder) */}
+                        {isSelf && (
+                          <button 
+                            type="button"
+                            className="win-btn" 
+                            style={{ width: 22, height: 22, padding: 0, color: 'var(--accent-red)' }}
+                            title="Delete message"
+                            onClick={() => {
+                              if (typeof onDeleteMessage === 'function') {
+                                onDeleteMessage(activeChannelId, msg.id);
+                              }
+                            }}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
 
                       {/* Bubble */}
                       <div style={{
@@ -1103,10 +1246,10 @@ export function MessagesView({
                         borderRadius: isSelf ? '14px 14px 3px 14px' : '14px 14px 14px 3px',
                         fontSize: 12.5,
                         lineHeight: 1.55,
-                        background: isSelf ? 'rgba(56, 189, 248, 0.08)' : 'var(--bg-surface)',
-                        border: isSelf ? '1px solid rgba(56, 189, 248, 0.25)' : '1px solid var(--border-color)',
-                        color: 'var(--text-primary)',
-                        boxShadow: isSelf ? '0 2px 8px rgba(0, 0, 0, 0.08)' : 'var(--shadow-subtle)',
+                        background: isSelf ? 'var(--msg-outgoing-bg, #E3E7EB)' : 'var(--bg-surface)',
+                        border: isSelf ? '1px solid var(--msg-outgoing-border, #CBD2D9)' : '1px solid var(--border-color)',
+                        color: isSelf ? 'var(--msg-outgoing-text, var(--text-primary))' : 'var(--text-primary)',
+                        boxShadow: isSelf ? '0 1px 3px rgba(0, 0, 0, 0.05)' : 'var(--shadow-subtle)',
                         position: 'relative'
                       }}>
                         {/* Quoted Reply Block */}
@@ -1307,40 +1450,77 @@ export function MessagesView({
                           )}
 
                           {/* Documents List */}
-                          {docs.map((doc, dIdx) => (
-                            <div 
-                              key={doc.id || dIdx}
-                              className="fallback-chip"
-                              style={{
-                                display: 'flex',
-                                padding: '8px 10px',
-                                background: 'var(--bg-hover)',
-                                border: '1px solid var(--border-dim)',
-                                borderRadius: 'var(--radius-xs)',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: 12
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <FileText size={16} color="var(--accent-blue)" />
-                                <div>
-                                  <div style={{ fontSize: 11.5, fontWeight: 700 }}>{doc.name}</div>
-                                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{doc.size || 'Attachment'} &bull; Stored in Cloud Vault</div>
+                          {docs.map((doc, dIdx) => {
+                            const previewUrl = doc.previewUrl || doc.dataUrl || doc.downloadUrl || backendBridge.getPreviewUrl(doc.id || doc.name);
+                            const handleOpenDoc = () => {
+                              setPreviewData({
+                                image: {
+                                  src: previewUrl,
+                                  title: doc.name,
+                                  name: doc.name,
+                                  size: doc.size,
+                                  downloadUrl: doc.downloadUrl || backendBridge.getDownloadUrl(doc.id || doc.name)
+                                },
+                                images: [{
+                                  src: previewUrl,
+                                  title: doc.name,
+                                  name: doc.name,
+                                  size: doc.size,
+                                  downloadUrl: doc.downloadUrl || backendBridge.getDownloadUrl(doc.id || doc.name)
+                                }],
+                                initialIndex: 0
+                              });
+                            };
+
+                            return (
+                              <div 
+                                key={doc.id || dIdx}
+                                className="fallback-chip"
+                                style={{
+                                  display: 'flex',
+                                  padding: '8px 10px',
+                                  background: 'var(--bg-hover)',
+                                  border: '1px solid var(--border-dim)',
+                                  borderRadius: 'var(--radius-xs)',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: 12,
+                                  cursor: 'pointer'
+                                }}
+                                onClick={handleOpenDoc}
+                                title="Click to preview file"
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <FileText size={16} color="var(--accent-blue)" />
+                                  <div>
+                                    <div style={{ fontSize: 11.5, fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: '2px' }}>{doc.name}</div>
+                                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{doc.size || 'Attachment'} &bull; Click to preview</div>
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
+                                  <button 
+                                    className="icon-btn" 
+                                    title="Preview File"
+                                    onClick={handleOpenDoc}
+                                    style={{ width: 24, height: 24 }}
+                                  >
+                                    <Eye size={12} />
+                                  </button>
+                                  <button 
+                                    className="icon-btn" 
+                                    title="Download Attachment"
+                                    onClick={() => {
+                                      const url = doc.downloadUrl || backendBridge.getDownloadUrl(doc.id || doc.name);
+                                      window.open(url, '_blank');
+                                    }}
+                                    style={{ width: 24, height: 24 }}
+                                  >
+                                    <Download size={12} />
+                                  </button>
                                 </div>
                               </div>
-                              <button 
-                                className="icon-btn" 
-                                title="Download Attachment"
-                                onClick={() => {
-                                  const url = doc.downloadUrl || backendBridge.getDownloadUrl(doc.id);
-                                  window.open(url, '_blank');
-                                }}
-                              >
-                                <Download size={13} />
-                              </button>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
 
@@ -1385,7 +1565,7 @@ export function MessagesView({
                       {isSelf && (
                         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginTop: 4 }}>
                           <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{msg.time}</span>
-                          <CheckCheck size={13} color="var(--accent-blue, #38bdf8)" title="Delivered &amp; Read" />
+                          <CheckCheck size={13} color="var(--msg-outgoing-check, var(--text-secondary))" title="Delivered &amp; Read" />
                         </div>
                       )}
                     </div>
@@ -1526,6 +1706,66 @@ export function MessagesView({
               {isUploading ? <RefreshCw size={15} className="spin" /> : <Paperclip size={15} />}
             </button>
 
+            {/* Emoji Insert Picker (Theme-adaptive) */}
+            <div style={{ position: 'relative' }}>
+              <button 
+                type="button" 
+                className="icon-btn" 
+                title="Insert Emoji"
+                onClick={() => setShowInputEmojiPicker(prev => !prev)}
+              >
+                <Smile size={16} />
+              </button>
+              {showInputEmojiPicker && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    bottom: 'calc(100% + 12px)',
+                    left: 0,
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 12,
+                    boxShadow: 'var(--shadow-modal)',
+                    padding: '10px',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(6, 32px)',
+                    gap: 6,
+                    zIndex: 100
+                  }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {['👍', '❤️', '🔥', '👏', '🎉', '💡', '🚀', '✅', '👀', '💯', '🎯', '✨', '🤝', '🙏', '⚡', '📌', '😊', '💪', '🙌', '🏆', '💼', '💻', '📊', '📁'].map(emoji => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      style={{
+                        width: 32,
+                        height: 32,
+                        fontSize: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'transparent',
+                        border: 'none',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        transition: 'background 0.15s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      onClick={() => {
+                        setInputText(prev => prev + emoji);
+                        setShowInputEmojiPicker(false);
+                        if (inputRef.current) inputRef.current.focus();
+                      }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <input 
               ref={inputRef}
               type="text" 
@@ -1550,44 +1790,99 @@ export function MessagesView({
         {showChannelInfo && (
           <div className="card-panel" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div className="panel-header">
-              <span className="panel-title">Channel Details</span>
+              <span className="panel-title">{activeChannel.isGroup ? 'Channel Details' : 'Direct Conversation'}</span>
             </div>
             <div style={{ padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4 }}>NAME</div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{activeChannel.title}</div>
-              </div>
+              {!activeChannel.isGroup ? (
+                /* Direct Teammate Profile Card */
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '12px 8px', background: 'var(--bg-subtle)', borderRadius: 8, border: '1px solid var(--border-dim)' }}>
+                  <div style={{ position: 'relative', marginBottom: 10 }}>
+                    <img
+                      src={activeChannel.avatar || './assets/id-card.png'}
+                      alt=""
+                      style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border-color)' }}
+                      onError={e => { e.target.src = './assets/id-card.png'; }}
+                    />
+                    <span 
+                      className={`status-dot ${activeChannel.isOnline ? 'online' : 'offline'}`}
+                      style={{ position: 'absolute', bottom: 2, right: 2, width: 12, height: 12, border: '2px solid var(--bg-surface)' }}
+                    />
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {activeChannel.title}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                    {activeChannel.member?.role || 'Team Member'} &bull; {activeChannel.member?.department || activeChannel.member?.dept || 'Engineering'}
+                  </div>
+                  {activeChannel.member?.email && (
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, wordBreak: 'break-all' }}>
+                      {activeChannel.member.email}
+                    </div>
+                  )}
+                  <div style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: 'var(--bg-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
+                    <span className={`status-dot ${activeChannel.isOnline ? 'online' : 'offline'}`} style={{ position: 'static', width: 7, height: 7, flexShrink: 0, background: activeChannel.isOnline ? 'var(--text-primary)' : 'var(--text-muted)' }} />
+                    {activeChannel.isOnline ? 'Active Online' : 'Currently Offline'}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4 }}>NAME</div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{activeChannel.title}</div>
+                </div>
+              )}
 
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>
-                  TEAM PARTICIPANTS ({teamMembers.filter(m => m.status === 'Online').length} Online / {teamMembers.length} Total)
+                  {activeChannel.isGroup ? `TEAM PARTICIPANTS (${teamMembers.filter(m => m.status === 'Online').length} Online / ${teamMembers.length} Total)` : 'CONVERSATION PARTICIPANTS'}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {(() => {
-                    // Deduplicate by name/email
-                    const seen = new Set();
-                    const uniqueMembers = teamMembers.filter(m => {
-                      const key = (m.email || m.name || '').toLowerCase();
-                      if (seen.has(key)) return false;
-                      seen.add(key);
-                      return true;
-                    });
+                    let membersToList = [];
+                    if (!activeChannel.isGroup) {
+                      // Show current user Jagadish AND the teammate
+                      const founder = teamMembers.find(m => m.name?.toLowerCase().includes('jagadish')) || {
+                        name: 'Jagadish K',
+                        role: 'Founder',
+                        department: 'Hardware Architecture',
+                        avatar: './assets/profile-photo.jpeg',
+                        status: 'Online',
+                        isOnline: true
+                      };
+                      const mate = activeChannel.member || teamMembers.find(m => m.name?.toLowerCase() === activeChannel.title?.toLowerCase()) || {
+                        name: activeChannel.title,
+                        role: 'Team Member',
+                        department: 'Software & Web',
+                        avatar: activeChannel.avatar,
+                        status: activeChannel.status || 'Offline',
+                        isOnline: !!activeChannel.isOnline
+                      };
+                      membersToList = [founder, mate];
+                    } else {
+                      // Deduplicate by name/email
+                      const seen = new Set();
+                      membersToList = teamMembers.filter(m => {
+                        const key = (m.email || m.name || '').toLowerCase();
+                        if (seen.has(key)) return false;
+                        seen.add(key);
+                        return true;
+                      });
 
-                    // Sort online members first, then offline
-                    uniqueMembers.sort((a, b) => {
-                      if (a.status === 'Online' && b.status !== 'Online') return -1;
-                      if (a.status !== 'Online' && b.status === 'Online') return 1;
-                      return (a.name || '').localeCompare(b.name || '');
-                    });
+                      // Sort online members first, then offline
+                      membersToList.sort((a, b) => {
+                        if (a.status === 'Online' && b.status !== 'Online') return -1;
+                        if (a.status !== 'Online' && b.status === 'Online') return 1;
+                        return (a.name || '').localeCompare(b.name || '');
+                      });
+                    }
 
-                    return uniqueMembers.map(m => {
+                    return membersToList.map(m => {
                       const isOnline = m.status === 'Online' || m.isOnline;
                       const isSelf = m.name?.toLowerCase().includes('jagadish');
                       return (
                         <div 
-                          key={m.id || m.uid || m.email} 
+                          key={m.id || m.uid || m.email || m.name} 
                           onClick={() => {
-                            if (!isSelf) handleStartDirectChat(m);
+                            if (!isSelf && activeChannel.isGroup) handleStartDirectChat(m);
                           }}
                           style={{ 
                             display: 'flex', 
@@ -1595,11 +1890,11 @@ export function MessagesView({
                             gap: 10,
                             padding: '4px 6px',
                             borderRadius: 4,
-                            cursor: isSelf ? 'default' : 'pointer',
+                            cursor: (isSelf || !activeChannel.isGroup) ? 'default' : 'pointer',
                             transition: 'background 0.12s ease'
                           }}
-                          className={isSelf ? '' : 'fallback-chip'}
-                          title={isSelf ? 'You (Workspace Founder)' : `Click to message ${m.name}`}
+                          className={(isSelf || !activeChannel.isGroup) ? '' : 'fallback-chip'}
+                          title={isSelf ? 'You (Workspace Founder)' : (activeChannel.isGroup ? `Click to message ${m.name}` : m.name)}
                         >
                           <img 
                             src={m.avatar || './assets/id-card.png'} 
@@ -1608,11 +1903,14 @@ export function MessagesView({
                             onError={e => { e.target.src = './assets/id-card.png'; }}
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {m.name} {isSelf ? '(You)' : ''}
+                            </div>
                             <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{m.role || 'Member'} &bull; {m.department || m.dept || 'Engineering'}</div>
                           </div>
                           <span 
                             className={`status-dot ${isOnline ? 'online' : 'offline'}`} 
+                            style={{ position: 'static', margin: '0 4px', flexShrink: 0 }}
                             title={isOnline ? 'Online' : 'Offline'}
                           />
                         </div>
@@ -1784,3 +2082,5 @@ export function MessagesView({
     </div>
   );
 }
+
+export default MessagesView;

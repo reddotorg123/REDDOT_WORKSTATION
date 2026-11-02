@@ -4,27 +4,30 @@ import {
   Search, 
   List, 
   LayoutGrid, 
-  MoreHorizontal, 
-  Check, 
   Trash2, 
   Edit3, 
-  Clock,
-  FileText,
-  X,
-  Share2,
-  Paperclip,
-  CheckSquare,
-  Square,
-  Image as ImageIcon,
+  FileText, 
+  X, 
+  Paperclip, 
+  CheckSquare, 
+  Square, 
+  Image as ImageIcon, 
+  Calendar, 
+  Tag, 
+  ChevronLeft, 
+  ChevronRight,
+  Bold,
+  Italic,
+  Underline,
+  Heading,
+  ListOrdered,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Code,
   Eye,
-  CheckCircle2,
-  Calendar,
-  User,
-  Tag,
-  ArrowLeft,
-  ArrowRight,
-  ChevronLeft,
-  ChevronRight
+  EyeOff,
+  Download
 } from 'lucide-react';
 import ImagePreviewModal from './ImagePreviewModal';
 
@@ -32,7 +35,9 @@ import ImagePreviewModal from './ImagePreviewModal';
  * Parses inline formatting:
  * - URLs -> Underlined clickable blue links
  * - **bold** -> <strong>
+ * - *italic* -> <em>
  * - _underline_ or <u> -> <span style="text-decoration: underline">
+ * - `code` -> <code>
  */
 function parseInlineFormatting(str) {
   if (!str) return '';
@@ -67,14 +72,31 @@ function parseInlineFormatting(str) {
       );
     }
 
-    const tokenRegex = /(\*\*.*?\*\*|_.*?_|<u>.*?<\/u>)/g;
+    const tokenRegex = /(\*\*.*?\*\*|_.*?_|<u>.*?<\/u>|\*.*?\*|`.*?`)/g;
     const tokens = part.split(tokenRegex);
 
     return tokens.map((token, j) => {
-      if (token.startsWith('**') && token.endsWith('**')) {
+      if (token.startsWith('**') && token.endsWith('**') && token.length >= 4) {
         return <strong key={`${i}_${j}`} style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{token.slice(2, -2)}</strong>;
       }
-      if (token.startsWith('_') && token.endsWith('_')) {
+      if (token.startsWith('`') && token.endsWith('`') && token.length >= 2) {
+        return (
+          <code key={`${i}_${j}`} style={{
+            background: 'var(--bg-active-nav, rgba(0,0,0,0.06))',
+            padding: '2px 5px',
+            borderRadius: 4,
+            fontFamily: 'monospace',
+            fontSize: '0.9em',
+            color: 'var(--text-primary)'
+          }}>
+            {token.slice(1, -1)}
+          </code>
+        );
+      }
+      if (token.startsWith('*') && token.endsWith('*') && token.length >= 2) {
+        return <em key={`${i}_${j}`} style={{ fontStyle: 'italic' }}>{token.slice(1, -1)}</em>;
+      }
+      if (token.startsWith('_') && token.endsWith('_') && token.length >= 2) {
         return <span key={`${i}_${j}`} style={{ textDecoration: 'underline' }}>{token.slice(1, -1)}</span>;
       }
       if (token.startsWith('<u>') && token.endsWith('</u>')) {
@@ -129,6 +151,62 @@ function renderFormattedDescription(text) {
       return;
     }
 
+    // Alignment tags: [center]...[/center] or [right]...[/right] or [left]...[/left]
+    if (line.startsWith('[center]') && line.endsWith('[/center]')) {
+      flushList(index);
+      elements.push(
+        <div key={`center_${index}`} style={{ textAlign: 'center', margin: '4px 0', fontSize: 12, color: 'var(--text-primary)' }}>
+          {parseInlineFormatting(line.slice(8, -9))}
+        </div>
+      );
+      return;
+    }
+    if (line.startsWith('[right]') && line.endsWith('[/right]')) {
+      flushList(index);
+      elements.push(
+        <div key={`right_${index}`} style={{ textAlign: 'right', margin: '4px 0', fontSize: 12, color: 'var(--text-primary)' }}>
+          {parseInlineFormatting(line.slice(7, -8))}
+        </div>
+      );
+      return;
+    }
+    if (line.startsWith('[left]') && line.endsWith('[/left]')) {
+      flushList(index);
+      elements.push(
+        <div key={`left_${index}`} style={{ textAlign: 'left', margin: '4px 0', fontSize: 12, color: 'var(--text-primary)' }}>
+          {parseInlineFormatting(line.slice(6, -7))}
+        </div>
+      );
+      return;
+    }
+
+    // Markdown Heading 3: ### Heading
+    if (line.startsWith('### ')) {
+      flushList(index);
+      elements.push(
+        <div 
+          key={`h3_${index}`}
+          style={{
+            fontSize: 12.5,
+            fontWeight: 800,
+            letterSpacing: '0.4px',
+            color: 'var(--text-primary)',
+            marginTop: index === 0 ? 0 : 12,
+            marginBottom: 6,
+            paddingBottom: 4,
+            borderBottom: '1px solid var(--border-color)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
+          }}
+        >
+          <span style={{ width: 4, height: 12, background: 'var(--text-primary)', borderRadius: 2 }} />
+          <span>{line.slice(4)}</span>
+        </div>
+      );
+      return;
+    }
+
     // Detect section headers
     const upper = line.toUpperCase();
     const isSectionHeader = upper.startsWith('TASK:') || 
@@ -168,7 +246,7 @@ function renderFormattedDescription(text) {
     }
 
     // Detect bullet or numbered items
-    const isBullet = line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ') || /^\d+[\.\)]\s/.test(line);
+    const isBullet = line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ') || /^\d+[.)]\s/.test(line);
     const isKnownDeliverableItem = [
       'UI design changes', 'UX improvements', 'Layout and alignment', 'Typography and color',
       'Navigation changes', 'Hero section enhancements', 'New features', 'Removed or modified',
@@ -180,7 +258,7 @@ function renderFormattedDescription(text) {
     ].some(prefix => line.startsWith(prefix));
 
     if (isBullet || isKnownDeliverableItem) {
-      const cleanText = line.replace(/^[-•*]\s*/, '').replace(/^\d+[\.\)]\s*/, '');
+      const cleanText = line.replace(/^[-•*]\s*/, '').replace(/^\d+[.)]\s*/, '');
       currentList.push(parseInlineFormatting(cleanText));
       return;
     } else {
@@ -207,6 +285,274 @@ function renderFormattedDescription(text) {
 
   flushList('final');
   return elements;
+}
+
+/**
+ * Rich Formatting Toolbar & Markdown Description Editor
+ * Provides one-click formatting: Bold, Italic, Underline, Bullets, Numbers, Alignments, Headings, Code, and Live Preview.
+ */
+function RichDescriptionEditor({
+  value = '',
+  onChange,
+  placeholder = 'Enter task scope, specifications, or deliverables...',
+  minRows = 3,
+  label = 'TASK DESCRIPTION'
+}) {
+  const [isPreview, setIsPreview] = useState(false);
+  const textareaRef = useRef(null);
+
+  const applyFormatting = (prefix, suffix = '', defaultText = '') => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentVal = value || '';
+    const selectedText = currentVal.substring(start, end) || defaultText;
+
+    const before = currentVal.substring(0, start);
+    const after = currentVal.substring(end);
+
+    const replacement = `${prefix}${selectedText}${suffix}`;
+    const nextValue = before + replacement + after;
+    onChange(nextValue);
+
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(
+        start + prefix.length,
+        start + prefix.length + selectedText.length
+      );
+    }, 0);
+  };
+
+  const applyLinePrefix = (prefix) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentVal = value || '';
+
+    const lastNewline = currentVal.lastIndexOf('\n', start - 1);
+    const lineStart = lastNewline === -1 ? 0 : lastNewline + 1;
+
+    const nextNewline = currentVal.indexOf('\n', end);
+    const lineEnd = nextNewline === -1 ? currentVal.length : nextNewline;
+
+    const selectedLines = currentVal.substring(lineStart, lineEnd);
+    const transformed = selectedLines
+      .split('\n')
+      .map(line => `${prefix}${line.replace(/^[-•*]\s*|^\d+[.)]\s*/, '')}`)
+      .join('\n');
+
+    const nextValue = currentVal.substring(0, lineStart) + transformed + currentVal.substring(lineEnd);
+    onChange(nextValue);
+
+    setTimeout(() => {
+      textarea.focus();
+    }, 0);
+  };
+
+  const applyAlignment = (align) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentVal = value || '';
+    const selectedText = currentVal.substring(start, end) || 'Centered Content';
+
+    if (align === 'left') {
+      const cleaned = selectedText.replace(/\[center\]|\[\/center\]|\[right\]|\[\/right\]|\[left\]|\[\/left\]/g, '');
+      const nextValue = currentVal.substring(0, start) + cleaned + currentVal.substring(end);
+      onChange(nextValue);
+    } else {
+      applyFormatting(`[${align}]`, `[/${align}]`, `${align === 'center' ? 'Center' : 'Right'} Aligned Text`);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.5px', color: 'var(--text-secondary)' }}>
+          {label}
+        </label>
+        <button
+          type="button"
+          onClick={() => setIsPreview(!isPreview)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '2px 8px',
+            fontSize: 10.5,
+            fontWeight: 600,
+            borderRadius: 4,
+            border: '1px solid var(--border-color)',
+            background: isPreview ? 'var(--control-background, #22262B)' : 'transparent',
+            color: isPreview ? '#FFFFFF' : 'var(--text-secondary)',
+            cursor: 'pointer'
+          }}
+          title={isPreview ? 'Back to Editor' : 'Live Preview Description'}
+        >
+          {isPreview ? <EyeOff size={11} /> : <Eye size={11} />}
+          <span>{isPreview ? 'Edit' : 'Preview'}</span>
+        </button>
+      </div>
+
+      {/* Formatting Toolbar */}
+      {!isPreview && (
+        <div 
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 3,
+            padding: '4px 6px',
+            background: 'var(--bg-subtle, rgba(0,0,0,0.03))',
+            border: '1px solid var(--border-color)',
+            borderBottom: 'none',
+            borderRadius: '6px 6px 0 0'
+          }}
+        >
+          <button
+            type="button"
+            className="icon-btn"
+            style={{ width: 24, height: 24, padding: 0 }}
+            onClick={() => applyFormatting('**', '**', 'Bold text')}
+            title="Bold (**text**)"
+          >
+            <Bold size={13} />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            style={{ width: 24, height: 24, padding: 0 }}
+            onClick={() => applyFormatting('*', '*', 'Italic text')}
+            title="Italic (*text*)"
+          >
+            <Italic size={13} />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            style={{ width: 24, height: 24, padding: 0 }}
+            onClick={() => applyFormatting('<u>', '</u>', 'Underlined text')}
+            title="Underline (<u>text</u>)"
+          >
+            <Underline size={13} />
+          </button>
+
+          <span style={{ width: 1, height: 16, background: 'var(--border-color)', margin: '0 2px' }} />
+
+          <button
+            type="button"
+            className="icon-btn"
+            style={{ width: 24, height: 24, padding: 0 }}
+            onClick={() => applyLinePrefix('• ')}
+            title="Bullet List (• item)"
+          >
+            <List size={13} />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            style={{ width: 24, height: 24, padding: 0 }}
+            onClick={() => applyLinePrefix('1. ')}
+            title="Numbered List (1. item)"
+          >
+            <ListOrdered size={13} />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            style={{ width: 24, height: 24, padding: 0 }}
+            onClick={() => applyLinePrefix('TASK: ')}
+            title="Section Heading (TASK: ...)"
+          >
+            <Heading size={13} />
+          </button>
+
+          <span style={{ width: 1, height: 16, background: 'var(--border-color)', margin: '0 2px' }} />
+
+          <button
+            type="button"
+            className="icon-btn"
+            style={{ width: 24, height: 24, padding: 0 }}
+            onClick={() => applyAlignment('left')}
+            title="Align Left"
+          >
+            <AlignLeft size={13} />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            style={{ width: 24, height: 24, padding: 0 }}
+            onClick={() => applyAlignment('center')}
+            title="Align Center ([center]...[/center])"
+          >
+            <AlignCenter size={13} />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            style={{ width: 24, height: 24, padding: 0 }}
+            onClick={() => applyAlignment('right')}
+            title="Align Right ([right]...[/right])"
+          >
+            <AlignRight size={13} />
+          </button>
+
+          <span style={{ width: 1, height: 16, background: 'var(--border-color)', margin: '0 2px' }} />
+
+          <button
+            type="button"
+            className="icon-btn"
+            style={{ width: 24, height: 24, padding: 0 }}
+            onClick={() => applyFormatting('`', '`', 'code')}
+            title="Inline Code (`code`)"
+          >
+            <Code size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* Editor Body or Preview */}
+      {isPreview ? (
+        <div 
+          style={{
+            minHeight: minRows * 30,
+            maxHeight: 220,
+            overflowY: 'auto',
+            padding: '10px 12px',
+            background: 'var(--bg-card, #ffffff)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 6,
+            fontSize: 12
+          }}
+        >
+          {renderFormattedDescription(value)}
+        </div>
+      ) : (
+        <textarea
+          ref={textareaRef}
+          className="input-control"
+          rows={minRows}
+          placeholder={placeholder}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          style={{
+            resize: 'vertical',
+            borderRadius: '0 0 6px 6px',
+            borderTop: 'none',
+            fontFamily: 'inherit',
+            fontSize: 12,
+            lineHeight: 1.55
+          }}
+        />
+      )}
+    </div>
+  );
 }
 
 export function TasksView({ 
@@ -248,6 +594,87 @@ export function TasksView({
   const [subtaskImageName, setSubtaskImageName] = useState('');
   const [subtaskImageSize, setSubtaskImageSize] = useState('');
   const subtaskFileInputRef = useRef(null);
+
+  // Task Document Attachment State & Ref
+  const docFileInputRef = useRef(null);
+
+  const formatFileSize = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const getDocIcon = (filename = '', mimeType = '') => {
+    const ext = String(filename).split('.').pop().toLowerCase();
+    if (['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'].includes(ext) || (mimeType && mimeType.startsWith('image/'))) {
+      return ImageIcon;
+    }
+    if (['js', 'jsx', 'ts', 'tsx', 'html', 'css', 'json', 'py', 'cpp', 'c', 'cs', 'java', 'sql'].includes(ext)) {
+      return Code;
+    }
+    return FileText;
+  };
+
+  const handleDocumentUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !selectedTask) return;
+
+    let pendingFiles = files.length;
+    const newDocs = [];
+
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        newDocs.push({
+          id: `doc_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          name: file.name,
+          size: formatFileSize(file.size),
+          rawSize: file.size,
+          type: file.type || 'application/octet-stream',
+          dataUrl: event.target.result,
+          uploadedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          uploadedBy: 'Jagadish K'
+        });
+
+        pendingFiles--;
+        if (pendingFiles === 0) {
+          const existingDocs = Array.isArray(selectedTask.documents) ? selectedTask.documents : [];
+          const updatedDocs = [...existingDocs, ...newDocs];
+          const updatedTask = { ...selectedTask, documents: updatedDocs };
+          if (typeof onUpdateTask === 'function') {
+            onUpdateTask(updatedTask);
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    if (docFileInputRef.current) docFileInputRef.current.value = '';
+  };
+
+  const handleDeleteDocument = (docId, e) => {
+    if (e) e.stopPropagation();
+    if (!selectedTask) return;
+    const existingDocs = Array.isArray(selectedTask.documents) ? selectedTask.documents : [];
+    const updatedDocs = existingDocs.filter(d => d.id !== docId);
+    const updatedTask = { ...selectedTask, documents: updatedDocs };
+    if (typeof onUpdateTask === 'function') {
+      onUpdateTask(updatedTask);
+    }
+  };
+
+  const handleDownloadDocument = (doc, e) => {
+    if (e) e.stopPropagation();
+    if (!doc || !doc.dataUrl) return;
+    const link = document.createElement('a');
+    link.href = doc.dataUrl;
+    link.download = doc.name || 'document';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Lightbox Preview for Subtask Images
   const [previewImage, setPreviewImage] = useState(null);
@@ -372,8 +799,9 @@ export function TasksView({
     if (!editingTask || !editingTask.title.trim()) return;
 
     const isCompleted = editingTask.status === 'Completed';
+    const targetTask = tasks.find(t => t.id === editingTask.id) || selectedTask || {};
     const updated = {
-      ...selectedTask,
+      ...targetTask,
       ...editingTask,
       title: editingTask.title.trim().toUpperCase(),
       completed: isCompleted
@@ -390,7 +818,7 @@ export function TasksView({
     if (!selectedTask) return;
     const existingList = Array.isArray(selectedTask.subtasks) ? selectedTask.subtasks : [];
     const target = existingList.find(s => s.id === subId);
-    const nextDone = !Boolean(target?.done || target?.completed);
+    const nextDone = !(target?.done || target?.completed);
 
     const updatedSubtasks = existingList.map(s => {
       if (s.id === subId) {
@@ -441,7 +869,7 @@ export function TasksView({
         // Calculate compressed size in KB
         const approxKb = Math.max(1, Math.round((compressed.length * 3 / 4) / 1024));
         setSubtaskImageSize(`${approxKb} KB`);
-      } catch (err) {
+      } catch {
         setSubtaskImage(event.target.result);
         setSubtaskImageName(file.name);
         setSubtaskImageSize(`${Math.max(1, Math.round(file.size / 1024))} KB`);
@@ -713,7 +1141,9 @@ export function TasksView({
                             <button 
                               className="icon-btn" 
                               title="Delete Task" 
-                              style={{ width: 24, height: 24, color: 'var(--accent-red)' }}
+                              style={{ width: 24, height: 24, color: 'var(--text-muted)' }}
+                              onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
+                              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
                               onClick={() => onDeleteTask(task.id)}
                             >
                               <Trash2 size={12} />
@@ -730,9 +1160,9 @@ export function TasksView({
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           {[
-            { key: 'Pending', label: 'PENDING', dotColor: '#f59e0b' },
-            { key: 'In Progress', label: 'IN PROGRESS', dotColor: '#3b82f6' },
-            { key: 'Completed', label: 'COMPLETED', dotColor: '#10b981' }
+            { key: 'Pending', label: 'PENDING', dotColor: 'var(--text-muted, #777F88)' },
+            { key: 'In Progress', label: 'IN PROGRESS', dotColor: 'var(--text-secondary, #515860)' },
+            { key: 'Completed', label: 'COMPLETED', dotColor: 'var(--text-primary, #17191C)' }
           ].map(({ key: colStatus, label, dotColor }) => {
             const colTasks = filteredTasks.filter(t => 
               colStatus === 'Completed' ? (t.completed || t.status === 'Completed') : t.status === colStatus
@@ -764,7 +1194,7 @@ export function TasksView({
                 }}
                 style={{ 
                   background: isDropTarget ? 'var(--bg-active-nav)' : 'var(--bg-subtle)',
-                  border: isDropTarget ? '2px dashed var(--accent, #3b82f6)' : '1px solid var(--border-color)',
+                  border: isDropTarget ? '2px dashed var(--text-primary, #17191C)' : '1px solid var(--border-color)',
                   transition: 'all 0.15s ease',
                   display: 'flex',
                   flexDirection: 'column'
@@ -983,7 +1413,9 @@ export function TasksView({
                               <button 
                                 type="button"
                                 className="icon-btn" 
-                                style={{ width: 20, height: 20, padding: 0, color: 'var(--accent-red)' }}
+                                style={{ width: 20, height: 20, padding: 0, color: 'var(--text-muted)' }}
+                                onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
+                                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
                                 onClick={() => onDeleteTask(task.id)}
                                 title="Delete Task"
                               >
@@ -1144,28 +1576,134 @@ export function TasksView({
                     </div>
                   </div>
 
-                  {/* Task Documents Card */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.5px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                      Task Documents &amp; Attachments
-                    </div>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '8px 12px',
-                      background: 'var(--bg-subtle)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius-xs)',
-                      width: 280
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <FileText size={15} color="var(--text-secondary)" />
-                        <span style={{ fontSize: 11.5, fontWeight: 600 }}>project_reddot.pdf</span>
-                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>2.4 MB</span>
+                  {/* Task Documents & Attachments Section */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, letterSpacing: '0.5px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                        <Paperclip size={13} />
+                        <span>Task Documents &amp; Attachments</span>
+                        {Array.isArray(selectedTask?.documents) && selectedTask.documents.length > 0 && (
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>({selectedTask.documents.length})</span>
+                        )}
                       </div>
-                      <Paperclip size={13} color="var(--text-muted)" />
+                      <button
+                        type="button"
+                        onClick={() => docFileInputRef.current?.click()}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '3px 8px',
+                          fontSize: 10.5,
+                          fontWeight: 600,
+                          borderRadius: 4,
+                          border: '1px solid var(--border-color)',
+                          background: 'var(--bg-subtle)',
+                          color: 'var(--text-primary)',
+                          cursor: 'pointer'
+                        }}
+                        title="Upload specification document, diagram, or reference file"
+                      >
+                        <Plus size={12} />
+                        <span>Add Document</span>
+                      </button>
+                      <input 
+                        type="file"
+                        ref={docFileInputRef}
+                        onChange={handleDocumentUpload}
+                        multiple
+                        style={{ display: 'none' }}
+                      />
                     </div>
+
+                    {/* Document List or Empty State */}
+                    {Array.isArray(selectedTask?.documents) && selectedTask.documents.length > 0 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto', paddingRight: 4 }}>
+                        {selectedTask.documents.map(doc => {
+                          const DocIcon = getDocIcon(doc.name, doc.type);
+                          return (
+                            <div
+                              key={doc.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 12px',
+                                background: 'var(--bg-subtle)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: 'var(--radius-xs)',
+                                gap: 10
+                              }}
+                            >
+                              <div 
+                                style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, cursor: 'pointer' }}
+                                onClick={() => handleDownloadDocument(doc)}
+                                title={`Click to download/open ${doc.name}`}
+                              >
+                                <DocIcon size={16} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
+                                <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                  <span style={{ fontSize: 11.5, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {doc.name}
+                                  </span>
+                                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                                    {doc.size || 'Attachment'} {doc.uploadedAt ? `· ${doc.uploadedAt}` : ''}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <button
+                                  type="button"
+                                  className="icon-btn"
+                                  style={{ width: 22, height: 22, color: 'var(--text-secondary)' }}
+                                  onClick={() => handleDownloadDocument(doc)}
+                                  title="Download / Open File"
+                                >
+                                  <Download size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="icon-btn"
+                                  style={{ width: 22, height: 22, color: 'var(--text-muted)' }}
+                                  onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
+                                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                                  onClick={(e) => handleDeleteDocument(doc.id, e)}
+                                  title="Remove Document"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div 
+                        onClick={() => docFileInputRef.current?.click()}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '16px 12px',
+                          border: '1px dashed var(--border-color)',
+                          borderRadius: 'var(--radius-xs)',
+                          background: 'var(--bg-subtle, rgba(0,0,0,0.02))',
+                          cursor: 'pointer',
+                          gap: 6,
+                          textAlign: 'center'
+                        }}
+                        title="Click to browse and upload documents"
+                      >
+                        <Paperclip size={18} color="var(--text-muted)" style={{ opacity: 0.7 }} />
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-primary)' }}>
+                          No documents attached
+                        </span>
+                        <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>
+                          Click "+ Add Document" to attach PDFs, specs, or files.
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1385,14 +1923,11 @@ export function TasksView({
                 </div>
 
                 <div className="form-group">
-                  <label>TASK DESCRIPTION</label>
-                  <textarea 
-                    className="input-control" 
-                    rows={3}
-                    placeholder="Enter task scope, specifications, or deliverables..."
+                  <RichDescriptionEditor
                     value={editingTask.description}
-                    onChange={e => setEditingTask({ ...editingTask, description: e.target.value })}
-                    style={{ resize: 'vertical' }}
+                    onChange={val => setEditingTask({ ...editingTask, description: val })}
+                    placeholder="Enter task scope, specifications, or deliverables..."
+                    minRows={4}
                   />
                 </div>
 
@@ -1503,13 +2038,11 @@ export function TasksView({
                 </div>
 
                 <div className="form-group">
-                  <label>TASK DESCRIPTION</label>
-                  <textarea 
-                    className="input-control" 
-                    rows={2}
-                    placeholder="Optional scope or deliverable notes..."
+                  <RichDescriptionEditor
                     value={newTaskDescription}
-                    onChange={e => setNewTaskDescription(e.target.value)}
+                    onChange={val => setNewTaskDescription(val)}
+                    placeholder="Optional scope or deliverable notes..."
+                    minRows={3}
                   />
                 </div>
 

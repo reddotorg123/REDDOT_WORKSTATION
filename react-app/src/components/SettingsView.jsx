@@ -10,8 +10,7 @@ import {
   Info, 
   Save, 
   Download, 
-  RotateCcw, 
-  Check 
+  RotateCcw 
 } from 'lucide-react';
 import { electronBridge } from '../services/electronBridge';
 
@@ -19,9 +18,9 @@ export function SettingsView({
   theme, 
   onToggleTheme, 
   userProfile, 
-  onUpdateUserProfile,
+  _onUpdateUserProfile,
   onSelectPhoto,
-  metrics
+  _metrics
 }) {
   const [activeTab, setActiveTab] = useState('general');
   const [workspaceName, setWorkspaceName] = useState('REDDOT WORKSTATION');
@@ -69,6 +68,13 @@ export function SettingsView({
   const [autoBackup, setAutoBackup] = useState(true);
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [otaState, setOtaState] = useState({
+    checking: false,
+    updating: false,
+    progress: 0,
+    updateInfo: null,
+    statusText: ''
+  });
 
   const handleSaveSettings = (e) => {
     e?.preventDefault();
@@ -415,23 +421,88 @@ export function SettingsView({
                 <span className="panel-title">About REDDOT Workstation</span>
               </div>
               <div style={{ padding: '16px 20px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                <p style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>REDDOT Architecture & Executive Workstation OS</p>
+                <p style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>REDDOT WS Architecture & Executive Workspace</p>
                 <p style={{ marginTop: 6 }}>Version: <strong>v3.12.0</strong> (Production Release Build)</p>
                 <p>Runtime: Electron 34 / React 19 / V8 Core</p>
                 <p>Native IPC Bridge: <span style={{ color: 'var(--accent-green)', fontWeight: 600 }}>● Connected & Authorized</span></p>
                 <p style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>Persistent Local Vault: %APPDATA%\reddot-workstation-os\reddot_storage</p>
-                <div style={{ marginTop: 14 }}>
-                  <button 
-                    type="button" 
-                    className="btn btn-primary" 
-                    style={{ fontSize: 11 }}
-                    onClick={async () => {
-                      const info = await electronBridge.otaCheckUpdate();
-                      alert(info?.updateAvailable ? `Update available: v${info.version}` : 'You are currently on the latest v3.12.0 production build.');
-                    }}
-                  >
-                    Check for Updates
-                  </button>
+                <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <button 
+                      type="button" 
+                      className="btn btn-primary" 
+                      style={{ fontSize: 11 }}
+                      disabled={otaState.checking || otaState.updating}
+                      onClick={async () => {
+                        try {
+                          setOtaState(prev => ({ ...prev, checking: true, statusText: 'Checking Cloud CDN for updates...' }));
+                          const info = await electronBridge.otaCheckUpdate();
+                          if (info?.hasUpdate) {
+                            setOtaState(prev => ({
+                              ...prev,
+                              checking: false,
+                              updateInfo: info,
+                              statusText: `Update v${info.latestVersion} available!`
+                            }));
+                          } else {
+                            setOtaState(prev => ({
+                              ...prev,
+                              checking: false,
+                              updateInfo: null,
+                              statusText: `You are on the latest production release (v${info?.currentVersion || '3.12.0'}).`
+                            }));
+                          }
+                        } catch (err) {
+                          setOtaState(prev => ({
+                            ...prev,
+                            checking: false,
+                            statusText: `Check error: ${err.message}`
+                          }));
+                        }
+                      }}
+                    >
+                      {otaState.checking ? 'Checking Cloud...' : 'Check for Updates'}
+                    </button>
+
+                    {otaState.updateInfo?.hasUpdate && (
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ fontSize: 11, background: 'var(--accent-green, #10b981)', color: '#fff', border: 'none' }}
+                        disabled={otaState.updating}
+                        onClick={async () => {
+                          try {
+                            setOtaState(prev => ({ ...prev, updating: true, statusText: 'Downloading and hotpatching workspace...' }));
+                            const res = await electronBridge.otaApplyHotpatch();
+                            if (res?.success) {
+                              setOtaState(prev => ({ ...prev, statusText: 'Hotpatch applied! Reloading UI...' }));
+                            }
+                          } catch (err) {
+                            setOtaState(prev => ({ ...prev, updating: false, statusText: `Hotpatch failed: ${err.message}` }));
+                          }
+                        }}
+                      >
+                        {otaState.updating ? 'Applying Hotpatch...' : `Install v${otaState.updateInfo.latestVersion} Instant OTA`}
+                      </button>
+                    )}
+                  </div>
+
+                  {otaState.statusText && (
+                    <div style={{ fontSize: 11, color: otaState.updateInfo?.hasUpdate ? 'var(--accent-green, #10b981)' : 'var(--text-muted)' }}>
+                      {otaState.statusText}
+                    </div>
+                  )}
+
+                  {otaState.updateInfo?.changelog && otaState.updateInfo.changelog.length > 0 && (
+                    <div style={{ marginTop: 6, padding: '10px 12px', background: 'var(--bg-card-inner, rgba(255,255,255,0.04))', borderRadius: 6 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: 'var(--text-primary)' }}>What's New in v{otaState.updateInfo.latestVersion}:</div>
+                      <ul style={{ margin: 0, paddingLeft: 16, fontSize: 11, color: 'var(--text-secondary)' }}>
+                        {otaState.updateInfo.changelog.slice(0, 3).map((line, i) => (
+                          <li key={i}>{line}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -444,7 +515,7 @@ export function SettingsView({
                 <span className="panel-title">Workspace Configuration</span>
               </div>
               <div style={{ padding: '16px 20px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                <p>REDDOT Architecture & Executive Workstation OS</p>
+                <p>REDDOT WS Architecture & Executive Workspace</p>
                 <p style={{ marginTop: 8 }}>Workspace: REDDOT WORKSTATION (Active Sprint 14)</p>
                 <p>Native Loopback Vault: 127.0.0.1 (Strict Single-Instance)</p>
               </div>

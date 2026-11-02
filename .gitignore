@@ -10,6 +10,10 @@ yarn-error.log*
 .env.*.local
 *.local.js
 firebase-service-account*.json
+service-account*.json
+service-account.json
+gdrive_tokens.json
+*.log
 
 # Build outputs and installers
 dist/

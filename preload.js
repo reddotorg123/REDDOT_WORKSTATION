@@ -156,6 +156,9 @@ dbDiagnostics: () => {
   },
 
   // Running Desktop Applications & System Telemetry
+  getDesktopSources: (options) => {
+    return ipcRenderer.invoke('get-desktop-sources', options);
+  },
   getRunningWorkApps: () => {
     return ipcRenderer.invoke('get-running-work-apps');
   },

@@ -1,80 +1,90 @@
 export const INITIAL_TASKS = [
   {
-    id: "01",
-    title: "DOC CARE APPLICATION GENERATION",
+    id: "task_1789309991954",
+    title: "A.R W&T, GRANDS (DESIGN)",
+    description: "VISITING CARD DESIGN",
+    assignedTo: "JAGADISH K",
+    assignedEmail: "jagadish2k2006@gmail.com",
+    dueDate: "5:00 PM",
+    priority: "High",
+    status: "Completed",
+    category: "Engineering",
+    completed: true,
+    subtasks: []
+  },
+  {
+    id: "task_1792213668546",
+    title: "DISCOVERY FUNCTION (SEM)",
+    description: "The AI model for the SEM application needs to be completed and optimized for automatic data fetching from multiple sources.",
     assignedTo: "Jai Keerthi",
-    assignedEmail: "jaikeerthi@reddot.com",
-    dueDate: "Today, 5:00 PM",
+    assignedEmail: "keerthijai909@gmail.com",
+    dueDate: "25-10-2026, 5:00 PM",
     priority: "High",
     status: "In Progress",
     category: "Engineering",
-    completed: false
+    completed: false,
+    subtasks: [
+      { id: "st_1792816702762_q5xd", title: "Deliverable", done: true, completed: true }
+    ]
   },
   {
-    id: "02",
-    title: "LINKEDIN ID GENERATION",
-    assignedTo: "Tejaswin S",
-    assignedEmail: "tejaswin@reddot.com",
-    dueDate: "Today, 5:00 PM",
+    id: "task_1792673269774",
+    title: "REPORT FOR ARGRNADS WEBSITE",
+    description: "Detailed comparison report between the old and new versions of the AR Grands website.",
+    assignedTo: "Tejaswini Siva",
+    assignedEmail: "tejaswinisiva02@gmail.com",
+    dueDate: "Today, 8:00 PM",
+    priority: "High",
+    status: "Pending",
+    category: "Engineering",
+    completed: false,
+    subtasks: []
+  },
+  {
+    id: "task_1792849001001",
+    title: "IMPROVE SEO IN REDDOT & SEM APPLICATION",
+    description: "Optimize meta descriptions, search engine keywords, site indexing, and SEM data integration for the REDDOT platform.",
+    assignedTo: "Mukesh",
+    assignedEmail: "mukeshk.webdev@gmail.com",
+    dueDate: "Today, 6:00 PM",
     priority: "High",
     status: "In Progress",
     category: "Engineering",
-    completed: false
+    completed: false,
+    subtasks: [
+      { id: "st_seo_1", title: "Audit core web vitals and keyword ranking", done: true, completed: true },
+      { id: "st_seo_2", title: "Implement dynamic sitemap and structured schema", done: false, completed: false }
+    ]
   },
   {
-    id: "03",
-    title: "IMPROVE SEO IN REDDOT",
-    assignedTo: "Jagadish K",
-    assignedEmail: "jagadishk@reddot.com",
-    dueDate: "Today, 5:00 PM",
-    priority: "High",
-    status: "Pending",
-    category: "Marketing",
-    completed: false
-  },
-  {
-    id: "04",
-    title: "CREATE LOGO FOR REDDOT",
-    assignedTo: "Jagadish K",
-    assignedEmail: "jagadishk@reddot.com",
-    dueDate: "Tomorrow",
-    priority: "Medium",
-    status: "Pending",
-    category: "Design",
-    completed: false
-  },
-  {
-    id: "05",
-    title: "TEAM MEETING",
-    assignedTo: "All Members",
-    assignedEmail: "team@reddot.com",
-    dueDate: "Tomorrow",
-    priority: "Low",
-    status: "Pending",
-    category: "Management",
-    completed: false
-  },
-  {
-    id: "06",
-    title: "UI/UX IMPROVEMENT",
-    assignedTo: "Jagadish K",
-    assignedEmail: "jagadishk@reddot.com",
-    dueDate: "Nov 6, 2026",
-    priority: "Medium",
-    status: "Pending",
-    category: "Design",
-    completed: false
-  },
-  {
-    id: "07",
-    title: "DEPLOY v3.0 UPDATE",
-    assignedTo: "Jagadish K",
-    assignedEmail: "jagadishk@reddot.com",
-    dueDate: "Nov 10, 2026",
+    id: "task_1792849002002",
+    title: "DOC CARE APPLICATION GENERATION & API SYNC",
+    description: "Build and verify automatic PDF/Doc generator workflow with cloud storage integration and cross-platform verification.",
+    assignedTo: "Kishor A",
+    assignedEmail: "kishoroffical06@gmail.com",
+    dueDate: "Tomorrow, 5:00 PM",
     priority: "High",
     status: "Pending",
     category: "Engineering",
-    completed: false
+    completed: false,
+    subtasks: [
+      { id: "st_doc_1", title: "Configure PDF document generation pipeline", done: false, completed: false }
+    ]
+  },
+  {
+    id: "task_1792849003003",
+    title: "REDDOT WORKSTATION UI/UX & LOGO REFINEMENT",
+    description: "Refine high-density blueprint design tokens, resolve layout alignment, and ensure all tabs adhere strictly to the monochrome theme.",
+    assignedTo: "Pavithra R",
+    assignedEmail: "pavithratech1206@gmail.com",
+    dueDate: "Tomorrow, 7:00 PM",
+    priority: "High",
+    status: "Pending",
+    category: "Design",
+    completed: false,
+    subtasks: [
+      { id: "st_ui_1", title: "Remove non-theme colors and audit contrast", done: true, completed: true }
+    ]
   }
 ];
 
@@ -97,10 +107,10 @@ export const INITIAL_TEAM = [
     name: "Jai Keerthi",
     role: "CEO",
     department: "AI / ML Systems",
-    status: "Online",
-    isOnline: true,
+    status: "Offline",
+    isOnline: false,
     email: "keerthijai909@gmail.com",
-    lastActive: "Now",
+    lastActive: "1h ago",
     avatar: "./assets/profile-photo1.jpeg"
   },
   {
@@ -109,11 +119,11 @@ export const INITIAL_TEAM = [
     name: "Tejaswini Siva",
     role: "Intern",
     department: "Software & Web",
-    status: "Online",
-    isOnline: true,
+    status: "Offline",
+    isOnline: false,
     email: "tejaswinisiva02@gmail.com",
-    lastActive: "Now",
-    avatar: "./assets/id-card.png"
+    lastActive: "3h ago",
+    avatar: "https://lh3.googleusercontent.com/d/1mc4rOkyg16zrVQkK9vBn51YtduJOSdhe=s1000"
   },
   {
     id: "RD-8TG5Q9",
@@ -121,11 +131,11 @@ export const INITIAL_TEAM = [
     name: "Mukesh",
     role: "Intern",
     department: "Software & Web",
-    status: "Online",
-    isOnline: true,
+    status: "Offline",
+    isOnline: false,
     email: "mukeshk.webdev@gmail.com",
-    lastActive: "15 min ago",
-    avatar: "./assets/id-card.png"
+    lastActive: "Yesterday",
+    avatar: "https://lh3.googleusercontent.com/a/ACg8ocJHLuNumB86tcfiWAI4litdkfoLUmWqDkeDAFyw6ASAEdkuOg=s96-c"
   },
   {
     id: "RD-DYZH9L",
@@ -137,7 +147,7 @@ export const INITIAL_TEAM = [
     isOnline: false,
     email: "kishoroffical06@gmail.com",
     lastActive: "30 min ago",
-    avatar: "./assets/id-card.png"
+    avatar: "https://lh3.googleusercontent.com/a/ACg8ocIfDzQr6AGeIeDRqfsC3FSC1kuwNHNdXh_XFYH9Za6HFk24oe8=s96-c"
   },
   {
     id: "RD-EMP-002",
@@ -149,7 +159,7 @@ export const INITIAL_TEAM = [
     isOnline: false,
     email: "pavithratech1206@gmail.com",
     lastActive: "Offline",
-    avatar: "./assets/id-card.png"
+    avatar: "https://lh3.googleusercontent.com/d/1TorRfvW0NgrOrGzIC5Rcmc6Ozidg78QW=s1000"
   }
 ];
 
@@ -319,7 +329,7 @@ export const INITIAL_CONVERSATIONS = [
     name: "Tejaswini Siva",
     status: "Online",
     isOnline: true,
-    avatar: "./assets/id-card.png",
+    avatar: "https://lh3.googleusercontent.com/d/1mc4rOkyg16zrVQkK9vBn51YtduJOSdhe=s1000",
     membersCount: 2,
     time: "15 min ago",
     timestamp: Date.now() - 900000,
@@ -332,7 +342,7 @@ export const INITIAL_CONVERSATIONS = [
     name: "Mukesh",
     status: "Online",
     isOnline: true,
-    avatar: "./assets/id-card.png",
+    avatar: "https://lh3.googleusercontent.com/a/ACg8ocJHLuNumB86tcfiWAI4litdkfoLUmWqDkeDAFyw6ASAEdkuOg=s96-c",
     membersCount: 2,
     time: "Yesterday",
     timestamp: Date.now() - 86400000,
@@ -345,7 +355,7 @@ export const INITIAL_CONVERSATIONS = [
     name: "Kishor A",
     status: "Offline",
     isOnline: false,
-    avatar: "./assets/id-card.png",
+    avatar: "https://lh3.googleusercontent.com/a/ACg8ocIfDzQr6AGeIeDRqfsC3FSC1kuwNHNdXh_XFYH9Za6HFk24oe8=s96-c",
     membersCount: 2,
     time: "Yesterday",
     timestamp: Date.now() - 90000000,
@@ -358,7 +368,7 @@ export const INITIAL_CONVERSATIONS = [
     name: "Pavithra R",
     status: "Resigned",
     isOnline: false,
-    avatar: "./assets/id-card.png",
+    avatar: "https://lh3.googleusercontent.com/d/1TorRfvW0NgrOrGzIC5Rcmc6Ozidg78QW=s1000",
     membersCount: 2,
     time: "12:00 PM",
     timestamp: 1788259200000,
@@ -498,3 +508,5 @@ export const INITIAL_FILES = [
     icon: "file"
   }
 ];
+
+export const INITIAL_EVENTS = [];

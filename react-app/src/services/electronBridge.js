@@ -38,7 +38,7 @@ export const electronBridge = {
       window.electronAPI.closeWindow();
     } else {
       console.log('[BRIDGE] Close window');
-      if (window.confirm('Close REDDOT Workstation OS?')) {
+      if (window.confirm('Close REDDOT WS?')) {
         window.close();
       }
     }
@@ -79,11 +79,14 @@ export const electronBridge = {
         if (serialized.length < 3.5 * 1024 * 1024) {
           localStorage.setItem(STORAGE_KEY, serialized);
         }
-      } catch (lsErr) {
-        // Quota exceeded or restricted in browser context; native dbSave on disk handles persistence
+      } catch (error) {
+        if (!window.electronAPI?.dbSave) throw error;
+        console.warn('[STORAGE] Browser cache save failed; native database save completed:', error);
       }
-    } catch (e) {
-      console.warn('[STORAGE] Save state failed:', e);
+      return true;
+    } catch (error) {
+      console.error('[STORAGE] Save state failed:', error);
+      throw error;
     }
   },
 
@@ -97,8 +100,8 @@ export const electronBridge = {
       }
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) return JSON.parse(raw);
-    } catch (e) {
-      console.warn('[STORAGE] Load state failed:', e);
+    } catch (error) {
+      console.warn('[STORAGE] Load state failed:', error);
     }
     return null;
   },
@@ -260,10 +263,68 @@ export const electronBridge = {
   // Notifications & Calls
   // ==========================================
   showNotification: (title, body) => {
+    if (!title) return;
+    
+    // Silence routine UI button clicks completely
+    const IGNORED_TITLES = new Set([
+      'Member Profile',
+      'Direct Chat',
+      'Create Department',
+      'Manage Roles',
+      'Skills Library',
+      'Email Client Opened',
+      'Email Copied',
+      'Copied',
+      'Meeting',
+      'Workshop',
+      'Call Ended',
+      'Floorplan Zoom',
+      'Floorplan View',
+      'Occupancy Layer',
+      'Floor Switch',
+      'Task Updated',
+      'Schedule Event',
+      'Department Selected',
+      'Department Cleared',
+      'Quick Action',
+      'Memory Cleaned',
+      'Task Assigned',
+      'Member Added',
+      'Profile Updated'
+    ]);
+    if (IGNORED_TITLES.has(title)) {
+      return;
+    }
+
+    // Cooldown and deduplication
+    const now = Date.now();
+    const key = `${title}::${body || ''}`;
+    if (!electronBridge._notifHistory) {
+      electronBridge._notifHistory = { lastTime: 0, lastKey: '' };
+    }
+    if (electronBridge._notifHistory.lastKey === key && now - electronBridge._notifHistory.lastTime < 10000) {
+      return;
+    }
+    if (now - electronBridge._notifHistory.lastTime < 3500) {
+      return;
+    }
+    electronBridge._notifHistory.lastTime = now;
+    electronBridge._notifHistory.lastKey = key;
+
     if (window.electronAPI?.showNotification) {
-      window.electronAPI.showNotification({ title, body });
-    } else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      new Notification(title, { body });
+      window.electronAPI.showNotification({ title, body, silent: false });
+    } else if (typeof Notification !== 'undefined') {
+      try {
+        if (Notification.permission === 'granted') {
+          new Notification(title, { body, silent: false });
+        } else if (Notification.permission !== 'denied') {
+          Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+              new Notification(title, { body, silent: false });
+            }
+          });
+        }
+      } catch {}
     }
   },
 
@@ -274,5 +335,53 @@ export const electronBridge = {
     if (payload?.url) {
       window.open(payload.url, '_blank');
     }
+  },
+
+  // ==========================================
+  // Over-The-Air (OTA) Cloud Updates
+  // ==========================================
+  otaGetInfo: async () => {
+    if (window.electronAPI?.otaGetInfo) {
+      return await window.electronAPI.otaGetInfo();
+    }
+    return { version: '3.12.0', isHotpatched: false, isPackaged: false };
+  },
+
+  otaCheckUpdate: async (customUrl) => {
+    if (window.electronAPI?.otaCheckUpdate) {
+      return await window.electronAPI.otaCheckUpdate(customUrl);
+    }
+    return { success: true, hasUpdate: false, currentVersion: '3.12.0', latestVersion: '3.12.0' };
+  },
+
+  otaApplyHotpatch: async (bundleUrl) => {
+    if (window.electronAPI?.otaApplyHotpatch) {
+      return await window.electronAPI.otaApplyHotpatch(bundleUrl);
+    }
+    return { success: false, error: 'OTA unavailable in browser environment' };
+  },
+
+  otaRevertHotpatch: async () => {
+    if (window.electronAPI?.otaRevertHotpatch) {
+      return await window.electronAPI.otaRevertHotpatch();
+    }
+    return { success: false, error: 'OTA unavailable in browser environment' };
+  },
+
+  onOtaProgress: (callback) => {
+    if (window.electronAPI?.onOtaProgress) {
+      return window.electronAPI.onOtaProgress(callback);
+    }
+    return () => {};
+  },
+
+  // ==========================================
+  // Screen Sharing & Desktop Capture
+  // ==========================================
+  getDesktopSources: async (options) => {
+    if (window.electronAPI?.getDesktopSources) {
+      return await window.electronAPI.getDesktopSources(options);
+    }
+    return [];
   }
 };

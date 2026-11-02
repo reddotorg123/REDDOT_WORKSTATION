@@ -78,7 +78,7 @@ export function TerminalModal({
         break;
 
       case 'version':
-        newHistory.push({ type: 'output', text: 'REDDOT Workstation OS v3.0.0-release (Electron/React/V8)' });
+        newHistory.push({ type: 'output', text: 'REDDOT WS v3.0.0-release (Electron/React/V8)' });
         break;
 
       case 'clear':
@@ -154,7 +154,7 @@ export function TerminalModal({
         }}>
           {history.map((h, i) => (
             <div key={i} style={{
-              color: h.type === 'error' ? '#ef4444' : h.type === 'input' ? '#38bdf8' : h.type === 'output' ? '#e2e8f0' : '#94a3b8'
+              color: h.type === 'error' ? '#cbd5e1' : h.type === 'input' ? '#38bdf8' : h.type === 'output' ? '#e2e8f0' : '#94a3b8'
             }}>
               {h.text}
             </div>
@@ -192,3 +192,5 @@ export function TerminalModal({
     </div>
   );
 }
+
+export default TerminalModal;

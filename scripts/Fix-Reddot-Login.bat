@@ -5,7 +5,9 @@ echo   REDDOT Workstation OS - Quick Login & Cache Reset
 echo ===================================================
 echo.
 echo [1/3] Closing any hanging REDDOT instances...
-taskkill /F /IM "REDDOT Workstation OS.exe" >nul 2>&1
+powershell -NoProfile -Command "Stop-Process -Name 'REDDOT*', 'electron*' -Force -ErrorAction SilentlyContinue" >nul 2>&1
+taskkill /F /IM REDDOT* /T >nul 2>&1
+taskkill /F /IM electron* /T >nul 2>&1
 
 echo [2/3] Removing old cache and corrupted files...
 if exist "%APPDATA%\reddot-workstation-os\hotpatch" (
@@ -16,8 +18,8 @@ if exist "%APPDATA%\reddot-workstation-os\hotpatch" (
 )
 
 echo [3/3] Launching REDDOT Workstation OS...
-if exist "%LOCALAPPDATA%\Programs\REDDOT-Workstation-OS\REDDOT Workstation OS.exe" (
-    start "" "%LOCALAPPDATA%\Programs\REDDOT-Workstation-OS\REDDOT Workstation OS.exe"
+if exist "%LOCALAPPDATA%\Programs\REDDOT-Workstation-OS\REDDOT-Workstation-OS.exe" (
+    start "" "%LOCALAPPDATA%\Programs\REDDOT-Workstation-OS\REDDOT-Workstation-OS.exe"
 ) else if exist "C:\Program Files\REDDOT Workstation OS\REDDOT Workstation OS.exe" (
     start "" "C:\Program Files\REDDOT Workstation OS\REDDOT Workstation OS.exe"
 ) else (

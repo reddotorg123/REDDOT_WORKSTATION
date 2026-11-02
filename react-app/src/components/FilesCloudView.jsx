@@ -1,23 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Upload, 
-  FolderPlus, 
   Search, 
   FileText, 
   Image, 
   FileArchive, 
   FileCode, 
   Folder, 
-  Clock, 
-  Star, 
-  Share2, 
   Trash2, 
   Cloud, 
-  MoreHorizontal, 
-  Download,
-  ExternalLink,
-  RefreshCw,
-  Check, 
+  Download, 
+  RefreshCw, 
   X,
   Eye
 } from 'lucide-react';
@@ -32,7 +25,6 @@ export function FilesCloudView({
 }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchFile, setSearchFile] = useState('');
-  const [actionMenuFileId, setActionMenuFileId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [storageStats, setStorageStats] = useState({
     status: 'online',
@@ -76,13 +68,13 @@ export function FilesCloudView({
       return <Image size={15} color="var(--text-secondary)" />;
     }
     if (t.includes('pdf') || ext === 'pdf') {
-      return <FileText size={15} color="var(--accent-red, #ef4444)" />;
+      return <FileText size={15} color="var(--text-secondary)" />;
     }
     if (t.includes('archive') || ['zip', 'rar', 'tar', 'gz', '7z'].includes(ext)) {
-      return <FileArchive size={15} color="#eab308" />;
+      return <FileArchive size={15} color="var(--text-secondary)" />;
     }
     if (['js', 'jsx', 'ts', 'tsx', 'cpp', 'h', 'py', 'json', 'html', 'css'].includes(ext)) {
-      return <FileCode size={15} color="#10b981" />;
+      return <FileCode size={15} color="var(--text-primary)" />;
     }
     return <FileText size={15} color="var(--text-secondary)" />;
   };
@@ -180,7 +172,21 @@ export function FilesCloudView({
   };
 
   // Filter files by category & search query
-  const filteredFiles = files.filter(f => {
+  const filteredFiles = files.map(f => {
+    const name = f.name || '';
+    const ext = (name.split('.').pop() || '').toLowerCase();
+    let displayType = f.type || 'Document';
+    if (ext === 'pdf') displayType = 'PDF';
+    else if (['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif', 'bmp', 'ico'].includes(ext)) displayType = 'Image';
+    else if (['txt', 'csv', 'md'].includes(ext)) displayType = 'Document';
+    else if (['js', 'jsx', 'ts', 'tsx', 'json', 'html', 'css', 'py'].includes(ext)) displayType = 'Code';
+    else if (['zip', 'rar', 'tar', 'gz', '7z'].includes(ext)) displayType = 'Archive';
+
+    return {
+      ...f,
+      type: displayType
+    };
+  }).filter(f => {
     const nameMatch = (f.name || '').toLowerCase().includes(searchFile.toLowerCase());
     if (!nameMatch) return false;
 
@@ -189,7 +195,7 @@ export function FilesCloudView({
     const t = String(f.type || '').toLowerCase();
 
     if (selectedCategory === 'images') {
-      return t.includes('image') || ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'].includes(ext);
+      return (t.includes('image') || ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'].includes(ext)) && ext !== 'pdf';
     }
     if (selectedCategory === 'docs') {
       return t.includes('pdf') || t.includes('doc') || ['pdf', 'txt', 'csv', 'md'].includes(ext);
@@ -205,7 +211,10 @@ export function FilesCloudView({
 
   // Extract all previewable images for carousel
   const allImageFiles = filteredFiles
-    .filter(f => f.isImage || (f.type && String(f.type).toLowerCase().includes('image')) || (f.name && /\.(png|jpe?g|webp|gif|svg|bmp)$/i.test(f.name)))
+    .filter(f => {
+      const ext = ((f.name || '').split('.').pop() || '').toLowerCase();
+      return ext !== 'pdf' && (f.isImage || (f.type && String(f.type).toLowerCase().includes('image')) || (f.name && /\.(png|jpe?g|webp|gif|svg|bmp)$/i.test(f.name)));
+    })
     .map(f => ({
       src: f.dataUrl || f.previewUrl || f.url || ((f.name || f.id) ? backendBridge.getPreviewUrl(f.name || f.id) : null),
       title: f.name,
@@ -312,9 +321,21 @@ export function FilesCloudView({
                 }} />
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
-                <Cloud size={13} color="#10b981" />
-                <span style={{ fontWeight: 600 }}>{storageStats.storageMode || 'Google Drive Cloud'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-secondary)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Cloud size={13} color="var(--text-primary)" />
+                  <span style={{ fontWeight: 600 }}>{storageStats.storageMode || 'Google Drive Cloud'}</span>
+                </div>
+                <span style={{ 
+                  fontSize: 10, 
+                  fontWeight: 700, 
+                  padding: '1px 6px', 
+                  borderRadius: 4, 
+                  background: backendStatus.online ? 'var(--bg-active-nav)' : 'var(--bg-subtle)', 
+                  color: backendStatus.online ? '#ffffff' : 'var(--text-muted)' 
+                }}>
+                  {backendStatus.online ? 'Online' : 'Offline'}
+                </span>
               </div>
             </div>
           </div>
@@ -381,22 +402,31 @@ export function FilesCloudView({
                 </thead>
                 <tbody>
                   {filteredFiles.map(file => {
-                    const isImg = file.isImage === true || 
+                    const ext = ((file.name || '').split('.').pop() || '').toLowerCase();
+                    const isPdf = ext === 'pdf' || (file.type && String(file.type).toLowerCase().includes('pdf'));
+                    const isTxt = ['txt', 'csv', 'md', 'json', 'js', 'jsx', 'ts', 'tsx', 'log', 'html', 'css'].includes(ext);
+                    const isImg = !isPdf && !isTxt && (
+                      file.isImage === true || 
                       (file.type && String(file.type).toLowerCase().includes('image')) ||
                       (file.mimeType && String(file.mimeType).toLowerCase().startsWith('image/')) ||
-                      (file.name && /\.(png|jpe?g|webp|gif|svg|bmp|ico)$/i.test(file.name));
+                      ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif', 'bmp', 'ico'].includes(ext)
+                    );
 
-                    const previewSrc = file.dataUrl || file.previewUrl || file.url || ((file.name || file.id) ? backendBridge.getPreviewUrl(file.name || file.id) : null);
+                    const previewSrc = file.previewUrl || file.dataUrl || file.url || ((file.name || file.id) ? backendBridge.getPreviewUrl(file.id || file.name) : null);
+                    const canPreview = Boolean(previewSrc) || isPdf || isTxt || isImg;
 
                     const openPreview = () => {
-                      if (isImg && previewSrc) {
-                        setPreviewImage({
-                          src: previewSrc,
-                          title: file.name,
-                          size: file.size,
-                          downloadUrl: file.downloadUrl || previewSrc
-                        });
-                      }
+                      const targetUrl = previewSrc || file.downloadUrl || backendBridge.getDownloadUrl(file.id || file.name);
+                      setPreviewImage({
+                        src: targetUrl,
+                        title: file.name,
+                        name: file.name,
+                        size: file.size,
+                        type: isPdf ? 'PDF' : isTxt ? 'Document' : isImg ? 'Image' : file.type,
+                        mimeType: isPdf ? 'application/pdf' : file.mimeType,
+                        isImage: isImg,
+                        downloadUrl: file.downloadUrl || targetUrl
+                      });
                     };
 
                     return (
@@ -431,16 +461,20 @@ export function FilesCloudView({
                                 />
                               </div>
                             ) : (
-                              getFileIcon(file.type, file.name)
+                              <div style={{ cursor: canPreview ? 'pointer' : 'default' }} onClick={openPreview}>
+                                {getFileIcon(file.type, file.name)}
+                              </div>
                             )}
                             <span 
                               style={{ 
                                 fontWeight: 600, 
-                                cursor: (isImg && previewSrc) ? 'pointer' : 'default',
-                                color: (isImg && previewSrc) ? 'var(--text-primary)' : 'inherit'
+                                cursor: canPreview ? 'pointer' : 'default',
+                                color: canPreview ? 'var(--text-primary)' : 'inherit',
+                                textDecoration: canPreview ? 'underline' : 'none',
+                                textUnderlineOffset: '3px'
                               }}
                               onClick={openPreview}
-                              title={(isImg && previewSrc) ? 'Click to preview' : file.name}
+                              title={canPreview ? `Click to preview ${file.name}` : file.name}
                             >
                               {file.name}
                             </span>
@@ -451,10 +485,10 @@ export function FilesCloudView({
                         <td style={{ color: 'var(--text-secondary)' }}>{file.modified || 'Today'}</td>
                         <td style={{ textAlign: 'center', position: 'relative' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                            {isImg && previewSrc && (
+                            {canPreview && (
                               <button 
                                 className="icon-btn" 
-                                title="Preview Image"
+                                title={isPdf ? "Preview PDF Document" : isImg ? "Preview Image" : "Preview Document"}
                                 onClick={openPreview}
                                 style={{ width: 26, height: 26 }}
                               >
@@ -473,7 +507,7 @@ export function FilesCloudView({
                               className="icon-btn" 
                               title="Delete File"
                               onClick={() => handleDelete(file.id)}
-                              style={{ width: 26, height: 26, color: 'var(--accent-red, #ef4444)' }}
+                              style={{ width: 26, height: 26, color: 'var(--text-muted)' }}
                             >
                               <Trash2 size={13} />
                             </button>
@@ -500,3 +534,5 @@ export function FilesCloudView({
     </div>
   );
 }
+
+export default FilesCloudView;

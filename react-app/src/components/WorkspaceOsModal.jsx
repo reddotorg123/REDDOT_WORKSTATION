@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Monitor, X, Cpu, HardDrive, Wifi, Shield, ArrowLeft } from 'lucide-react';
+import { Clock, HardDrive, Wifi, Shield, ArrowLeft } from 'lucide-react';
 
 export function WorkspaceOsModal({ isOpen, onClose }) {
   const [time, setTime] = useState('');
   const [date, setDate] = useState('');
-  const [cpuUsage, setCpuUsage] = useState(14);
-  const [ramUsage, setRamUsage] = useState(38);
-
   useEffect(() => {
     if (!isOpen) return;
 
@@ -24,15 +21,9 @@ export function WorkspaceOsModal({ isOpen, onClose }) {
     updateClock();
     const interval = setInterval(updateClock, 1000);
 
-    // Random slight fluctuations for telemetry simulation
-    const teleInterval = setInterval(() => {
-      setCpuUsage(prev => Math.min(65, Math.max(8, prev + Math.floor(Math.random() * 7) - 3)));
-    }, 2500);
-
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       clearInterval(interval);
-      clearInterval(teleInterval);
     };
   }, [isOpen, onClose]);
 
@@ -98,8 +89,8 @@ export function WorkspaceOsModal({ isOpen, onClose }) {
           gap: 12,
           alignItems: 'center'
         }}>
-          <span className="badge badge-completed">● EXECUTIVE CLUSTER SYNCHRONIZED</span>
-          <span className="badge">SPRINT 14 • 4 DAYS REMAINING</span>
+          <span className="badge badge-completed">TEAM PRESENCE UPDATES IN REAL TIME</span>
+          <span className="badge">OFFLINE WHEN THE CONNECTION DISCONNECTS</span>
         </div>
       </div>
 
@@ -114,37 +105,39 @@ export function WorkspaceOsModal({ isOpen, onClose }) {
         padding: '16px 20px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Cpu size={20} color="var(--text-secondary)" />
+          <Wifi size={20} color="var(--text-secondary)" />
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>CPU TELEMETRY</div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>{cpuUsage}% LOAD</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>TEAM PRESENCE</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>Live connection state</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Clock size={20} color="var(--text-secondary)" />
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>WORK STATUS</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>Punch events</div>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <HardDrive size={20} color="var(--text-secondary)" />
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>RAM BUFFER</div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>{ramUsage}% ALLOCATED</div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Wifi size={20} color="var(--text-secondary)" />
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>NETWORK BRIDGE</div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>12ms TLS 1.3</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>DUTY SIGNALS</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>In, break, out</div>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Shield size={20} color="var(--text-secondary)" />
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>ENCLAVE SHIELD</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent-green)' }}>SECURED</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>APP USAGE</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>Not collected</div>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
+export default WorkspaceOsModal;

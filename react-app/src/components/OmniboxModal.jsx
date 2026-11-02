@@ -8,8 +8,6 @@ import {
   MessageSquare, 
   FolderGit2, 
   Settings, 
-  Monitor, 
-  Terminal, 
   X 
 } from 'lucide-react';
 
@@ -47,6 +45,7 @@ export function OmniboxModal({
   const filteredNav = quickNav.filter(n => n.label.toLowerCase().includes(query.toLowerCase()));
   const filteredTasks = tasks.filter(t => t.title.toLowerCase().includes(query.toLowerCase())).slice(0, 4);
   const filteredFiles = files.filter(f => f.name.toLowerCase().includes(query.toLowerCase())).slice(0, 4);
+  const filteredMembers = teamMembers.filter(m => (m.name || '').toLowerCase().includes(query.toLowerCase())).slice(0, 4);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -192,8 +191,44 @@ export function OmniboxModal({
               </div>
             </div>
           )}
+
+          {/* Team Members match */}
+          {filteredMembers.length > 0 && (
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, color: 'var(--text-muted)', marginBottom: 6 }}>
+                TEAM MEMBERS
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {filteredMembers.map(m => (
+                  <div
+                    key={m.id}
+                    onClick={() => {
+                      onNavigateTab('team');
+                      onClose();
+                    }}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      fontSize: 12
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <span>{m.name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.role}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
+
+export default OmniboxModal;

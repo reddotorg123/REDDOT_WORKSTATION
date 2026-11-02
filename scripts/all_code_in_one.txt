@@ -1,0 +1,892 @@
+////////////////////////////////////////////////////////////////////////////////
+// REDDOT WORKSTATION • COMPLETE ARCHITECTURE & FULL CODEBASE
+// Generated: 2026-10-25T14:50:19.913Z
+// Total Bundled Files: 11
+// Primary Focus: Wallpaper Desktop App (Electron + Live Wallpaper UI)
+// Includes: React App, Backend Services, Attachment Service, and Qt 6 C++/QML
+////////////////////////////////////////////////////////////////////////////////
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+  1. broadcast-update.js
+  2. build.js
+  3. bundle-all-code.js
+  4. clean-global-state.js
+  5. detect-active-apps.ps1
+  6. Fix-Reddot-Login.bat
+  7. get-foreground-app.ps1
+  8. publish-ota.js
+  9. repack-asar.js
+ 10. sync-all-targets.js
+ 11. sync-hotpatch.js
+
+
+================================================================================
+FILE: broadcast-update.js
+LINES: 98 | SIZE: 4624 bytes
+================================================================================
+/**
+ * REDDOT Workstation OS - Broadcast Update Announcement
+ * Posts an official release update alert into the general team chat channel via Firestore REST.
+ */
+
+const https = require('https');
+
+const API_KEY = 'AIzaSyBpjenDcXDREseIDv5NfgpDo2fAk_gUhdk';
+const PROJECT_ID = 'reddot-workspace';
+const ORG_ID = 'reddot';
+const CHANNEL_ID = 'general';
+
+const msgId = 'msg_ota_v3101_' + Date.now();
+const postUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/organizations/${ORG_ID}/channels/${CHANNEL_ID}/messages/${msgId}?key=${API_KEY}`;
+const channelMetaUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/organizations/${ORG_ID}/channels/${CHANNEL_ID}?updateMask.fieldPaths=lastMessageText&updateMask.fieldPaths=lastMessageSender&updateMask.fieldPaths=lastMessageTime&updateMask.fieldPaths=updatedAt&key=${API_KEY}`;
+
+const announcementText = `📢 **[OFFICIAL OTA UPDATE] REDDOT Workstation v3.10.1 is now LIVE!**\n\n✨ **What's New in Workstation v3.10.1:**
+• **Real-Time Instant Messaging Engine**: Multi-channel listeners across all public channels and teammate Direct Messages ensuring messages appear immediately on the recipient's screen in real-time.
+• **High-Visibility Unread Counters**: Glowing unread count badge on the Messages sidebar tab, team channels, and direct message contacts.
+• **Smart Audio & Desktop Popups**: Instant audio chirps and native Windows desktop notifications for incoming messages with direct jump-to-chat.
+• **Universal Running Apps Synchronization**: Adaptive role-based heuristic ensuring all teammates broadcast their active foreground and background processes reliably across all workstations.
+• **Decoupled Real-Time Telemetry**: Independent 6-second presence ticker continuously updating and broadcasting live tools to Firestore whether clocked in or on standby.
+• **Profile Running Apps Quick Switcher**: Allows team members to switch foreground focus and manage background tool stacks directly inside their profile.\n\n👉 **How to Update:**\nClick the glowing **⚡ UPDATE v3.10.1** button in your top header or restart your REDDOT Workstation to apply the hotpatch instantly!`;
+
+const payload = JSON.stringify({
+  fields: {
+    id: { stringValue: msgId },
+    senderId: { stringValue: 'RD-SYSTEM-BOT' },
+    senderUid: { stringValue: 'RD-SYSTEM-BOT' },
+    senderEmpId: { stringValue: 'SYS-OTA' },
+    senderName: { stringValue: 'REDDOT System Bot ⚡' },
+    senderEmail: { stringValue: 'system@reddot.com' },
+    senderPhoto: { stringValue: '' },
+    text: { stringValue: announcementText },
+    createdAt: { integerValue: String(Date.now()) },
+    channelId: { stringValue: CHANNEL_ID },
+    isEdited: { booleanValue: false },
+    isPinned: { booleanValue: true }
+  }
+});
+
+function postJson(url, data, method = 'PATCH') {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const options = {
+      hostname: parsed.hostname,
+      port: 443,
+      path: parsed.pathname + parsed.search,
+      method: method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try { resolve(JSON.parse(body)); } catch (_) { resolve(body); }
+        } else {
+          reject(new Error(`HTTP ${res.statusCode}: ${body}`));
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.write(data);
+    req.end();
+  });
+}
+
+async function main() {
+  console.log('📡 Broadcasting v3.6.7 Announcement to team chat channel [#general]...');
+
+  // 1. Post announcement message
+  await postJson(postUrl, payload, 'PATCH');
+  console.log('✅ Announcement message successfully posted!');
+
+  // 2. Update channel metadata
+  const channelMetaPayload = JSON.stringify({
+    fields: {
+      lastMessageText: { stringValue: '📢 REDDOT Workstation v3.6.7 OTA is now LIVE! Attendance Past Records, Analytics Modal & Card Interactivity Restored.' },
+      lastMessageSender: { stringValue: 'REDDOT System Bot ⚡' },
+      lastMessageTime: { integerValue: String(Date.now()) },
+      updatedAt: { integerValue: String(Date.now()) }
+    }
+  });
+  await postJson(channelMetaUrl, channelMetaPayload, 'PATCH');
+  console.log('✅ General channel metadata updated.');
+}
+
+main().catch(err => {
+  console.error('❌ Failed to broadcast announcement:', err);
+  process.exit(1);
+});
+
+
+================================================================================
+FILE: build.js
+LINES: 122 | SIZE: 5436 bytes
+================================================================================
+/**
+ * REDDOT Workstation OS - Standalone Windows Package & EXE Compilation Pipeline
+ * High-performance, offline-first packaging engine that bundles app with Electron runtime
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+const ROOT_DIR = path.join(__dirname, '..');
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'package.json'), 'utf8'));
+const APP_VERSION = pkg.version || '2.5.1';
+const DIST_SOURCE = path.join(ROOT_DIR, 'node_modules', 'electron', 'dist');
+const RELEASE_DIR = path.join(ROOT_DIR, 'app', `v${APP_VERSION}`);
+const UNPACKED_DIR = path.join(RELEASE_DIR, 'REDDOT-Workstation-OS-win32-x64');
+
+console.log('======================================================================');
+console.log('  REDDOT WORKSTATION OS • WINDOWS PACKAGING & EXE PIPELINE');
+console.log('======================================================================');
+
+// Helper to copy directory recursively
+function copyDirSync(src, dest) {
+  if (!fs.existsSync(src)) return;
+  if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name === 'default_app.asar') continue; // Skip default electron placeholder
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      copyDirSync(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+try {
+  console.log('[1/4] Preparing clean release directory...');
+  try {
+    if (fs.existsSync(RELEASE_DIR)) {
+      fs.rmSync(RELEASE_DIR, { recursive: true, force: true });
+    }
+  } catch (e) {
+    console.warn('[BUILD] Existing directory in use; updating application files in place.');
+  }
+  fs.mkdirSync(RELEASE_DIR, { recursive: true });
+  fs.mkdirSync(UNPACKED_DIR, { recursive: true });
+
+  console.log('[2/4] Bundling native Electron runtime binary files...');
+  if (!fs.existsSync(DIST_SOURCE)) {
+    throw new Error(`Electron distribution not found at: ${DIST_SOURCE}`);
+  }
+  
+  fs.cpSync(DIST_SOURCE, UNPACKED_DIR, {
+    recursive: true,
+    filter: (src) => !src.endsWith('default_app.asar')
+  });
+
+  // Rename electron.exe to official application executable
+  const origExe = path.join(UNPACKED_DIR, 'electron.exe');
+  const targetExe = path.join(UNPACKED_DIR, 'REDDOT-Workstation-OS.exe');
+  if (fs.existsSync(origExe)) {
+    fs.renameSync(origExe, targetExe);
+  }
+
+  console.log('[3/4] Packaging application resources, styles, assets & OTA engine...');
+  const appTargetDir = path.join(UNPACKED_DIR, 'resources', 'app');
+  fs.mkdirSync(appTargetDir, { recursive: true });
+
+  // Copy app payload
+  fs.copyFileSync(path.join(ROOT_DIR, 'package.json'), path.join(appTargetDir, 'package.json'));
+  fs.copyFileSync(path.join(ROOT_DIR, 'main.js'), path.join(appTargetDir, 'main.js'));
+  fs.copyFileSync(path.join(ROOT_DIR, 'preload.js'), path.join(appTargetDir, 'preload.js'));
+  fs.cpSync(path.join(ROOT_DIR, 'wallpaper-ui'), path.join(appTargetDir, 'wallpaper-ui'), { recursive: true });
+
+  // Create 1-Click Launchers in release root
+  console.log('[4/4] Generating Standalone Portable Executable & Setup Launchers...');
+  
+  // Create Portable EXE shortcut runner
+  const portableRunnerContent = `@echo off
+start "" "%~dp0REDDOT-Workstation-OS-win32-x64\\REDDOT-Workstation-OS.exe"
+`;
+  fs.writeFileSync(path.join(RELEASE_DIR, 'Launch-REDDOT-Workstation-OS.bat'), portableRunnerContent);
+
+  // Create Setup & Desktop Shortcut Installer script
+  const setupScriptContent = `@echo off
+title Install REDDOT Workstation OS
+echo ==============================================================
+echo   INSTALLING REDDOT WORKSTATION OS (DESKTOP SHORTCUT & SYSTEM)
+echo ==============================================================
+echo.
+set "TARGET_DIR=%LOCALAPPDATA%\\Programs\\REDDOT-Workstation-OS"
+echo [1/2] Installing to %TARGET_DIR%...
+if exist "%TARGET_DIR%" rmdir /s /q "%TARGET_DIR%"
+xcopy /e /i /y "%~dp0REDDOT-Workstation-OS-win32-x64" "%TARGET_DIR%" >nul
+
+echo [2/2] Creating Desktop Shortcut...
+powershell -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\\REDDOT Workstation OS.lnk'); $s.TargetPath='%TARGET_DIR%\\REDDOT-Workstation-OS.exe'; $s.WorkingDirectory='%TARGET_DIR%'; $s.Save()"
+
+echo.
+echo Installation complete! Desktop shortcut created.
+echo Launching application...
+start "" "%TARGET_DIR%\\REDDOT-Workstation-OS.exe"
+`;
+  fs.writeFileSync(path.join(RELEASE_DIR, 'Install-REDDOT-Workstation-OS.bat'), setupScriptContent);
+
+  console.log('\n======================================================================');
+  console.log('  PACKAGING COMPLETED SUCCESSFULLY!');
+  console.log('======================================================================');
+  console.log('Output location:');
+  console.log('  -> Executable: ' + targetExe);
+  console.log('  -> Portable:   ' + path.join(RELEASE_DIR, 'Launch-REDDOT-Workstation-OS.bat'));
+  console.log('  -> Installer:  ' + path.join(RELEASE_DIR, 'Install-REDDOT-Workstation-OS.bat'));
+  console.log('======================================================================\n');
+  process.exit(0);
+} catch (err) {
+  console.error('\n[ERROR] Packaging failed:', err);
+  process.exit(1);
+}
+
+
+================================================================================
+FILE: bundle-all-code.js
+LINES: 123 | SIZE: 5098 bytes
+================================================================================
+const fs = require('fs');
+const path = require('path');
+
+const rootDir = __dirname;
+const outputFile = path.join(rootDir, 'all_code_in_one.txt');
+const copyToDesktopApp = path.join(rootDir, 'wallpaper-desktop-app', 'all_code_in_one.txt');
+
+const includeExtensions = new Set([
+  '.js', '.jsx', '.ts', '.tsx', '.html', '.css', '.json',
+  '.cpp', '.h', '.hpp', '.qml', '.ps1', '.bat', '.sh'
+]);
+
+const excludeDirs = new Set([
+  'node_modules', '.git', '.vscode', '.playwright-mcp', '.qtcreator',
+  'build', 'dist', 'out', 'vendor', 'scratch', 'edge_temp',
+  'asar_staging', 'asar_staging_installed', 'asar_staging_updated',
+  'asar_full_staging', 'storage', 'vault', 'app', 'wallpaper-ui-backup',
+  'assets'
+]);
+
+const excludeFiles = new Set([
+  'package-lock.json', 'all_code_in_one.txt', 'reddot_workstation_complete_codebase.txt',
+  'input_att_0.txt', 'service-account.json', 'gdrive_tokens.json', 'vk_swiftshader_icd.json',
+  'bundle_all.js'
+]);
+
+const filesToInclude = [];
+
+function scanDir(dir) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (e) {
+    return;
+  }
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    const relPath = path.relative(rootDir, fullPath).split(path.sep).join('/');
+
+    if (entry.isDirectory()) {
+      if (excludeDirs.has(entry.name)) continue;
+      scanDir(fullPath);
+    } else if (entry.isFile()) {
+      if (excludeFiles.has(entry.name)) continue;
+      const ext = path.extname(entry.name).toLowerCase();
+      if (!includeExtensions.has(ext)) continue;
+      if (entry.name.endsWith('.log') || entry.name.endsWith('.log.txt')) continue;
+      filesToInclude.push({ fullPath, relPath });
+    }
+  }
+}
+
+scanDir(rootDir);
+
+function getPriority(norm) {
+  // 1. Core Wallpaper Desktop UI
+  if (norm === 'wallpaper-desktop-app/wallpaper-ui/index.html') return 1;
+  if (norm === 'wallpaper-desktop-app/wallpaper-ui/style.css') return 2;
+  if (norm === 'wallpaper-desktop-app/wallpaper-ui/wallpaper.js') return 3;
+  if (norm.startsWith('wallpaper-desktop-app/wallpaper-ui/firebase-')) return 4;
+  if (norm.startsWith('wallpaper-desktop-app/wallpaper-ui/')) return 5;
+  // 2. Electron Main Process
+  if (norm === 'wallpaper-desktop-app/main.js') return 6;
+  if (norm === 'wallpaper-desktop-app/preload.js') return 7;
+  if (norm === 'wallpaper-desktop-app/package.json') return 8;
+  if (norm === 'wallpaper-desktop-app/version.json') return 9;
+  // 3. Desktop App Scripts & Root
+  if (norm.startsWith('wallpaper-desktop-app/scripts/')) return 15;
+  if (norm.startsWith('wallpaper-desktop-app/react-app/')) return 30;
+  if (norm.startsWith('wallpaper-desktop-app/')) return 20;
+  // 4. Backend & Microservices
+  if (norm.startsWith('backend/')) return 40;
+  if (norm.startsWith('attachment-service/')) return 50;
+  // 5. Qt 6 Workstation
+  if (norm.startsWith('reddot-workstation-qt/')) return 60;
+  return 70;
+}
+
+filesToInclude.sort((a, b) => {
+  const pA = getPriority(a.relPath);
+  const pB = getPriority(b.relPath);
+  if (pA !== pB) return pA - pB;
+  return a.relPath.localeCompare(b.relPath);
+});
+
+const outStream = fs.createWriteStream(outputFile, { encoding: 'utf8' });
+
+outStream.write('////////////////////////////////////////////////////////////////////////////////\n');
+outStream.write('// REDDOT WORKSTATION • COMPLETE ARCHITECTURE & FULL CODEBASE\n');
+outStream.write('// Generated: ' + new Date().toISOString() + '\n');
+outStream.write('// Total Bundled Files: ' + filesToInclude.length + '\n');
+outStream.write('// Primary Focus: Wallpaper Desktop App (Electron + Live Wallpaper UI)\n');
+outStream.write('// Includes: React App, Backend Services, Attachment Service, and Qt 6 C++/QML\n');
+outStream.write('////////////////////////////////////////////////////////////////////////////////\n\n');
+
+outStream.write('================================================================================\n');
+outStream.write('TABLE OF CONTENTS\n');
+outStream.write('================================================================================\n');
+filesToInclude.forEach((f, idx) => {
+  outStream.write((idx + 1).toString().padStart(3, ' ') + '. ' + f.relPath + '\n');
+});
+outStream.write('\n\n');
+
+for (const file of filesToInclude) {
+  const content = fs.readFileSync(file.fullPath, 'utf8');
+  const lines = content.split('\n').length;
+  const size = Buffer.byteLength(content, 'utf8');
+
+  outStream.write('================================================================================\n');
+  outStream.write('FILE: ' + file.relPath + '\n');
+  outStream.write('LINES: ' + lines + ' | SIZE: ' + size + ' bytes\n');
+  outStream.write('================================================================================\n');
+  outStream.write(content);
+  outStream.write('\n\n');
+}
+
+outStream.end(() => {
+  const outStats = fs.statSync(outputFile);
+  console.log('Successfully written ' + filesToInclude.length + ' files (' + (outStats.size / 1024 / 1024).toFixed(2) + ' MB)');
+  fs.copyFileSync(outputFile, copyToDesktopApp);
+  console.log('Mirrored to: ' + copyToDesktopApp);
+});
+
+
+================================================================================
+FILE: clean-global-state.js
+LINES: 80 | SIZE: 3007 bytes
+================================================================================
+/**
+ * REDDOT Workstation OS - Global Cloud State Sync & Sanitization
+ * Synchronizes global state in Cloud Firestore so all workstations see correct member status and zero stale hours.
+ */
+
+const https = require('https');
+
+const API_KEY = 'AIzaSyBpjenDcXDREseIDv5NfgpDo2fAk_gUhdk';
+const PROJECT_ID = 'reddot-workspace';
+const ORG_ID = 'reddot';
+
+function patchDoc(docPath, fields, maskFields) {
+  return new Promise((resolve, reject) => {
+    let url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${docPath}?key=${API_KEY}`;
+    if (maskFields && maskFields.length) {
+      url += '&' + maskFields.map(m => 'updateMask.fieldPaths=' + encodeURIComponent(m)).join('&');
+    }
+    const payload = JSON.stringify({ fields });
+    const parsed = new URL(url);
+    const req = https.request({
+      hostname: parsed.hostname,
+      port: 443,
+      path: parsed.pathname + parsed.search,
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    }, res => {
+      let b = '';
+      res.on('data', c => b += c);
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try { resolve(JSON.parse(b)); } catch (_) { resolve(b); }
+        } else {
+          reject(new Error(`HTTP ${res.statusCode}: ${b}`));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+async function main() {
+  console.log('🌐 Executing Global Cloud State Update on Firestore...');
+
+  const todayDateStr = new Date().toDateString();
+
+  // 1. Update RD-EMP-002 (Pavithra R's employee ID doc)
+  console.log('1. Updating RD-EMP-002 status to DUTY_OFF, 0h...');
+  const empRes = await patchDoc(`organizations/${ORG_ID}/members/RD-EMP-002`, {
+    status: { stringValue: 'DUTY_OFF' },
+    active: { booleanValue: false },
+    todayHours: { integerValue: '0' },
+    todaySeconds: { integerValue: '0' },
+    todayDate: { stringValue: todayDateStr }
+  }, ['status', 'active', 'todayHours', 'todaySeconds', 'todayDate']);
+  console.log('✅ RD-EMP-002 updated successfully:', empRes.updateTime);
+
+  // 2. Update Yp9Rm1HggQYJYMDc6x8e7DFxRyR2 (Pavithra R's Auth UID doc)
+  console.log('2. Updating UID Yp9Rm1HggQYJYMDc6x8e7DFxRyR2 status to DUTY_OFF, 0h...');
+  const userRes = await patchDoc(`organizations/${ORG_ID}/members/Yp9Rm1HggQYJYMDc6x8e7DFxRyR2`, {
+    status: { stringValue: 'DUTY_OFF' },
+    active: { booleanValue: false },
+    todayHours: { integerValue: '0' },
+    todaySeconds: { integerValue: '0' },
+    todayDate: { stringValue: todayDateStr }
+  }, ['status', 'active', 'todayHours', 'todaySeconds', 'todayDate']);
+  console.log('✅ Yp9Rm1HggQYJYMDc6x8e7DFxRyR2 updated successfully:', userRes.updateTime);
+
+  console.log('\n🎉 Global Cloud Update completed successfully across all nodes!');
+}
+
+main().catch(err => {
+  console.error('❌ Global Cloud Update failed:', err);
+  process.exit(1);
+});
+
+
+================================================================================
+FILE: detect-active-apps.ps1
+LINES: 18 | SIZE: 475 bytes
+================================================================================
+$ErrorActionPreference = 'SilentlyContinue'
+$apps = Get-Process | Where-Object { $_.MainWindowTitle -ne '' -and $_.ProcessName -ne 'powershell' } | ForEach-Object {
+    [PSCustomObject]@{
+        name = $_.ProcessName
+        exe = ($_.ProcessName + '.exe').ToLower()
+        title = $_.MainWindowTitle
+    }
+}
+if ($apps) {
+    if ($apps.Count -eq 1) {
+        ConvertTo-Json -Compress @($apps)
+    } else {
+        $apps | ConvertTo-Json -Compress
+    }
+} else {
+    '[]'
+}
+
+
+================================================================================
+FILE: Fix-Reddot-Login.bat
+LINES: 33 | SIZE: 1318 bytes
+================================================================================
+@echo off
+title REDDOT Workstation - Quick Login Reset
+echo ===================================================
+echo   REDDOT Workstation OS - Quick Login & Cache Reset
+echo ===================================================
+echo.
+echo [1/3] Closing any hanging REDDOT instances...
+powershell -NoProfile -Command "Stop-Process -Name 'REDDOT*', 'electron*' -Force -ErrorAction SilentlyContinue" >nul 2>&1
+taskkill /F /IM REDDOT* /T >nul 2>&1
+taskkill /F /IM electron* /T >nul 2>&1
+
+echo [2/3] Removing old cache and corrupted files...
+if exist "%APPDATA%\reddot-workstation-os\hotpatch" (
+    rmdir /S /Q "%APPDATA%\reddot-workstation-os\hotpatch"
+    echo   -> Cache cleared successfully!
+) else (
+    echo   -> Cache already clean.
+)
+
+echo [3/3] Launching REDDOT Workstation OS...
+if exist "%LOCALAPPDATA%\Programs\REDDOT-Workstation-OS\REDDOT-Workstation-OS.exe" (
+    start "" "%LOCALAPPDATA%\Programs\REDDOT-Workstation-OS\REDDOT-Workstation-OS.exe"
+) else if exist "C:\Program Files\REDDOT Workstation OS\REDDOT Workstation OS.exe" (
+    start "" "C:\Program Files\REDDOT Workstation OS\REDDOT Workstation OS.exe"
+) else (
+    echo Please launch REDDOT Workstation from your desktop shortcut.
+)
+
+echo.
+echo [SUCCESS] Your workstation is ready! You can now log in normally.
+echo Press any key to exit.
+pause >nul
+
+
+================================================================================
+FILE: get-foreground-app.ps1
+LINES: 25 | SIZE: 715 bytes
+================================================================================
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32Window {
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+}
+"@ -ErrorAction SilentlyContinue
+
+try {
+    $hwnd = [Win32Window]::GetForegroundWindow()
+    $procId = 0
+    [Win32Window]::GetWindowThreadProcessId($hwnd, [ref]$procId)
+    if ($procId -gt 0) {
+        $p = Get-Process -Id $procId -ErrorAction SilentlyContinue
+        if ($p) {
+            Write-Output "$($p.ProcessName).exe"
+            exit 0
+        }
+    }
+} catch {}
+Write-Output "unknown"
+
+
+================================================================================
+FILE: publish-ota.js
+LINES: 148 | SIZE: 5898 bytes
+================================================================================
+/**
+ * REDDOT Workstation OS - Cloud OTA Publisher
+ * Publishes release manifest and hotpatch bundle directly to Cloud Firestore REST endpoints.
+ */
+
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
+
+const API_KEY = 'AIzaSyBpjenDcXDREseIDv5NfgpDo2fAk_gUhdk';
+const MANIFEST_URL = `https://firestore.googleapis.com/v1/projects/reddot-workspace/databases/(default)/documents/organizations/reddot/system/otaRelease?key=${API_KEY}`;
+const BUNDLE_URL = `https://firestore.googleapis.com/v1/projects/reddot-workspace/databases/(default)/documents/organizations/reddot/ota/bundle?key=${API_KEY}`;
+
+function patchDocument(url, data) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(data);
+    const parsed = new URL(url);
+
+    const options = {
+      hostname: parsed.hostname,
+      port: 443,
+      path: parsed.pathname + parsed.search,
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            resolve(JSON.parse(body));
+          } catch (_) {
+            resolve(body);
+          }
+        } else {
+          reject(new Error(`HTTP ${res.statusCode}: ${body}`));
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+async function main() {
+  console.log('🚀 Starting REDDOT Cloud OTA Update Publication...');
+
+  const rootDir = path.resolve(__dirname, '..');
+  const versionPath = path.join(rootDir, 'version.json');
+  const versionData = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
+
+  const uiDir = path.join(rootDir, 'wallpaper-ui');
+  const rawWallpaperJs = fs.readFileSync(path.join(uiDir, 'wallpaper.js'), 'utf8');
+  const rawFirebaseServiceJs = fs.readFileSync(path.join(uiDir, 'firebase-service.js'), 'utf8');
+  const rawStyleCss = fs.readFileSync(path.join(uiDir, 'style.css'), 'utf8');
+  const rawIndexHtml = fs.readFileSync(path.join(uiDir, 'index.html'), 'utf8');
+
+  // Safely minify line comments and whitespace to guarantee the hotpatch bundle
+  // stays safely within Firestore's strict 1,048,576 bytes per document ceiling.
+  const wallpaperJs = rawWallpaperJs
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/^[ \t]+/gm, '')
+    .replace(/^\s*[\r\n]/gm, '');
+
+  // Safely minify CSS, HTML, and FirebaseService comments to guarantee the hotpatch bundle
+  // stays safely within Firestore's strict 1,048,576 bytes per document ceiling with 100KB+ headroom.
+  const styleCss = rawStyleCss
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*([\{\}:;,])\s*/g, '$1')
+    .replace(/;\}/g, '}')
+    .trim();
+
+  const indexHtml = rawIndexHtml
+    .replace(/<!--(?!\[if)[\s\S]*?-->/g, '')
+    .replace(/>\s+</g, '><')
+    .trim();
+
+  const firebaseServiceJs = rawFirebaseServiceJs
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/^\s*[\r\n]/gm, '');
+
+  console.log(`📦 Packaging Release v${versionData.version} (${versionData.releaseDate})...`);
+  console.log(`   - wallpaper.js: ${wallpaperJs.length} bytes`);
+  console.log(`   - firebase-service.js: ${firebaseServiceJs.length} bytes`);
+  console.log(`   - style.css: ${styleCss.length} bytes (optimized from ${rawStyleCss.length})`);
+  console.log(`   - index.html: ${indexHtml.length} bytes (optimized from ${rawIndexHtml.length})`);
+  const totalBytes = wallpaperJs.length + firebaseServiceJs.length + styleCss.length + indexHtml.length;
+  console.log(`   - Total Payload: ${totalBytes} bytes (Firestore limit: 1,048,576 bytes, headroom: ${1048576 - totalBytes} bytes)`);
+
+  // 1. Publish Release Manifest
+  const manifestPayload = {
+    fields: {
+      version: { stringValue: versionData.version },
+      releaseDate: { stringValue: versionData.releaseDate },
+      minRequiredVersion: { stringValue: versionData.minRequiredVersion || '2.0.0' },
+      mandatory: { booleanValue: !!versionData.mandatory },
+      downloadUrl: { stringValue: versionData.downloadUrl || '' },
+      changelog: {
+        arrayValue: {
+          values: (versionData.changelog || []).map(item => ({ stringValue: item }))
+        }
+      }
+    }
+  };
+
+  console.log('📡 1/2 Publishing Release Manifest to organizations/reddot/system/otaRelease...');
+  const manifestRes = await patchDocument(MANIFEST_URL, manifestPayload);
+  console.log('✅ Manifest Published Successfully! Document update time:', manifestRes.updateTime);
+
+  // 2. Publish Hotpatch Bundle
+  const bundlePayload = {
+    fields: {
+      version: { stringValue: versionData.version },
+      releaseDate: { stringValue: versionData.releaseDate },
+      updatedAt: { stringValue: new Date().toISOString() },
+      wallpaperJs: { stringValue: wallpaperJs },
+      firebaseServiceJs: { stringValue: firebaseServiceJs },
+      styleCss: { stringValue: styleCss },
+      indexHtml: { stringValue: indexHtml },
+      changelog: {
+        arrayValue: {
+          values: (versionData.changelog || []).map(item => ({ stringValue: item }))
+        }
+      }
+    }
+  };
+
+  console.log('📡 2/2 Publishing Hotpatch Bundle to organizations/reddot/ota/bundle...');
+  const bundleRes = await patchDocument(BUNDLE_URL, bundlePayload);
+  console.log('✅ Bundle Published Successfully! Document update time:', bundleRes.updateTime);
+
+  console.log(`\n🎉 OTA Release v${versionData.version} is now LIVE on REDDOT Cloud!`);
+}
+
+main().catch(err => {
+  console.error('❌ OTA Publication failed:', err);
+  process.exit(1);
+});
+
+
+================================================================================
+FILE: repack-asar.js
+LINES: 44 | SIZE: 1535 bytes
+================================================================================
+const asar = require('@electron/asar');
+const path = require('path');
+const fs = require('fs');
+
+async function repack() {
+  const rootDir = path.resolve(__dirname, '..');
+  const staging = path.join(rootDir, 'scratch', 'asar_staging');
+  if (fs.existsSync(staging)) fs.rmSync(staging, { recursive: true, force: true });
+  fs.mkdirSync(staging, { recursive: true });
+
+  fs.copyFileSync(path.join(rootDir, 'main.js'), path.join(staging, 'main.js'));
+  fs.copyFileSync(path.join(rootDir, 'preload.js'), path.join(staging, 'preload.js'));
+  fs.copyFileSync(path.join(rootDir, 'package.json'), path.join(staging, 'package.json'));
+  fs.copyFileSync(path.join(rootDir, 'version.json'), path.join(staging, 'version.json'));
+
+  function copyDir(src, dest) {
+    fs.mkdirSync(dest, { recursive: true });
+    for (const item of fs.readdirSync(src)) {
+      const s = path.join(src, item);
+      const d = path.join(dest, item);
+      if (fs.statSync(s).isDirectory()) {
+        copyDir(s, d);
+      } else {
+        fs.copyFileSync(s, d);
+      }
+    }
+  }
+
+  copyDir(path.join(rootDir, 'wallpaper-ui'), path.join(staging, 'wallpaper-ui'));
+
+  const targets = [
+    path.join(rootDir, 'app', 'v2.5.3', 'win-unpacked', 'resources', 'app.asar')
+  ];
+
+  for (const destAsar of targets) {
+    if (fs.existsSync(path.dirname(destAsar))) {
+      await asar.createPackage(staging, destAsar);
+      console.log(`[ASAR] Repacked: ${destAsar} (${(fs.statSync(destAsar).size / (1024 * 1024)).toFixed(2)} MB)`);
+    }
+  }
+}
+
+repack().catch(console.error);
+
+
+================================================================================
+FILE: sync-all-targets.js
+LINES: 80 | SIZE: 3689 bytes
+================================================================================
+const fs = require('fs');
+const path = require('path');
+const asar = require('@electron/asar');
+
+async function syncAllTargets() {
+  console.log('=== REDDOT WORKSTATION OS • MASTER MULTI-TARGET SYNC ===');
+  const rootDir = path.resolve(__dirname, '..');
+
+  function copyDirRecursive(src, dest) {
+    if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+    for (const item of fs.readdirSync(src)) {
+      const srcPath = path.join(src, item);
+      const destPath = path.join(dest, item);
+      if (fs.statSync(srcPath).isDirectory()) {
+        copyDirRecursive(srcPath, destPath);
+      } else {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    }
+  }
+
+  // Common Staging for ASAR Repack
+  const staging = path.join(rootDir, 'scratch', 'asar_staging');
+  if (fs.existsSync(staging)) fs.rmSync(staging, { recursive: true, force: true });
+  fs.mkdirSync(staging, { recursive: true });
+
+  fs.copyFileSync(path.join(rootDir, 'main.js'), path.join(staging, 'main.js'));
+  fs.copyFileSync(path.join(rootDir, 'preload.js'), path.join(staging, 'preload.js'));
+  fs.copyFileSync(path.join(rootDir, 'package.json'), path.join(staging, 'package.json'));
+  fs.copyFileSync(path.join(rootDir, 'version.json'), path.join(staging, 'version.json'));
+  copyDirRecursive(path.join(rootDir, 'wallpaper-ui'), path.join(staging, 'wallpaper-ui'));
+
+  // TARGET 1: Installed Application in AppData\Local\Programs
+  const possibleInstalledDirs = [
+    path.join(process.env.LOCALAPPDATA, 'Programs', 'REDDOT Workstation OS', 'resources'),
+    path.join(process.env.LOCALAPPDATA, 'Programs', 'REDDOT-Workstation-OS', 'resources')
+  ];
+
+  for (const parentResources of possibleInstalledDirs) {
+    if (fs.existsSync(parentResources)) {
+      console.log(`[TARGET 1] Syncing installed app.asar: ${parentResources}`);
+      const unpackedApp = path.join(parentResources, 'app');
+      if (fs.existsSync(unpackedApp)) {
+        try { fs.rmSync(unpackedApp, { recursive: true, force: true }); } catch (_) {}
+      }
+      const targetAsar = path.join(parentResources, 'app.asar');
+      try {
+        await asar.createPackage(staging, targetAsar);
+        console.log(`  -> Successfully repacked: ${targetAsar} (${(fs.statSync(targetAsar).size / (1024 * 1024)).toFixed(2)} MB)`);
+      } catch (err) {
+        console.warn(`  -> Could not repack installed asar: ${err.message}`);
+      }
+    }
+  }
+
+  // TARGET 2: Hotpatch in AppData\Roaming\reddot-workstation-os\hotpatch\wallpaper-ui
+  const hotpatchDir = path.join(process.env.APPDATA, 'reddot-workstation-os', 'hotpatch');
+  const hotpatchUiDir = path.join(hotpatchDir, 'wallpaper-ui');
+  console.log(`[TARGET 2] Syncing hotpatch directory: ${hotpatchUiDir}`);
+  if (!fs.existsSync(hotpatchDir)) fs.mkdirSync(hotpatchDir, { recursive: true });
+  fs.copyFileSync(path.join(rootDir, 'version.json'), path.join(hotpatchDir, 'version.json'));
+  copyDirRecursive(path.join(rootDir, 'wallpaper-ui'), hotpatchUiDir);
+  console.log('  -> Target 2 synchronized successfully!');
+
+  // TARGET 3: Repack app.asar in workspace win-unpacked
+  const unpackedAsar = path.join(rootDir, 'app', 'v2.5.3', 'win-unpacked', 'resources', 'app.asar');
+  if (fs.existsSync(path.dirname(unpackedAsar))) {
+    console.log(`[TARGET 3] Repacking workspace win-unpacked app.asar...`);
+    await asar.createPackage(staging, unpackedAsar);
+    console.log(`  -> Target 3 app.asar repacked successfully! (${(fs.statSync(unpackedAsar).size / (1024 * 1024)).toFixed(2)} MB)`);
+  }
+
+  console.log('\n[SUCCESS] All distribution targets are 100% up to date!');
+}
+
+syncAllTargets().catch(err => {
+  console.error('[ERROR] Multi-target sync failed:', err);
+  process.exit(1);
+});
+
+
+================================================================================
+FILE: sync-hotpatch.js
+LINES: 42 | SIZE: 1374 bytes
+================================================================================
+/**
+ * REDDOT WORKSTATION OS • HOTPATCH SYNC SCRIPT
+ * Keeps %APPDATA%\reddot-workstation-os\hotpatch perfectly synchronized with wallpaper-ui/
+ */
+const fs = require('fs');
+const path = require('path');
+
+const rootDir = path.resolve(__dirname, '..');
+const uiDir = path.join(rootDir, 'wallpaper-ui');
+const hotpatchDir = path.join(process.env.APPDATA, 'reddot-workstation-os', 'hotpatch');
+const hotpatchUiDir = path.join(hotpatchDir, 'wallpaper-ui');
+
+function copyDirRecursive(src, dest) {
+  if (!fs.existsSync(dest)) {
+    fs.mkdirSync(dest, { recursive: true });
+  }
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirRecursive(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+try {
+  console.log('[SYNC] Mirroring wallpaper-ui into hotpatch directory...');
+  copyDirRecursive(uiDir, hotpatchUiDir);
+
+  const vJsonSrc = path.join(rootDir, 'version.json');
+  if (fs.existsSync(vJsonSrc)) {
+    fs.copyFileSync(vJsonSrc, path.join(hotpatchDir, 'version.json'));
+  }
+  console.log('[SYNC] Successfully synchronized hotpatch to v3.0.1!');
+} catch (e) {
+  console.error('[SYNC] Failed to synchronize hotpatch:', e.message);
+  process.exit(1);
+}
+
+

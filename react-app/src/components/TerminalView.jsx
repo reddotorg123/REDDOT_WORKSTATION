@@ -1,10 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Terminal as TerminalIcon, 
   Play, 
-  RotateCcw, 
   ExternalLink, 
-  FileCode, 
   Layers, 
   Activity, 
   GitBranch, 

@@ -10,11 +10,17 @@ const PROJECT_ID = 'reddot-workspace';
 const ORG_ID = 'reddot';
 const CHANNEL_ID = 'general';
 
-const msgId = 'msg_ota_v331_' + Date.now();
+const msgId = 'msg_ota_v3101_' + Date.now();
 const postUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/organizations/${ORG_ID}/channels/${CHANNEL_ID}/messages/${msgId}?key=${API_KEY}`;
 const channelMetaUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/organizations/${ORG_ID}/channels/${CHANNEL_ID}?updateMask.fieldPaths=lastMessageText&updateMask.fieldPaths=lastMessageSender&updateMask.fieldPaths=lastMessageTime&updateMask.fieldPaths=updatedAt&key=${API_KEY}`;
 
-const announcementText = `📢 **[CRITICAL SYSTEM UPDATE] REDDOT Workstation v3.3.1 is now LIVE!**\n\n✨ **What's New & Fixed in Workstation v3.3.1:**\n• **Instant Login & Stability Hotfix**: Restored seamless, 100% reliable workstation authentication and login for all team members.\n• **Lightweight & High Performance**: Reverted experimental background monitoring to ensure ultra-smooth workstation responsiveness.\n• **WhatsApp Status Ticks Overhaul**: Past messages and answered conversation messages accurately display WhatsApp Double Green Ticks (✓✓). Delivered cloud messages display Double Grey Ticks (✓✓).\n• **Message Seen & Delivery Audit**: WhatsApp-style Message Info modal displaying read-by participants and delivery receipts with exact timestamps.\n• **Enterprise Role Standardization**: Streamlined all company structures to 4 strict roles: Founder, CEO, Manager, and Employee.\n• **Strict Attendance Access**: Full attendance telemetry, member filtering, and ledger exports restricted strictly to CEO and Founder.\n• **Author-Only Message Deletion**: Strict author validation ensures users can only delete their own chat messages.\n• **Real-Time Online Presence**: Seamless live presence synchronization across Direct Messages, Team Members, and Chat header.\n\n👉 **How to Update:**\nClick the glowing **⚡ UPDATE** button in your top header or restart your REDDOT Workstation to apply the hotfix automatically!`;
+const announcementText = `📢 **[OFFICIAL OTA UPDATE] REDDOT Workstation v3.10.1 is now LIVE!**\n\n✨ **What's New in Workstation v3.10.1:**
+• **Real-Time Instant Messaging Engine**: Multi-channel listeners across all public channels and teammate Direct Messages ensuring messages appear immediately on the recipient's screen in real-time.
+• **High-Visibility Unread Counters**: Glowing unread count badge on the Messages sidebar tab, team channels, and direct message contacts.
+• **Smart Audio & Desktop Popups**: Instant audio chirps and native Windows desktop notifications for incoming messages with direct jump-to-chat.
+• **Universal Running Apps Synchronization**: Adaptive role-based heuristic ensuring all teammates broadcast their active foreground and background processes reliably across all workstations.
+• **Decoupled Real-Time Telemetry**: Independent 6-second presence ticker continuously updating and broadcasting live tools to Firestore whether clocked in or on standby.
+• **Profile Running Apps Quick Switcher**: Allows team members to switch foreground focus and manage background tool stacks directly inside their profile.\n\n👉 **How to Update:**\nClick the glowing **⚡ UPDATE v3.10.1** button in your top header or restart your REDDOT Workstation to apply the hotpatch instantly!`;
 
 const payload = JSON.stringify({
   fields: {
@@ -66,7 +72,7 @@ function postJson(url, data, method = 'PATCH') {
 }
 
 async function main() {
-  console.log('📡 Broadcasting v3.3.1 Hotfix Announcement to team chat channel [#general]...');
+  console.log('📡 Broadcasting v3.6.7 Announcement to team chat channel [#general]...');
 
   // 1. Post announcement message
   await postJson(postUrl, payload, 'PATCH');
@@ -75,7 +81,7 @@ async function main() {
   // 2. Update channel metadata
   const channelMetaPayload = JSON.stringify({
     fields: {
-      lastMessageText: { stringValue: '📢 REDDOT Workstation v3.3.1 Hotfix is now LIVE! Instant Login Restored.' },
+      lastMessageText: { stringValue: '📢 REDDOT Workstation v3.6.7 OTA is now LIVE! Attendance Past Records, Analytics Modal & Card Interactivity Restored.' },
       lastMessageSender: { stringValue: 'REDDOT System Bot ⚡' },
       lastMessageTime: { integerValue: String(Date.now()) },
       updatedAt: { integerValue: String(Date.now()) }

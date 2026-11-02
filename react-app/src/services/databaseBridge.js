@@ -5,7 +5,7 @@
  * Provides zero-latency boot, real tasks, members, chats, and attendance punches.
  */
 
-import { electronBridge } from './electronBridge';
+import { electronBridge } from './electronBridge.js';
 
 let cachedRawDb = null;
 let _dbSaveTimer = null;
@@ -65,6 +65,7 @@ export const databaseBridge = {
           imageSize: st.imageSize || null
         })) : [],
         attachments: t.attachments || [],
+        documents: Array.isArray(t.documents) ? t.documents : (Array.isArray(t.attachments) ? t.attachments : []),
         createdAt: t.createdAt || Date.now()
       };
     });
@@ -97,7 +98,8 @@ export const databaseBridge = {
 
       const rawStatus = String(m.status || '').toUpperCase();
       const lastSeen = Number(m.lastSeenAt || 0);
-      const isRecentlyActive = lastSeen > 0 && (now - lastSeen) < (2 * 60 * 60 * 1000);
+      // Strict 2-minute presence cutoff: only users active in the last 120 seconds are truly online
+      const isRecentlyActive = lastSeen > 0 && (now - lastSeen) < 120000;
       const isExplicitOnline = (m.isOnline === true || m.online === true || rawStatus === 'DUTY_ON' || rawStatus === 'ONLINE') &&
                                rawStatus !== 'DUTY_OFF' && rawStatus !== 'OFFLINE' && rawStatus !== 'RESIGNED';
       const isSelf = email.includes('jagadish') || (m.name && m.name.toLowerCase().includes('jagadish'));
@@ -107,19 +109,33 @@ export const databaseBridge = {
       if (rawStatus === 'RESIGNED') finalStatus = 'Resigned';
       else if (isOnline) finalStatus = 'Online';
 
+      const memberDept = m.department || m.dept || (m.role?.toLowerCase().includes('founder') ? 'Hardware Architecture' : m.role?.toLowerCase().includes('ceo') ? 'AI / ML Systems' : 'Software & Web');
+
       seenMap.set(dedupeKey, {
         id: mid || String(idx + 1).padStart(2, '0'),
         uid: m.uid || mid,
         name: m.displayName || m.name || (email ? email.split('@')[0] : 'Team Member'),
-        role: m.role || 'Developer',
-        dept: m.dept || m.department || 'Engineering',
+        role: m.role || 'Specialist',
+        dept: memberDept,
+        department: memberDept,
         status: finalStatus,
-        isOnline,
+        isOnline: finalStatus === 'Online',
         email: m.email || '',
-        avatar: m.photoUrl || m.photoURL || m.avatar || null,
-        lastActive: m.lastSeenAt ? this.formatRelativeTime(m.lastSeenAt) : (m.lastActive || 'Recently'),
+        avatar: m.photoUrl || m.photoURL || m.avatar || (m.name?.toLowerCase().includes('jagadish') ? './assets/profile-photo.jpeg' : m.name?.toLowerCase().includes('keerthi') ? './assets/profile-photo1.jpeg' : null),
+        lastActive: finalStatus === 'Online' ? 'Active now' : (m.lastSeenAt ? this.formatRelativeTime(m.lastSeenAt) : 'Offline'),
         activeTool: m.activeTool || null,
-        todayHours: m.todayHours || 0
+        todayHours: m.todayHours || 0,
+        workMode: m.workMode || (finalStatus === 'Online' ? 'Hybrid' : 'Remote'),
+        location: m.location || (finalStatus === 'Online' ? 'Main Office' : 'Work From Home'),
+        joinDate: m.joinDate || 'Jan 15, 2024',
+        reportingTo: m.reportingTo || 'Jagadish K',
+        bio: m.bio || `${m.name || 'Member'} drives core engineering and workstation operations across ${memberDept}.`,
+        skills: Array.isArray(m.skills) ? m.skills : (
+          memberDept.toLowerCase().includes('hardware') ? ['Hardware Arch', 'Embedded C', 'PCB Design', 'FPGA', 'System Dev'] :
+          memberDept.toLowerCase().includes('ai') ? ['Python', 'AI/ML Systems', 'Neural Nets', 'FastAPI', 'MLOps'] :
+          ['React', 'TypeScript', 'Software & Web', 'Node.js', 'System Design']
+        ),
+        projects: Array.isArray(m.projects) ? m.projects : []
       });
     });
 
@@ -147,6 +163,12 @@ export const databaseBridge = {
     if (db.chats && typeof db.chats === 'object') {
       Object.keys(db.chats).forEach(chanId => {
         if (chanId.startsWith('dm_')) {
+          if (chanId.includes('jagadish2k2006_gmail_com___jagadish2k2006_gmail_com') ||
+              chanId.includes('Uvhr9MPQ0RODCujtxzUiWcJBzHk2_Uvhr9MPQ0RODCujtxzUiWcJBzHk2') ||
+              chanId.includes('___rd_jagadi')) {
+            return; // Skip self DM
+          }
+
           const chatMsgs = db.chats[chanId] || [];
           const lastMsg = chatMsgs[chatMsgs.length - 1];
           let participantName = 'Direct Message';
@@ -156,28 +178,37 @@ export const databaseBridge = {
 
           // Try matching member (ignoring self and empty emails)
           for (const m of teamMembers) {
-            if (!m || !m.email || m.name?.toLowerCase().includes('jagadish') || m.email?.toLowerCase().includes('jagadish')) continue;
+            if (!m || !m.name || m.name?.toLowerCase().includes('jagadish') || m.email?.toLowerCase().includes('jagadish')) continue;
             const cleanEmail = (m.email || '').toLowerCase().replace(/[@.]/g, '_');
-            const emailUser = m.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '_');
+            const emailUser = m.email ? m.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
             const cleanUid = (m.uid || m.id || '').toLowerCase();
             const lowerChan = chanId.toLowerCase();
 
             if ((cleanEmail && lowerChan.includes(cleanEmail)) || 
                 (emailUser && emailUser.length > 2 && lowerChan.includes(emailUser)) ||
-                (cleanUid && cleanUid.length > 3 && lowerChan.includes(cleanUid))) {
+                (cleanUid && cleanUid.length > 3 && lowerChan.includes(cleanUid)) ||
+                (lowerChan.includes(m.name.toLowerCase().replace(/\s+/g, ''))) ||
+                (m.name.toLowerCase().includes('tejaswini') && lowerChan.includes('tejaswini')) ||
+                (m.name.toLowerCase().includes('pavithra') && (lowerChan.includes('pavithra') || lowerChan.includes('emp-002') || lowerChan.includes('emp_002')))) {
               participantName = m.name;
               participantStatus = m.status;
-              participantAvatar = m.avatar;
+              participantAvatar = m.avatar || m.photoUrl || m.photoURL || null;
               isOnline = m.isOnline;
               break;
             }
           }
 
           if (participantName === 'Direct Message' && lastMsg) {
-            participantName = (lastMsg.senderName && lastMsg.senderName !== 'JAGADISH K') 
-              ? lastMsg.senderName 
-              : (lastMsg.recipientName && lastMsg.recipientName !== 'Teammate' ? lastMsg.recipientName : 'Direct Message');
+            const sender = lastMsg.senderName || lastMsg.sender;
+            if (sender && !sender.toLowerCase().includes('jagadish')) {
+              participantName = sender;
+              participantAvatar = lastMsg.senderPhoto || lastMsg.avatar || null;
+            } else if (lastMsg.recipientName && !lastMsg.recipientName.toLowerCase().includes('jagadish') && lastMsg.recipientName !== 'Teammate') {
+              participantName = lastMsg.recipientName;
+            }
           }
+
+          if (participantName === 'Direct Message') return; // Skip unrecognized or empty direct chats
 
           channelMap.set(chanId, {
             id: chanId,
@@ -328,13 +359,54 @@ export const databaseBridge = {
       avatar: (founder && founder.avatar) ? founder.avatar : './assets/profile-photo.jpeg'
     };
 
+    // 7. Normalizing User-Scheduled Events
+    const events = (db.events || []).map((e, idx) => ({
+      id: e.id || `evt_${idx + 1}`,
+      title: e.title || 'Untitled Event',
+      time: e.time || '09:00 AM',
+      date: e.date || 'Today',
+      location: e.location || 'Online Meeting',
+      type: e.type || 'meeting',
+      attendees: e.attendees || 'All Members',
+      completed: !!e.completed
+    }));
+
+    // 8. Normalizing Leave Requests
+    const rawLeaves = Array.isArray(db.leaveRequests) ? db.leaveRequests : [];
+    const leaves = rawLeaves.map((l, idx) => {
+      const isWFH = l.leaveType === 'Work From Home' || l.isWFH || String(l.leaveType).toLowerCase().includes('home');
+      return {
+        id: l.id || `leave_${idx + 1}`,
+        member: l.name || l.applicant || l.employee || 'Team Member',
+        name: l.name || l.applicant || l.employee || 'Team Member',
+        employee: l.name || l.applicant || l.employee || 'Team Member',
+        email: l.email || '',
+        workerId: l.workerId || '',
+        leaveType: l.leaveType || 'Casual Leave',
+        isWFH,
+        status: (l.status || 'APPROVED').toUpperCase(),
+        reason: l.reason || '',
+        dates: l.dates || '',
+        startDate: l.startDate || '',
+        endDate: l.endDate || '',
+        duration: l.duration || 'Full Day',
+        days: l.days || 1,
+        createdAt: l.createdAt || l.timestamp || Date.now(),
+        timestamp: l.timestamp || l.createdAt || Date.now()
+      };
+    });
+
     return {
       tasks,
       teamMembers,
       conversations,
       messages,
       attendance,
+      punchLogs: rawPunches,
+      leaves,
+      leaveRequests: leaves,
       userProfile,
+      events,
       rawDb: db
     };
   },
@@ -356,7 +428,8 @@ export const databaseBridge = {
         await electronBridge.saveState(_pendingDbSave);
         _pendingDbSave = null;
       } catch (err) {
-        console.warn('[DB] Immediate save error:', err);
+        console.error('[DB] Immediate save failed:', err);
+        throw err;
       }
       return true;
     }
@@ -378,6 +451,26 @@ export const databaseBridge = {
     return true;
   },
 
+  async saveWorkspaceSection(section, value) {
+    if (section === 'files' && !Array.isArray(value)) {
+      throw new TypeError('Workspace files must be an array.');
+    }
+    if (section === 'userProfile' && (!value || typeof value !== 'object' || Array.isArray(value))) {
+      throw new TypeError('Workspace profile must be an object.');
+    }
+    if (section !== 'files' && section !== 'userProfile') {
+      throw new TypeError(`Unsupported workspace section: ${section}`);
+    }
+
+    if (!cachedRawDb) {
+      await this.loadWorkspaceDatabase();
+      if (!cachedRawDb) cachedRawDb = {};
+    }
+
+    cachedRawDb[section] = value;
+    return this.saveDatabase(cachedRawDb, true);
+  },
+
   /**
    * Batch updates team members in the raw database and saves debounced.
    */
@@ -385,7 +478,29 @@ export const databaseBridge = {
     if (!cachedRawDb) await this.loadWorkspaceDatabase();
     if (cachedRawDb) {
       cachedRawDb.members = updatedMembers;
-      await this.saveDatabase(cachedRawDb);
+      await this.saveDatabase(cachedRawDb, true);
+    }
+  },
+
+  /**
+   * Appends or updates a single member in the raw database and persists immediately.
+   */
+  async saveMember(member) {
+    if (!member) return;
+    if (!cachedRawDb) await this.loadWorkspaceDatabase();
+    if (cachedRawDb) {
+      if (!Array.isArray(cachedRawDb.members)) cachedRawDb.members = [];
+      const idx = cachedRawDb.members.findIndex(m => 
+        (member.id && m.id === member.id) || 
+        (member.uid && m.uid === member.uid) || 
+        (member.email && m.email && m.email.toLowerCase() === member.email.toLowerCase())
+      );
+      if (idx >= 0) {
+        cachedRawDb.members[idx] = { ...cachedRawDb.members[idx], ...member };
+      } else {
+        cachedRawDb.members.push(member);
+      }
+      await this.saveDatabase(cachedRawDb, true);
     }
   },
 
@@ -396,7 +511,7 @@ export const databaseBridge = {
     if (!cachedRawDb) await this.loadWorkspaceDatabase();
     if (cachedRawDb) {
       cachedRawDb.tasks = updatedTasks;
-      await this.saveDatabase(cachedRawDb);
+      await this.saveDatabase(cachedRawDb, true);
     }
   },
 
@@ -404,6 +519,7 @@ export const databaseBridge = {
    * Appends or updates a single task.
    */
   async saveTask(task) {
+    if (!task) return;
     if (!cachedRawDb) await this.loadWorkspaceDatabase();
     if (cachedRawDb) {
       if (!Array.isArray(cachedRawDb.tasks)) cachedRawDb.tasks = [];
@@ -413,7 +529,47 @@ export const databaseBridge = {
       } else {
         cachedRawDb.tasks.unshift(task);
       }
-      await this.saveDatabase(cachedRawDb);
+      await this.saveDatabase(cachedRawDb, true);
+    }
+  },
+
+  /**
+   * Appends or updates an event in the raw database and persists immediately.
+   */
+  async saveEvent(event) {
+    if (!event) return;
+    if (!cachedRawDb) await this.loadWorkspaceDatabase();
+    if (cachedRawDb) {
+      if (!Array.isArray(cachedRawDb.events)) cachedRawDb.events = [];
+      const idx = cachedRawDb.events.findIndex(e => e.id === event.id);
+      if (idx >= 0) {
+        cachedRawDb.events[idx] = { ...cachedRawDb.events[idx], ...event };
+      } else {
+        cachedRawDb.events.push(event);
+      }
+      await this.saveDatabase(cachedRawDb, true);
+    }
+  },
+
+  /**
+   * Batch updates events in the raw database.
+   */
+  async updateEvents(updatedEvents) {
+    if (!cachedRawDb) await this.loadWorkspaceDatabase();
+    if (cachedRawDb) {
+      cachedRawDb.events = updatedEvents;
+      await this.saveDatabase(cachedRawDb, true);
+    }
+  },
+
+  /**
+   * Deletes an event by ID.
+   */
+  async deleteEvent(eventId) {
+    if (!cachedRawDb) await this.loadWorkspaceDatabase();
+    if (cachedRawDb && Array.isArray(cachedRawDb.events)) {
+      cachedRawDb.events = cachedRawDb.events.filter(e => e.id !== eventId);
+      await this.saveDatabase(cachedRawDb, true);
     }
   },
 
@@ -472,26 +628,59 @@ export const databaseBridge = {
     if (!cachedRawDb) await this.loadWorkspaceDatabase();
     if (cachedRawDb) {
       if (!Array.isArray(cachedRawDb.punchLogs)) cachedRawDb.punchLogs = [];
-      cachedRawDb.punchLogs.push(punch);
+      const existingIndex = punch?.id
+        ? cachedRawDb.punchLogs.findIndex(existing => existing?.id === punch.id)
+        : -1;
+      if (existingIndex >= 0) {
+        cachedRawDb.punchLogs[existingIndex] = { ...cachedRawDb.punchLogs[existingIndex], ...punch };
+      } else {
+        cachedRawDb.punchLogs.push(punch);
+      }
+      await this.saveDatabase(cachedRawDb, true);
+    }
+  },
+
+  /**
+   * Appends or updates a leave / WFH request in the persistent database.
+   */
+  async saveLeaveRequest(leave) {
+    if (!leave) return;
+    if (!cachedRawDb) await this.loadWorkspaceDatabase();
+    if (cachedRawDb) {
+      if (!Array.isArray(cachedRawDb.leaveRequests)) cachedRawDb.leaveRequests = [];
+      const idx = cachedRawDb.leaveRequests.findIndex(l => l.id === leave.id);
+      if (idx >= 0) {
+        cachedRawDb.leaveRequests[idx] = { ...cachedRawDb.leaveRequests[idx], ...leave };
+      } else {
+        cachedRawDb.leaveRequests.unshift(leave);
+      }
       await this.saveDatabase(cachedRawDb);
     }
   },
 
   /**
-   * Updates or adds a team member.
+   * Updates multiple team members in batch. Supports both array and object formats.
    */
-  async saveMember(member) {
+  async saveMembers(members) {
     if (!cachedRawDb) await this.loadWorkspaceDatabase();
-    if (cachedRawDb) {
-      if (!cachedRawDb.members || typeof cachedRawDb.members !== 'object') cachedRawDb.members = {};
-      const memberId = member.id || member.uid || `RD-${Date.now().toString(36)}`;
-      cachedRawDb.members[memberId] = {
-        ...(cachedRawDb.members[memberId] || {}),
-        ...member,
-        id: memberId,
-        updatedAt: Date.now()
-      };
-      await this.saveDatabase(cachedRawDb);
+    if (cachedRawDb && Array.isArray(members)) {
+      if (Array.isArray(cachedRawDb.members)) {
+        members.forEach(member => {
+          const idx = cachedRawDb.members.findIndex(m => 
+            (member.id && m.id === member.id) || 
+            (member.uid && m.uid === member.uid) || 
+            (member.email && m.email && m.email.toLowerCase() === member.email.toLowerCase())
+          );
+          if (idx >= 0) {
+            cachedRawDb.members[idx] = { ...cachedRawDb.members[idx], ...member };
+          } else {
+            cachedRawDb.members.push(member);
+          }
+        });
+      } else {
+        cachedRawDb.members = [...members];
+      }
+      await this.saveDatabase(cachedRawDb, true);
     }
   },
 

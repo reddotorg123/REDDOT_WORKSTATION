@@ -25,7 +25,7 @@ class BackendBridgeService {
     this.cachedStatus = status;
     this.isOnline = !!status.online;
     this.listeners.forEach(cb => {
-      try { cb({ online: this.isOnline, ...status }); } catch (_) {}
+      try { cb({ online: this.isOnline, ...status }); } catch {}
     });
   }
 
@@ -41,7 +41,7 @@ class BackendBridgeService {
           this.notifyListeners({ online: true, ...ipcHealth });
           return { online: true, ...ipcHealth };
         }
-      } catch (_) {}
+      } catch {}
     }
 
     // 2. Direct HTTP health check fallback
@@ -56,7 +56,7 @@ class BackendBridgeService {
         this.notifyListeners({ online: true, ...data });
         return { online: true, ...data };
       }
-    } catch (_) {}
+    } catch {}
 
     this.notifyListeners({ online: false, storageMode: 'Offline Vault' });
     return { online: false, storageMode: 'Offline Vault' };
@@ -73,7 +73,7 @@ class BackendBridgeService {
         signal: AbortSignal.timeout(2500)
       });
       if (res.ok) return await res.json();
-    } catch (_) {}
+    } catch {}
     return {
       status: 'offline',
       storageMode: 'Private Local Vault',
@@ -93,7 +93,7 @@ class BackendBridgeService {
         if (res && res.success && Array.isArray(res.attachments)) {
           return res.attachments;
         }
-      } catch (_) {}
+      } catch {}
     }
 
     // Direct HTTP call
@@ -109,7 +109,7 @@ class BackendBridgeService {
           return data.attachments;
         }
       }
-    } catch (e) {
+    } catch {
       console.warn('[BACKEND_BRIDGE] Failed to fetch attachments:', e.message);
     }
     return [];
@@ -166,7 +166,7 @@ class BackendBridgeService {
       try {
         const ipcRes = await window.electronAPI.deleteBackendAttachment(attachmentId);
         if (ipcRes && ipcRes.success) return true;
-      } catch (_) {}
+      } catch {}
     }
 
     try {
@@ -174,7 +174,7 @@ class BackendBridgeService {
         method: 'DELETE'
       });
       return res.ok;
-    } catch (_) {
+    } catch {
       return false;
     }
   }

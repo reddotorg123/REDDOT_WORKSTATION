@@ -2,9 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="./assets/id-card.png" />
+    <link rel="icon" type="image/png" href="./assets/icon.png" />
+    <link rel="shortcut icon" href="./assets/icon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>REDDOT WORKSTATION OS v3.0</title>
+    <title>REDDOT WS v3.0</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -15,11 +17,115 @@
     <script src="./vendor/firebase-firestore-compat.js"></script>
     <script src="./vendor/firebase-database-compat.js"></script>
     <script src="./firebase-config.js"></script>
+    <script src="./auth-policy.js"></script>
     <script src="./firebase-service.js"></script>
-    <script type="module" crossorigin src="./assets/index-9ZiyRdnG.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BKS9Zz7W.css">
+    <script type="module" crossorigin src="./assets/index-Bw5D3dI5.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/jsx-runtime-1Aph62Vy.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-uxHRFG2Y.css">
   </head>
-  <body>
+  <body style="margin: 0; padding: 0; background-color: #000000; overflow: hidden;">
+    <!-- NATIVE INSTANT STARTUP VIDEO (Plays on first open, 0ms delay, never on reload) -->
+    <div id="reddot-startup-video-container" style="position: fixed; inset: 0; z-index: 9999999; background: #FFFFFF; display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1);">
+      <video
+        id="reddot-startup-video"
+        src="./assets/loading-video-light.mp4"
+        preload="auto"
+        playsinline
+        autoplay
+        muted
+        style="width: 100%; height: 100%; object-fit: cover; display: block;"
+      ></video>
+      <div
+        id="reddot-startup-skip"
+        style="position: absolute; bottom: 28px; right: 32px; display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 24px; background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.15); color: rgba(255, 255, 255, 0.85); font-size: 0.78rem; font-weight: 500; letter-spacing: 0.04em; cursor: pointer; user-select: none; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); z-index: 10000000;"
+      >
+        <span>Skip</span>
+        <span style="font-size: 0.68rem; padding: 2px 5px; border-radius: 4px; background: rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.7);">ESC</span>
+      </div>
+    </div>
+
+    <script>
+      (function() {
+        var container = document.getElementById('reddot-startup-video-container');
+        var video = document.getElementById('reddot-startup-video');
+        var skipBtn = document.getElementById('reddot-startup-skip');
+        
+        // NEVER play on reload: If already played in this session, immediately remove container before first paint!
+        try {
+          if (sessionStorage.getItem('reddot_startup_video_played')) {
+            if (container) container.remove();
+            return;
+          }
+        } catch (_) {}
+
+        // User preference of theme: default light theme, if dark theme then use dark theme video
+        var savedTheme = 'light';
+        try {
+          savedTheme = localStorage.getItem('reddot_theme') || 'light';
+        } catch (_) {}
+
+        if (savedTheme === 'dark') {
+          if (container) container.style.backgroundColor = '#000000';
+          if (video) video.src = './assets/loading-video-dark.mp4';
+        } else {
+          if (container) container.style.backgroundColor = '#FFFFFF';
+          if (video) video.src = './assets/loading-video-light.mp4';
+        }
+
+        var finished = false;
+        function finishStartupVideo() {
+          if (finished) return;
+          finished = true;
+          try {
+            sessionStorage.setItem('reddot_startup_video_played', 'true');
+          } catch (_) {}
+
+          if (container) {
+            container.style.opacity = '0';
+            container.style.pointerEvents = 'none';
+            setTimeout(function() {
+              if (container && container.parentNode) {
+                container.parentNode.removeChild(container);
+              }
+            }, 700);
+          }
+        }
+
+        if (video) {
+          try { video.playbackRate = 1.0; } catch (_) {}
+          video.addEventListener('ended', finishStartupVideo);
+          video.addEventListener('error', finishStartupVideo);
+          var playPromise = video.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(function() {
+              video.muted = true;
+              video.play().catch(finishStartupVideo);
+            });
+          }
+        }
+
+        if (skipBtn) {
+          skipBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            finishStartupVideo();
+          });
+        }
+
+        if (container) {
+          container.addEventListener('click', finishStartupVideo);
+        }
+
+        window.addEventListener('keydown', function(e) {
+          if (e.key === 'Escape' || e.key === ' ' || e.key === 'Enter') {
+            finishStartupVideo();
+          }
+        });
+
+        // 11s safety fallback (video is ~9.9s at 1x normal speed)
+        setTimeout(finishStartupVideo, 11000);
+      })();
+    </script>
+
     <div id="root"></div>
   </body>
 </html>

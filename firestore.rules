@@ -1,57 +1,120 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function approvedAccount() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          'jagadish2k2006@gmail.com',
+          'keerthijai909@gmail.com',
+          'pavithratech1206@gmail.com',
+          'tejaswinisiva02@gmail.com'
+        ];
+    }
 
-    // Universal Allow for REDDOT Workstation OS Realtime Multi-Device Sync
-    match /{document=**} {
-      allow read, write: if true;
+    function adminAccount() {
+      return approvedAccount()
+        && request.auth.token.email in [
+          'jagadish2k2006@gmail.com',
+          'keerthijai909@gmail.com'
+        ];
+    }
+
+    function memberPath(orgId) {
+      return /databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid);
+    }
+
+    function activeMember(orgId) {
+      return approvedAccount()
+        && exists(memberPath(orgId))
+        && get(memberPath(orgId)).data.email == request.auth.token.email
+        && get(memberPath(orgId)).data.active == true
+        && get(memberPath(orgId)).data.get('resigned', false) != true
+        && get(memberPath(orgId)).data.get('suspended', false) != true;
+    }
+
+    function workspaceMember(orgId) {
+      return activeMember(orgId)
+        || (adminAccount()
+          && !exists(memberPath(orgId)));
+    }
+
+    function workspaceAdmin(orgId) {
+      return adminAccount()
+        && (!exists(memberPath(orgId)) || activeMember(orgId));
+    }
+
+    function canCreateOwnMember(memberUid) {
+      return approvedAccount()
+        && request.auth.uid == memberUid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.active == true
+        && request.resource.data.get('resigned', false) != true
+        && request.resource.data.get('suspended', false) != true
+        && (
+          (request.auth.token.email == 'jagadish2k2006@gmail.com'
+            && request.resource.data.role == 'Founder'
+            && request.resource.data.isOwner == true)
+          || (request.auth.token.email == 'keerthijai909@gmail.com'
+            && request.resource.data.role == 'CEO'
+            && request.resource.data.isOwner == false)
+          || (request.auth.token.email in [
+              'pavithratech1206@gmail.com',
+              'tejaswinisiva02@gmail.com'
+            ]
+            && request.resource.data.role in ['Employee', 'Intern']
+            && request.resource.data.isOwner == false)
+        );
+    }
+
+    function canUpdateOwnMember(orgId, memberUid) {
+      return approvedAccount()
+        && activeMember(orgId)
+        && request.auth.uid == memberUid
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.isOwner == resource.data.isOwner
+        && request.resource.data.active == resource.data.active
+        && request.resource.data.get('resigned', false) == resource.data.get('resigned', false)
+        && request.resource.data.get('suspended', false) == resource.data.get('suspended', false)
+        && request.resource.data.get('deleted', false) == resource.data.get('deleted', false);
     }
 
     match /organizations/{orgId} {
-      allow read, write: if true;
+      allow read: if orgId == 'reddot' && workspaceMember(orgId);
+      allow write: if orgId == 'reddot' && workspaceAdmin(orgId);
+    }
 
-      // Members Collection
-      match /members/{memberDocId} {
-        allow read, write: if true;
-      }
+    match /organizations/{orgId}/members/{memberUid} {
+      allow read: if orgId == 'reddot' && workspaceMember(orgId);
+      allow create: if orgId == 'reddot'
+        && (workspaceAdmin(orgId) || canCreateOwnMember(memberUid));
+      allow update: if orgId == 'reddot'
+        && (workspaceAdmin(orgId) || canUpdateOwnMember(orgId, memberUid));
+      allow delete: if orgId == 'reddot' && workspaceAdmin(orgId);
+    }
 
-      // Invites Collection
-      match /invites/{inviteId} {
-        allow read, write: if true;
-      }
+    match /organizations/{orgId}/members/{memberUid}/bookmarks/{bookmarkId} {
+      allow read, write: if orgId == 'reddot'
+        && workspaceMember(orgId)
+        && (request.auth.uid == memberUid || workspaceAdmin(orgId));
+    }
 
-      // Tasks Collection
-      match /tasks/{taskId} {
-        allow read, write: if true;
-
-        match /activity/{eventId} {
-          allow read, write: if true;
-        }
-      }
-
-      // Channels Collection & Direct Messages
-      match /channels/{channelId} {
-        allow read, write: if true;
-
-        match /messages/{messageId} {
-          allow read, write: if true;
-        }
-      }
-
-      // Audit Logs Collection
-      match /auditLogs/{eventId} {
-        allow read, write: if true;
-      }
-
-      // Realtime Calls Signaling Collection
-      match /calls/{callId} {
-        allow read, write: if true;
-      }
-
-      // Shift Punch Logs Collection
-      match /punchLogs/{punchId} {
-        allow read, write: if true;
-      }
+    match /organizations/{orgId}/{collection}/{document=**} {
+      allow read: if orgId == 'reddot'
+        && collection != 'members'
+        && workspaceMember(orgId);
+      allow write: if orgId == 'reddot'
+        && workspaceMember(orgId)
+        && (!(collection in [
+          'members',
+          'invites',
+          'resignedMembers',
+          'system',
+          'workTools'
+        ]) || workspaceAdmin(orgId));
     }
   }
 }

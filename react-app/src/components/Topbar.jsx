@@ -1,29 +1,36 @@
 import React, { useState } from 'react';
-import { Search, Bell, Minus, Square, X, Check, XCircle, Pin } from 'lucide-react';
+import { Search, Bell, Minus, Square, X, Sun, Moon } from 'lucide-react';
 import { electronBridge } from '../services/electronBridge';
 
-export function Topbar({
+export const Topbar = React.memo(function Topbar({
   activeTheme,
+  onToggleTheme,
   onOpenOmnibox,
   onOpenSettings,
   userProfile,
+  onLogout,
   notifications = [],
-  isPinned = false,
-  onTogglePin
+  _isPinned = false,
+  _onTogglePin
 }) {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <header className="topbar">
-      {/* Brand */}
-      <div className="topbar-brand topbar-no-drag" onClick={() => window.location.reload()}>
-        <div className="brand-icon-box">
-          <div className="brand-circle"></div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'baseline' }}>
-          <span className="brand-title">REDDOT WORKSTATION</span>
-          <span className="brand-version">v3.0</span>
+      {/* Left: Brand */}
+      <div style={{ display: 'flex', alignItems: 'center' }} className="topbar-no-drag">
+
+        {/* Brand */}
+        <div className="topbar-brand" onClick={() => window.location.reload()}>
+          <div className="brand-icon-box" style={{ background: 'transparent', padding: 0, overflow: 'hidden' }}>
+            <img src="./assets/icon.png" alt="R" style={{ width: 22, height: 22, borderRadius: 5, objectFit: 'cover' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span className="brand-title">REDDOT WORKSTATION</span>
+            <span className="brand-version">v3.0</span>
+          </div>
         </div>
       </div>
 
@@ -36,10 +43,10 @@ export function Topbar({
         <Search size={14} color="var(--text-muted)" />
         <input 
           type="text" 
-          placeholder="Search tasks, files, members..." 
+          placeholder="Search tasks, files, members, or commands..." 
           readOnly 
         />
-        <span className="search-kbd">Ctrl+K</span>
+        <span className="search-kbd">Ctrl + K</span>
       </div>
 
       {/* Right Controls */}
@@ -59,7 +66,7 @@ export function Topbar({
                 right: 5,
                 width: 7,
                 height: 7,
-                backgroundColor: 'var(--accent-red)',
+                backgroundColor: 'var(--text-primary)',
                 borderRadius: '50%'
               }} />
             )}
@@ -118,31 +125,122 @@ export function Topbar({
           )}
         </div>
 
-        {/* User Profile Badge */}
-        <div className="user-profile-badge" onClick={onOpenSettings} title="User Profile & Settings">
-          <div className="user-avatar-circle">
-            {userProfile?.avatar ? (
-              <img src={userProfile.avatar} alt={userProfile.name} />
-            ) : (
-              <span>JK</span>
-            )}
+        {/* Theme Toggle (Sun / Moon) matching Reference */}
+        {onToggleTheme && (
+          <button 
+            className="icon-btn" 
+            title={activeTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            onClick={onToggleTheme}
+          >
+            {activeTheme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
+          </button>
+        )}
+
+        {/* User Profile Badge & Dropdown */}
+        <div style={{ position: 'relative' }}>
+          <div 
+            className="user-profile-badge" 
+            onClick={() => setShowProfileMenu(!showProfileMenu)} 
+            title="User Profile & Account"
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="user-avatar-circle">
+              {userProfile?.avatar ? (
+                <img src={userProfile.avatar} alt={userProfile.name} />
+              ) : (
+                <span>{(userProfile?.name || 'JK').split(' ').map(p => p[0]).join('').slice(0, 2)}</span>
+              )}
+            </div>
+            <div className="user-info-text">
+              <span className="user-name-title">{userProfile?.name || 'Jagadish K'}</span>
+              <span className="user-role-title">{userProfile?.role || 'Founder'}</span>
+            </div>
           </div>
-          <div className="user-info-text">
-            <span className="user-name-title">{userProfile?.name || 'JAGADISH K'}</span>
-            <span className="user-role-title">{userProfile?.role || 'FOUNDER'}</span>
-          </div>
+
+          {showProfileMenu && (
+            <div 
+              style={{
+                position: 'absolute',
+                top: 42,
+                right: 0,
+                width: 240,
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-md, 8px)',
+                boxShadow: 'var(--shadow-modal, 0 10px 30px rgba(0,0,0,0.25))',
+                zIndex: 120,
+                padding: '10px 0',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              <div style={{ padding: '6px 14px 10px', borderBottom: '1px solid var(--border-dim)' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {userProfile?.name || 'Jagadish K'}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  {userProfile?.email || 'jagadish2k2006@gmail.com'}
+                </div>
+                <div style={{ marginTop: 4, display: 'inline-block', fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-primary)', background: 'var(--bg-subtle)', border: '1px solid var(--border-color)', padding: '2px 7px', borderRadius: 4 }}>
+                  ● Active Session
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  if (onOpenSettings) onOpenSettings();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '9px 14px',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-subtle)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              >
+                Settings & Preferences
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  if (onLogout) onLogout();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '9px 14px',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  borderTop: '1px solid var(--border-dim)'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-subtle)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              >
+                Switch Account / Sign Out
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Native Windows Controls */}
+        {/* Native Window Controls */}
         <div className="window-controls">
-          <button 
-            className="win-btn" 
-            title={isPinned ? "Switch to Interactive Window Mode" : "Pin as Live Windows Desktop Background"} 
-            onClick={onTogglePin}
-            style={{ color: isPinned ? 'var(--accent-red)' : 'var(--text-secondary)' }}
-          >
-            <Pin size={11} style={{ transform: isPinned ? 'rotate(45deg)' : 'none' }} />
-          </button>
           <button 
             className="win-btn" 
             title="Minimize" 
@@ -168,4 +266,6 @@ export function Topbar({
       </div>
     </header>
   );
-}
+});
+
+export default Topbar;

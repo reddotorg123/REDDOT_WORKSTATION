@@ -5,7 +5,7 @@
  * ============================================================================
  */
 
-const { app, BrowserWindow, screen, Tray, Menu, nativeImage, ipcMain, powerMonitor, session, Notification, dialog, shell } = require('electron');
+const { app, BrowserWindow, screen, Tray, Menu, nativeImage, ipcMain, powerMonitor, session, Notification, dialog, shell, desktopCapturer } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -26,6 +26,11 @@ app.commandLine.appendSwitch('enable-accelerated-video-decode');
 // Standard desktop Chrome User-Agent to ensure Google OAuth & Firebase SSO are never blocked
 const CHROME_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 app.userAgentFallback = CHROME_USER_AGENT;
+
+// Windows Application User Model ID (Required for Windows 10/11 Action Center & Toast Notifications)
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.reddot.workstation.ws');
+}
 
 let mainWindow = null;
 let tray = null;
@@ -634,25 +639,8 @@ function createWallpaperWindow() {
 
   setTimeout(showAndActivate, 800);
 
-  mainWindow.on('close', async (e) => {
-    if (!mainWindow._clockedOutOnClose) {
-      e.preventDefault();
-      mainWindow._clockedOutOnClose = true;
-      try {
-        await mainWindow.webContents.executeJavaScript(`
-          if (typeof autoPerformExitClockOut === 'function') {
-            autoPerformExitClockOut();
-          }
-        `);
-      } catch (err) {
-        console.warn('[EXIT] Auto clock-out on window close error:', err);
-      }
-      setTimeout(() => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.destroy();
-        }
-      }, 350);
-    }
+  mainWindow.on('close', (e) => {
+    // Window closing cleanly without automatic side-effect punches
   });
 
   mainWindow.on('closed', () => {
@@ -1283,8 +1271,10 @@ ipcMain.handle('save-file-dialog', async (event, payload) => {
 });
 
 // --- OVER-THE-AIR (OTA) CLOUD UPDATER ENGINE ---
-const DEFAULT_OTA_MANIFEST_URL = 'https://firestore.googleapis.com/v1/projects/reddot-workspace/databases/(default)/documents/organizations/reddot/system/otaRelease?key=AIzaSyBpjenDcXDREseIDv5NfgpDo2fAk_gUhdk';
-const CLOUD_BUNDLE_URL = 'https://firestore.googleapis.com/v1/projects/reddot-workspace/databases/(default)/documents/organizations/reddot/ota/bundle?key=AIzaSyBpjenDcXDREseIDv5NfgpDo2fAk_gUhdk';
+const SUPABASE_OTA_BASE = 'https://eliyyiythrbcmwdrcvzk.supabase.co/storage/v1/object/public/reddot-releases';
+const DEFAULT_OTA_MANIFEST_URL = `${SUPABASE_OTA_BASE}/version.json`;
+const DEFAULT_OTA_BUNDLE_URL = `${SUPABASE_OTA_BASE}/ota-bundle.tar.gz`;
+const FIRESTORE_FALLBACK_MANIFEST_URL = 'https://firestore.googleapis.com/v1/projects/reddot-workspace/databases/(default)/documents/organizations/reddot/system/otaRelease?key=AIzaSyBpjenDcXDREseIDv5NfgpDo2fAk_gUhdk';
 let downloadedUpdatePath = null;
 
 function fetchJson(url) {
@@ -1515,77 +1505,87 @@ ipcMain.handle('ota-check-update', async (event, customParam) => {
   };
 });
 
-ipcMain.handle('ota-apply-hotpatch', async (event) => {
+ipcMain.handle('ota-apply-hotpatch', async (event, customBundleUrl) => {
   if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
 
+  const bundleUrl = (typeof customBundleUrl === 'string' && customBundleUrl.startsWith('http'))
+    ? customBundleUrl
+    : DEFAULT_OTA_BUNDLE_URL;
+
+  const hotpatchDir = getHotpatchDir();
+  const hotpatchUiDir = getHotpatchUiDir();
+  const tempExtractDir = path.join(app.getPath('userData'), `hotpatch_temp_${Date.now()}`);
+  const tempTarGzPath = path.join(app.getPath('userData'), `ota_download_${Date.now()}.tar.gz`);
+
   try {
-    const bundleDoc = await fetchJson(CLOUD_BUNDLE_URL);
-    if (!bundleDoc || !bundleDoc.fields) {
-      throw new Error('Cloud OTA bundle is not available or could not be fetched');
+    console.log(`[OTA] Initiating hotpatch download from ${bundleUrl}...`);
+    // 1. Download tar.gz bundle package to temporary file
+    await downloadBinaryFile(bundleUrl, tempTarGzPath, (progress) => {
+      mainWindow?.webContents.send('ota-download-progress', progress);
+    });
+
+    if (!fs.existsSync(tempTarGzPath) || fs.statSync(tempTarGzPath).size < 100) {
+      throw new Error('Downloaded OTA bundle is empty or corrupted');
     }
 
-    const fields = bundleDoc.fields;
-    const remoteVersion = fields.version?.stringValue || '2.5.3';
-    const wallpaperJs = fields.wallpaperJs?.stringValue;
-    const firebaseServiceJs = fields.firebaseServiceJs?.stringValue;
-    const styleCss = fields.styleCss?.stringValue;
-    const indexHtml = fields.indexHtml?.stringValue;
+    // 2. Unpack tar.gz into temporary directory first to guarantee atomic extraction
+    if (fs.existsSync(tempExtractDir)) {
+      fs.rmSync(tempExtractDir, { recursive: true, force: true });
+    }
+    fs.mkdirSync(tempExtractDir, { recursive: true });
 
-    // Use safe, user-writable userData directory (works inside Program Files, asar, portable, dev)
-    const hotpatchDir = getHotpatchDir();
-    const hotpatchUiDir = getHotpatchUiDir();
+    await new Promise((resolve, reject) => {
+      const childProcess = require('child_process');
+      childProcess.execFile('tar.exe', ['-xzf', tempTarGzPath, '-C', tempExtractDir], (err, stdout, stderr) => {
+        if (err) {
+          return reject(new Error(`Failed to extract OTA package: ${stderr || err.message}`));
+        }
+        resolve();
+      });
+    });
 
+    // Verify index.html exists in extracted contents
+    const extractedIndex = path.join(tempExtractDir, 'index.html');
+    if (!fs.existsSync(extractedIndex)) {
+      throw new Error('Corrupted OTA package: index.html is missing');
+    }
+
+    // 3. Atomically copy extracted files into user-writable hotpatchUiDir
     if (!fs.existsSync(hotpatchUiDir)) {
       fs.mkdirSync(hotpatchUiDir, { recursive: true });
     }
 
-    const filesUpdated = [];
-    if (wallpaperJs) {
-      fs.writeFileSync(path.join(hotpatchUiDir, 'wallpaper.js'), wallpaperJs, 'utf8');
-      filesUpdated.push('wallpaper.js');
-    }
-    if (firebaseServiceJs) {
-      fs.writeFileSync(path.join(hotpatchUiDir, 'firebase-service.js'), firebaseServiceJs, 'utf8');
-      filesUpdated.push('firebase-service.js');
-    }
-    if (styleCss) {
-      fs.writeFileSync(path.join(hotpatchUiDir, 'style.css'), styleCss, 'utf8');
-      filesUpdated.push('style.css');
-    }
-    if (indexHtml) {
-      fs.writeFileSync(path.join(hotpatchUiDir, 'index.html'), indexHtml, 'utf8');
-      filesUpdated.push('index.html');
-    }
+    // Copy extracted tree into hotpatchUiDir recursively
+    fs.cpSync(tempExtractDir, hotpatchUiDir, { recursive: true, force: true });
 
-    // Update hotpatch version manifest in userData
+    // Read or fetch target version info
+    let targetVersion = '3.12.0';
+    let targetChangelog = [];
+    try {
+      const manifest = await fetchJson(DEFAULT_OTA_MANIFEST_URL);
+      if (manifest && manifest.version) {
+        targetVersion = manifest.version;
+        targetChangelog = manifest.changelog || [];
+      }
+    } catch (_) {}
+
+    // 4. Write verified version manifest in userData hotpatch directory
     const hotpatchVJsonPath = path.join(hotpatchDir, 'version.json');
     const vData = {
-      version: remoteVersion,
-      releaseDate: fields.releaseDate?.stringValue || new Date().toISOString().slice(0, 10),
+      version: targetVersion,
+      releaseDate: new Date().toISOString().slice(0, 10),
       appliedAt: new Date().toISOString(),
-      changelog: fields.changelog?.arrayValue?.values ? fields.changelog.arrayValue.values.map(v => v.stringValue) : []
+      changelog: targetChangelog
     };
     fs.writeFileSync(hotpatchVJsonPath, JSON.stringify(vData, null, 2), 'utf8');
-    filesUpdated.push('version.json');
 
-    // Also update dev workspace if not packaged (for easy dev sync)
-    if (!app.isPackaged) {
-      try {
-        const localUiDir = path.join(__dirname, 'wallpaper-ui');
-        if (wallpaperJs) fs.writeFileSync(path.join(localUiDir, 'wallpaper.js'), wallpaperJs, 'utf8');
-        if (firebaseServiceJs) fs.writeFileSync(path.join(localUiDir, 'firebase-service.js'), firebaseServiceJs, 'utf8');
-        if (styleCss) fs.writeFileSync(path.join(localUiDir, 'style.css'), styleCss, 'utf8');
-        if (indexHtml) fs.writeFileSync(path.join(localUiDir, 'index.html'), indexHtml, 'utf8');
-        const vJsonPath = path.join(__dirname, 'version.json');
-        if (fs.existsSync(vJsonPath)) {
-          const devVData = JSON.parse(fs.readFileSync(vJsonPath, 'utf8'));
-          devVData.version = remoteVersion;
-          fs.writeFileSync(vJsonPath, JSON.stringify(devVData, null, 2), 'utf8');
-        }
-      } catch (_) {}
-    }
+    // 5. Clean up temporary files
+    try { if (fs.existsSync(tempTarGzPath)) fs.unlinkSync(tempTarGzPath); } catch (_) {}
+    try { if (fs.existsSync(tempExtractDir)) fs.rmSync(tempExtractDir, { recursive: true, force: true }); } catch (_) {}
 
-    // Clear session cache so Chromium picks up hotpatch instantly
+    console.log(`[OTA] Hotpatch v${targetVersion} installed successfully. Reloading workspace...`);
+
+    // 6. Clear session cache so Chromium picks up the new bundle immediately without restarting
     if (mainWindow && !mainWindow.isDestroyed()) {
       try {
         await mainWindow.webContents.session.clearCache();
@@ -1598,9 +1598,16 @@ ipcMain.handle('ota-apply-hotpatch', async (event) => {
       }, 500);
     }
 
-    return { success: true, version: remoteVersion, filesUpdated };
+    return {
+      success: true,
+      version: targetVersion,
+      message: `Successfully hotpatched to v${targetVersion} with zero downtime!`
+    };
   } catch (err) {
     console.error('[OTA] Hotpatch installation error:', err);
+    // Cleanup temporary files on failure
+    try { if (fs.existsSync(tempTarGzPath)) fs.unlinkSync(tempTarGzPath); } catch (_) {}
+    try { if (fs.existsSync(tempExtractDir)) fs.rmSync(tempExtractDir, { recursive: true, force: true }); } catch (_) {}
     throw err;
   }
 });
@@ -1929,6 +1936,27 @@ ipcMain.on('incoming-call-alert', (event, payload) => {
   }
 });
 
+// Screen Sharing / Desktop Capturer API for WebRTC Screen Share
+ipcMain.handle('get-desktop-sources', async (event, options = {}) => {
+  if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender');
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: options.types || ['screen', 'window'],
+      thumbnailSize: { width: 320, height: 180 },
+      fetchWindowIcons: true
+    });
+    return sources.map(src => ({
+      id: src.id,
+      name: src.name,
+      thumbnail: src.thumbnail ? src.thumbnail.toDataURL() : null,
+      appIcon: src.appIcon ? src.appIcon.toDataURL() : null
+    }));
+  } catch (err) {
+    console.error('[SCREEN-SHARE] desktopCapturer error:', err);
+    return [];
+  }
+});
+
 // Single instance lock
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -2036,17 +2064,6 @@ if (!gotTheLock) {
     if (backendProcess) {
       try { backendProcess.kill(); } catch (_) {}
       backendProcess = null;
-    }
-
-    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow._clockedOutOnClose) {
-      mainWindow._clockedOutOnClose = true;
-      try {
-        mainWindow.webContents.executeJavaScript(`
-          if (typeof autoPerformExitClockOut === 'function') {
-            autoPerformExitClockOut();
-          }
-        `);
-      } catch (_) {}
     }
   });
 

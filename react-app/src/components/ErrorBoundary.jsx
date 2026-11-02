@@ -31,7 +31,7 @@ export class ErrorBoundary extends React.Component {
           <p style={{ color: 'var(--text-secondary)', maxWidth: 500, marginBottom: 20, fontSize: 13 }}>
             An unexpected error occurred while displaying this module. You can return to Dashboard or reset this view.
           </p>
-          <div style={{ padding: '8px 16px', background: 'var(--bg-card)', borderRadius: 6, fontFamily: 'monospace', fontSize: 11, marginBottom: 20, color: '#f87171' }}>
+          <div style={{ padding: '8px 16px', background: 'var(--bg-card)', borderRadius: 6, fontFamily: 'monospace', fontSize: 11, marginBottom: 20, color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}>
             {this.state.error?.message || 'Component failed to render'}
           </div>
           <button 
