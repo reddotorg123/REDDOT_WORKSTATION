@@ -847,11 +847,11 @@ export function AttendanceView({
     const arcOnlyD = `M ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2}`;
 
     // Tag positions with collision avoidance:
-    // If the angular span between in and out tags is narrow (< 32 degrees), stagger radial distances
+    // Placed at clean radius outside clock numbers to avoid any overlap
     const angleDiff = Math.abs(inAngleDeg - outAngleDeg);
-    const isClose = angleDiff < 32 || angleDiff > 328;
-    const inTagR = 126;
-    const outTagR = isClose ? 139 : 126;
+    const isClose = angleDiff < 36 || angleDiff > 324;
+    const inTagR = 142;
+    const outTagR = isClose ? 162 : 142;
 
     const inTagX = +(cx + inTagR * Math.cos(radIn)).toFixed(1);
     const inTagY = +(cy + inTagR * Math.sin(radIn)).toFixed(1);

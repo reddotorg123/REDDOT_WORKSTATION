@@ -29,7 +29,7 @@ export const Topbar = React.memo(function Topbar({
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
             <span className="brand-title">REDDOT WS</span>
-            <span className="brand-version">v3.13.0</span>
+            <span className="brand-version">v3.13.1</span>
           </div>
         </div>
       </div>

@@ -31,7 +31,7 @@ export function SettingsView({
   const [language, setLanguage] = useState('English');
   const [autoSave, setAutoSave] = useState(true);
   const [startOnLogin, setStartOnLogin] = useState(false);
-  const [installedVersion, setInstalledVersion] = useState('3.13.0');
+  const [installedVersion, setInstalledVersion] = useState('3.13.1');
 
   // Load verified runtime version info from Electron
   useEffect(() => {

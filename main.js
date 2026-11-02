@@ -1483,17 +1483,19 @@ ipcMain.handle('ota-check-update', async (event, customParam) => {
     return {
       success: true,
       hasUpdate: hasUpdate,
+      updateAvailable: hasUpdate,
       currentVersion: currentVersion,
       latestVersion: remoteVersion,
-      releaseDate: manifest.releaseDate || '2026-09-05',
+      version: remoteVersion,
+      releaseDate: manifest.releaseDate || '2026-11-02',
       minRequiredVersion: manifest.minRequiredVersion || '2.0.0',
       changelog: manifest.changelog || [
-        'Borderless Workspace: Removed top menu bar for distraction-free immersion',
-        'Interactive Task Editor: Edit tasks with assignee, priority, status, and cloud sync',
-        'Real-Time Fleet Hours Today: Live aggregate punch log calculations and presence ticker',
+        'Interactive Time & Shifts: Functional weekly & monthly pickers and clean arc labels',
+        'Fleet Presence: Real-time dynamic employee status and team metrics',
         'Over-The-Air (OTA) Cloud Pipeline: Instant hotpatching with zero downtime'
       ],
       downloadUrl: manifest.downloadUrl || '',
+      otaBundleUrl: manifest.otaBundleUrl || DEFAULT_OTA_BUNDLE_URL,
       canHotpatch: true,
       mandatory: !!manifest.mandatory
     };
@@ -1502,9 +1504,11 @@ ipcMain.handle('ota-check-update', async (event, customParam) => {
   return {
     success: true,
     hasUpdate: false,
+    updateAvailable: false,
     currentVersion: currentVersion,
     latestVersion: currentVersion,
-    releaseDate: '2026-09-05',
+    version: currentVersion,
+    releaseDate: '2026-11-02',
     changelog: ['You are running the verified production build of REDDOT Workstation OS.'],
     offlineNotice: 'Cloud release server currently standby'
   };
@@ -1616,6 +1620,83 @@ ipcMain.handle('ota-apply-hotpatch', async (event, customBundleUrl) => {
     throw err;
   }
 });
+
+async function performAutoHotpatchCheck() {
+  try {
+    const activeInfo = getActiveVersionInfo();
+    const currentVersion = activeInfo.version;
+    const manifest = await fetchJson(DEFAULT_OTA_MANIFEST_URL);
+    if (!manifest || !manifest.version) return;
+
+    if (compareSemver(manifest.version, currentVersion) > 0) {
+      console.log(`[OTA-AUTO] New update available: v${manifest.version} (current: v${currentVersion}). Initiating background OTA download...`);
+      const bundleUrl = manifest.otaBundleUrl || DEFAULT_OTA_BUNDLE_URL;
+      const hotpatchDir = getHotpatchDir();
+      const hotpatchUiDir = getHotpatchUiDir();
+      const tempExtractDir = path.join(app.getPath('userData'), `hotpatch_temp_auto_${Date.now()}`);
+      const tempTarGzPath = path.join(app.getPath('userData'), `ota_download_auto_${Date.now()}.tar.gz`);
+
+      await downloadBinaryFile(bundleUrl, tempTarGzPath);
+
+      if (!fs.existsSync(tempTarGzPath) || fs.statSync(tempTarGzPath).size < 100) {
+        throw new Error('Downloaded auto OTA bundle is empty or corrupted');
+      }
+
+      if (fs.existsSync(tempExtractDir)) {
+        fs.rmSync(tempExtractDir, { recursive: true, force: true });
+      }
+      fs.mkdirSync(tempExtractDir, { recursive: true });
+
+      await new Promise((resolve, reject) => {
+        const childProcess = require('child_process');
+        childProcess.execFile('tar.exe', ['-xzf', tempTarGzPath, '-C', tempExtractDir], (err, stdout, stderr) => {
+          if (err) return reject(new Error(`Failed to extract OTA package: ${stderr || err.message}`));
+          resolve();
+        });
+      });
+
+      const extractedIndex = path.join(tempExtractDir, 'index.html');
+      if (!fs.existsSync(extractedIndex)) {
+        throw new Error('Corrupted OTA package: index.html is missing');
+      }
+
+      if (!fs.existsSync(hotpatchUiDir)) {
+        fs.mkdirSync(hotpatchUiDir, { recursive: true });
+      }
+      fs.cpSync(tempExtractDir, hotpatchUiDir, { recursive: true, force: true });
+
+      const hotpatchVJsonPath = path.join(hotpatchDir, 'version.json');
+      const vData = {
+        version: manifest.version,
+        releaseDate: manifest.releaseDate || new Date().toISOString().slice(0, 10),
+        appliedAt: new Date().toISOString(),
+        changelog: manifest.changelog || []
+      };
+      fs.writeFileSync(hotpatchVJsonPath, JSON.stringify(vData, null, 2), 'utf8');
+
+      try { if (fs.existsSync(tempTarGzPath)) fs.unlinkSync(tempTarGzPath); } catch (_) {}
+      try { if (fs.existsSync(tempExtractDir)) fs.rmSync(tempExtractDir, { recursive: true, force: true }); } catch (_) {}
+
+      console.log(`[OTA-AUTO] Successfully auto-hotpatched to v${manifest.version}! Refreshing workspace...`);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        try {
+          await mainWindow.webContents.session.clearCache();
+        } catch (_) {}
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.reloadIgnoringCache();
+          }
+        }, 1000);
+      }
+    }
+  } catch (err) {
+    console.warn('[OTA-AUTO] Background OTA check notice:', err.message);
+  }
+}
+
+// Check on startup after 4 seconds, and re-check every 30 minutes in background
+setTimeout(performAutoHotpatchCheck, 4000);
+setInterval(performAutoHotpatchCheck, 30 * 60 * 1000);
 
 // Revert to factory bundled build (clears hotpatches from userData and restores pristine app.asar code)
 ipcMain.handle('ota-revert-hotpatch', async (event) => {
