@@ -15,7 +15,10 @@ export function AuthScreen({ onLoginSuccess }) {
     setIsLoading(true);
     setErrorMsg('');
     try {
-      const authProfile = await firebaseBridge.signInWithGoogle(rememberMe);
+      const authProfile = await Promise.race([
+        firebaseBridge.signInWithGoogle(rememberMe),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Authentication timed out. If the Google popup was blocked, please click Sign in again.')), 45000))
+      ]);
       if (typeof onLoginSuccess === 'function') {
         onLoginSuccess(authProfile);
       }
