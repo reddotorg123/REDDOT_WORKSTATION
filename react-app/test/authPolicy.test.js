@@ -15,6 +15,7 @@ test('workspace auth policy approves only the Firestore-rules allowlist', () => 
   const policy = browserWindow.REDDOT_AUTH_POLICY;
   assert.equal(policy.isApprovedEmail('JAGADISH2K2006@gmail.com'), true);
   assert.equal(policy.isApprovedEmail('keerthijai909@gmail.com'), true);
+  assert.equal(policy.isApprovedEmail('reddot.org.123@gmail.com'), true);
   assert.equal(policy.isApprovedEmail('unknown@example.com'), false);
   assert.equal(policy.isApprovedEmail(''), false);
   assert.equal(policy.isApprovedEmail(null), false);
@@ -25,6 +26,7 @@ test('workspace auth policy maps approved accounts to their restricted default r
   assert.equal(policy.roleForEmail('jagadish2k2006@gmail.com'), 'Founder');
   assert.equal(policy.roleForEmail('keerthijai909@gmail.com'), 'CEO');
   assert.equal(policy.roleForEmail('pavithratech1206@gmail.com'), 'Employee');
+  assert.equal(policy.roleForEmail('reddot.org.123@gmail.com'), 'Founder');
   assert.equal(policy.roleForEmail('unknown@example.com'), null);
 });
 

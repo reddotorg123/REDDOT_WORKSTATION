@@ -6,9 +6,12 @@ service cloud.firestore {
         && request.auth.token.email_verified == true
         && request.auth.token.email in [
           'jagadish2k2006@gmail.com',
+          'reddot.org.123@gmail.com',
           'keerthijai909@gmail.com',
           'pavithratech1206@gmail.com',
-          'tejaswinisiva02@gmail.com'
+          'tejaswinisiva02@gmail.com',
+          'mukeshk.webdev@gmail.com',
+          'kishoroffical06@gmail.com'
         ];
     }
 
@@ -16,6 +19,7 @@ service cloud.firestore {
       return approvedAccount()
         && request.auth.token.email in [
           'jagadish2k2006@gmail.com',
+          'reddot.org.123@gmail.com',
           'keerthijai909@gmail.com'
         ];
     }
@@ -53,7 +57,7 @@ service cloud.firestore {
         && request.resource.data.get('resigned', false) != true
         && request.resource.data.get('suspended', false) != true
         && (
-          (request.auth.token.email == 'jagadish2k2006@gmail.com'
+          (request.auth.token.email in ['jagadish2k2006@gmail.com', 'reddot.org.123@gmail.com']
             && request.resource.data.role == 'Founder'
             && request.resource.data.isOwner == true)
           || (request.auth.token.email == 'keerthijai909@gmail.com'
@@ -61,7 +65,9 @@ service cloud.firestore {
             && request.resource.data.isOwner == false)
           || (request.auth.token.email in [
               'pavithratech1206@gmail.com',
-              'tejaswinisiva02@gmail.com'
+              'tejaswinisiva02@gmail.com',
+              'mukeshk.webdev@gmail.com',
+              'kishoroffical06@gmail.com'
             ]
             && request.resource.data.role in ['Employee', 'Intern']
             && request.resource.data.isOwner == false)

@@ -85,7 +85,7 @@ class FirebaseBridgeService {
   toAuthProfile(user, member = null) {
     const email = (user?.email || '').trim().toLowerCase();
     const role = member?.role || window.REDDOT_AUTH_POLICY?.roleForEmail(email) || 'Employee';
-    const isFounder = email === 'jagadish2k2006@gmail.com';
+    const isFounder = email === 'jagadish2k2006@gmail.com' || email === 'reddot.org.123@gmail.com';
     const isKeerthi = email === 'keerthijai909@gmail.com';
     return {
       uid: user.uid,
