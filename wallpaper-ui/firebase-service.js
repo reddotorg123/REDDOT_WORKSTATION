@@ -28,7 +28,8 @@
     _authListeners: [],
 
     isApprovedWorkspaceEmail(email) {
-      return !!authPolicy && authPolicy.isApprovedEmail(email);
+      const policy = window.REDDOT_AUTH_POLICY || authPolicy;
+      return !!policy && policy.isApprovedEmail(email);
     },
 
     async requireAuthorizedUser(user) {
@@ -547,8 +548,12 @@
         status: existingData?.status || 'DUTY_OFF'
       };
 
-      await this.db.collection(`organizations/${ORG_ID}/members`).doc(user.uid).set(memberData, { merge: true });
-      await this.logAudit('MEMBER_PROFILE_SYNCED', `Automated Gmail profile sync for ${displayName} [${role}]`, user.uid);
+      try {
+        await this.db.collection(organizations//members).doc(user.uid).set(memberData, { merge: true });
+        await this.logAudit('MEMBER_PROFILE_SYNCED', Automated Gmail profile sync for  [], user.uid);
+      } catch (writeErr) {
+        console.warn('[FIREBASE] Member profile sync notice (continuing with authorized session):', writeErr.message);
+      }
 
       this.currentMember = memberData;
       return memberData;

@@ -121,7 +121,8 @@ export function MessagesView({
   onSyncCloudMessages,
   teamMembers = [],
   initialActiveChannelId = null,
-  onSelectChannel = null
+  onSelectChannel = null,
+  onStartCall = null
 }) {
   const [activeChannelId, setActiveChannelId] = useState(initialActiveChannelId || conversations[0]?.id || 'general');
   const [prevInitialId, setPrevInitialId] = useState(initialActiveChannelId);
@@ -349,10 +350,10 @@ export function MessagesView({
       const lowerChan = String(channelObj.id || activeChannelId || '').toLowerCase();
       const lowerTitle = String(channelObj.title || channelObj.name || '').toLowerCase();
 
-      // Find the teammate who is NOT Jagadish
+      // Find the teammate who is NOT the current logged-in user
       const mate = teamMembers.find(m => {
         if (!m || !m.name) return false;
-        const isSelf = m.name.toLowerCase().includes('jagadish') || (m.email && m.email.toLowerCase().includes('jagadish'));
+        const isSelf = isCurrentMember(m, currentUser, currentUserEmail, currentUserUid);
         if (isSelf) return false;
         const cleanEmail = (m.email || '').toLowerCase().replace(/[@.]/g, '_');
         const emailUser = m.email ? m.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '_') : '';
@@ -372,7 +373,7 @@ export function MessagesView({
         channelObj.title = mate.name;
         channelObj.name = mate.name;
         channelObj.avatar = mate.avatar || mate.photoUrl || mate.photoURL || './assets/id-card.png';
-        const mateSelf = (mate.email && mate.email.toLowerCase().includes('jagadish')) || (mate.name && mate.name.toLowerCase().includes('jagadish'));
+        const mateSelf = isCurrentMember(mate, currentUser, currentUserEmail, currentUserUid);
         const mateLastSeen = Number(mate.lastSeenAt || 0);
         const mateOnline = mateSelf || (
           (mate.status === 'Online' || mate.isOnline) &&
@@ -386,9 +387,12 @@ export function MessagesView({
         channelObj.member = { ...mate, status: channelObj.status, isOnline: mateOnline };
       }
 
-      // Safeguard: NEVER let direct message avatar point to Jagadish's photo
+      // Safeguard: NEVER let direct message avatar point to current user's photo
       if (channelObj.avatar && (channelObj.avatar.includes('profile-photo.jpeg') || channelObj.avatar.includes('1aE0qcOkewuGFzXtCTcUCrjOrRc1-6aRq'))) {
-        channelObj.avatar = channelObj.member?.avatar || './assets/id-card.png';
+        const curMemberObj = teamMembers.find(m => isCurrentMember(m, currentUser, currentUserEmail, currentUserUid));
+        if (curMemberObj && (curMemberObj.avatar?.includes('profile-photo.jpeg') || curMemberObj.avatar?.includes('1aE0qcOkewuGFzXtCTcUCrjOrRc1-6aRq'))) {
+          channelObj.avatar = channelObj.member?.avatar || './assets/id-card.png';
+        }
       }
 
       // Strip leading '#' if present for DMs
@@ -438,17 +442,57 @@ export function MessagesView({
   }, [onSyncCloudMessages]);
 
   // Live Cloud Firestore Channel Messages Subscription
+  const seenMessageIdsRef = useRef(new Set());
+  const initialLoadDoneRef = useRef(false);
+
   useEffect(() => {
     if (!activeChannelId) return;
     const unsub = firebaseBridge.subscribeChannelMessages(activeChannelId, (cloudMsgs) => {
-      if (cloudMsgs && Array.isArray(cloudMsgs) && typeof onSyncCloudMessagesRef.current === 'function') {
-        onSyncCloudMessagesRef.current(activeChannelId, cloudMsgs);
+      if (cloudMsgs && Array.isArray(cloudMsgs)) {
+        // Trigger native notification for incoming new messages from other participants
+        if (initialLoadDoneRef.current) {
+          cloudMsgs.forEach(m => {
+            const mId = m.id || `${m.timestamp}_${m.sender}`;
+            if (!seenMessageIdsRef.current.has(mId)) {
+              seenMessageIdsRef.current.add(mId);
+              const isFromSelf = m.isSelf || m.isOutgoing || 
+                (currentUser && m.sender?.toLowerCase() === currentUser.toLowerCase()) ||
+                (currentUserEmail && m.senderEmail?.toLowerCase() === currentUserEmail.toLowerCase());
+              if (!isFromSelf) {
+                const senderName = m.senderDisplayName || m.sender || activeChannel.title || 'Teammate';
+                const bodyText = m.text || (m.attachments?.length ? 'Sent an attachment' : 'New message');
+                if (window.electronAPI?.showNotification) {
+                  window.electronAPI.showNotification({
+                    title: `${senderName} (${activeChannel.title || 'REDDOT Chat'})`,
+                    body: bodyText
+                  });
+                } else if ('Notification' in window && Notification.permission === 'granted') {
+                  new Notification(`${senderName} (${activeChannel.title || 'REDDOT Chat'})`, {
+                    body: bodyText,
+                    icon: './assets/id-card.png'
+                  });
+                }
+              }
+            }
+          });
+        } else {
+          // Record initial existing messages so we don't spam notifications on channel open
+          cloudMsgs.forEach(m => {
+            const mId = m.id || `${m.timestamp}_${m.sender}`;
+            seenMessageIdsRef.current.add(mId);
+          });
+          initialLoadDoneRef.current = true;
+        }
+
+        if (typeof onSyncCloudMessagesRef.current === 'function') {
+          onSyncCloudMessagesRef.current(activeChannelId, cloudMsgs);
+        }
       }
     });
     return () => {
       if (typeof unsub === 'function') unsub();
     };
-  }, [activeChannelId]);
+  }, [activeChannelId, currentUser, currentUserEmail, activeChannel.title]);
 
   // Format current AM/PM time
   const formatCurrentTime = () => {
@@ -665,6 +709,19 @@ export function MessagesView({
   };
 
   const handleStartCall = (isVideo = false) => {
+    if (typeof onStartCall === 'function') {
+      onStartCall({
+        targetMember: activeChannel.member || {
+          name: activeChannel.title || activeChannel.name,
+          email: activeChannel.id?.includes('@') ? activeChannel.id : '',
+          id: activeChannel.id
+        },
+        channelId: activeChannelId,
+        isVideo
+      });
+      return;
+    }
+
     const meetingUrl = `https://meet.jit.si/reddot-${activeChannelId || 'general'}`;
     const callTitle = `REDDOT ${isVideo ? 'Video' : 'Voice'} Call — #${activeChannel.title || activeChannelId}`;
 
@@ -1839,16 +1896,16 @@ export function MessagesView({
                   {(() => {
                     let membersToList = [];
                     if (!activeChannel.isGroup) {
-                      // Show current user Jagadish AND the teammate
-                      const founder = teamMembers.find(m => m.name?.toLowerCase().includes('jagadish')) || {
-                        name: 'Jagadish K',
-                        role: 'Founder',
-                        department: 'Hardware Architecture',
-                        avatar: './assets/profile-photo.jpeg',
+                      // Show current authenticated user AND the conversation partner
+                      const currentUserObj = teamMembers.find(m => isCurrentMember(m, currentUser, currentUserEmail, currentUserUid)) || {
+                        name: currentUser || 'User',
+                        role: currentUserRole || 'Member',
+                        department: 'Engineering',
+                        avatar: './assets/id-card.png',
                         status: 'Online',
                         isOnline: true
                       };
-                      const mate = activeChannel.member || teamMembers.find(m => m.name?.toLowerCase() === activeChannel.title?.toLowerCase()) || {
+                      const mate = activeChannel.member || teamMembers.find(m => m.name?.toLowerCase() === activeChannel.title?.toLowerCase() && !isCurrentMember(m, currentUser, currentUserEmail, currentUserUid)) || {
                         name: activeChannel.title,
                         role: 'Team Member',
                         department: 'Software & Web',
@@ -1856,7 +1913,7 @@ export function MessagesView({
                         status: activeChannel.status || 'Offline',
                         isOnline: !!activeChannel.isOnline
                       };
-                      membersToList = [founder, mate];
+                      membersToList = [currentUserObj, mate];
                     } else {
                       // Deduplicate by name/email
                       const seen = new Set();
@@ -1877,7 +1934,7 @@ export function MessagesView({
 
                     return membersToList.map(m => {
                       const isOnline = m.status === 'Online' || m.isOnline;
-                      const isSelf = m.name?.toLowerCase().includes('jagadish');
+                      const isSelf = isCurrentMember(m, currentUser, currentUserEmail, currentUserUid);
                       return (
                         <div 
                           key={m.id || m.uid || m.email || m.name} 
@@ -1988,7 +2045,7 @@ export function MessagesView({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {teamMembers
                     .filter(m => {
-                      const isSelf = m.name?.toLowerCase().includes('jagadish') || m.email?.toLowerCase().includes('jagadish');
+                      const isSelf = isCurrentMember(m, currentUser, currentUserEmail, currentUserUid);
                       if (isSelf) return false;
                       if (!contactSearch.trim()) return true;
                       const q = contactSearch.toLowerCase();

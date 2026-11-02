@@ -1213,19 +1213,65 @@ class FirebaseBridgeService {
     } catch {}
   }
 
+  // --- REAL-TIME CALL SIGNALING ---
+  async sendCallInvite(targetMember, roomUrl, callType = 'video') {
+    const svc = await this.ensureReady();
+    if (svc && typeof svc.sendCallInvite === 'function') {
+      return svc.sendCallInvite(targetMember, roomUrl, callType);
+    }
+  }
+
+  async respondToCall(callId, status = 'ACCEPTED') {
+    const svc = await this.ensureReady();
+    if (svc && typeof svc.respondToCall === 'function') {
+      return svc.respondToCall(callId, status);
+    }
+  }
+
+  async cancelCall(callId) {
+    const svc = await this.ensureReady();
+    if (svc && typeof svc.cancelCall === 'function') {
+      return svc.cancelCall(callId);
+    }
+  }
+
+  subscribeIncomingCalls(callback) {
+    let isSubscribed = true;
+    let unsub = () => {};
+
+    this.ensureReady().then(svc => {
+      if (!isSubscribed) return;
+      if (svc && typeof svc.subscribeIncomingCalls === 'function') {
+        unsub = svc.subscribeIncomingCalls(calls => {
+          if (isSubscribed && typeof callback === 'function') callback(calls);
+        });
+      }
+    }).catch(err => console.warn('[CALL_SIGNAL] Listener error:', err.message));
+
+    return () => {
+      isSubscribed = false;
+      try { unsub(); } catch {}
+    };
+  }
+
   // --- REAL AUTHENTICATION BRIDGES ---
   async signInWithGoogle(rememberSession = true) {
     await this.ensureReady();
     if (typeof window !== 'undefined' && window.FirebaseService && typeof window.FirebaseService.signInWithGoogle === 'function') {
       await this.setSessionPersistence(rememberSession);
-      const user = await window.FirebaseService.signInWithGoogle();
-      if (user) {
-        const authProfile = this.toAuthProfile(user, window.FirebaseService.currentMember);
-        this.setActiveUser(authProfile);
-        return authProfile;
+      try {
+        const user = await window.FirebaseService.signInWithGoogle();
+        if (user) {
+          const authProfile = this.toAuthProfile(user, window.FirebaseService.currentMember);
+          this.setActiveUser(authProfile);
+          return authProfile;
+        }
+      } catch (err) {
+        console.error('[FIREBASE_BRIDGE] signInWithGoogle thrown error:', err);
+        throw err;
       }
     }
-    throw new Error('Google Sign-in service unavailable or popup was interrupted.');
+    throw new Error('Firebase authentication service is initializing. Please try again in a moment.');
   }
 
   async signInWithCredentials(email, password, rememberSession = true) {

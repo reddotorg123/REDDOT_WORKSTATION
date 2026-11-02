@@ -19,6 +19,8 @@ const OmniboxModal = lazy(() => import('./components/OmniboxModal'));
 import { AuthScreen } from './components/AuthScreen';
 import { ApplyLeaveModal } from './components/ApplyLeaveModal';
 import { StartupVideoScreen } from './components/StartupVideoScreen';
+import { CallOverlayModal } from './components/CallOverlayModal';
+import { webRTCCallService } from './services/webRTCCallService';
 
 // Premium Skeletal Loading Screen Fallback
 function ViewLoadingFallback() {
@@ -167,6 +169,10 @@ export function App() {
 
   // Apply Leave Modal State
   const [isApplyLeaveOpen, setIsApplyLeaveOpen] = useState(false);
+
+  // Active & Incoming WebRTC Call States
+  const [activeCall, setActiveCall] = useState(null);
+  const [incomingCall, setIncomingCall] = useState(null);
 
   // Sync active user to firebase bridge so dynamic messages and presence are accurate
   useEffect(() => {
@@ -435,12 +441,28 @@ export function App() {
       ));
     });
 
+    const unsubIncomingCalls = firebaseBridge.subscribeIncomingCalls(calls => {
+      if (Array.isArray(calls) && calls.length > 0) {
+        const latest = calls[0];
+        setIncomingCall(latest);
+        if (window.electronAPI?.showNotification) {
+          window.electronAPI.showNotification({
+            title: `Incoming ${latest.callType === 'video' ? 'Video' : 'Voice'} Call`,
+            body: `${latest.callerName || 'Teammate'} is calling your workstation...`
+          });
+        }
+      } else {
+        setIncomingCall(null);
+      }
+    });
+
     return () => {
       if (typeof unsubMembers === 'function') unsubMembers();
       if (typeof unsubTasks === 'function') unsubTasks();
       if (typeof unsubPunches === 'function') unsubPunches();
       if (typeof unsubChannels === 'function') unsubChannels();
       if (typeof unsubPresence === 'function') unsubPresence();
+      if (typeof unsubIncomingCalls === 'function') unsubIncomingCalls();
       livePresenceRef.current = {};
       livePresenceReadyRef.current = false;
     };
@@ -1032,6 +1054,79 @@ export function App() {
     setCurrentTab('messages');
   };
 
+  // Real-time Calling Actions
+  const handleInitiateCall = async ({ targetMember, channelId, isVideo = false }) => {
+    try {
+      const roomUrl = `https://meet.jit.si/reddot-${channelId || 'direct'}`;
+      const callData = await firebaseBridge.sendCallInvite(targetMember, roomUrl, isVideo ? 'video' : 'audio');
+      
+      const outgoingCall = {
+        callId: callData?.callId || `call_${Date.now()}`,
+        callerId: userProfile.email || userProfile.uid,
+        callerName: userProfile.name,
+        callerPhoto: userProfile.avatar,
+        recipientId: targetMember.email || targetMember.id,
+        recipientName: targetMember.name || targetMember.title,
+        recipientPhoto: targetMember.avatar || targetMember.photoUrl,
+        callType: isVideo ? 'video' : 'audio',
+        status: 'calling',
+        startedAt: new Date().toISOString()
+      };
+      setActiveCall(outgoingCall);
+
+      // Start WebRTC media streams
+      await webRTCCallService.startCall({
+        caller: { name: userProfile.name, email: userProfile.email, id: userProfile.id },
+        recipient: { name: outgoingCall.recipientName, email: outgoingCall.recipientId, id: outgoingCall.recipientId },
+        isVideo
+      });
+    } catch (err) {
+      console.warn('[CALL] Initiate call error:', err);
+      // Fallback: If WebRTC media fails, open standalone meeting window
+      const meetingUrl = `https://meet.jit.si/reddot-${channelId || 'general'}`;
+      if (window.electronAPI?.openCallWindow) {
+        window.electronAPI.openCallWindow({ url: meetingUrl, title: `REDDOT ${isVideo ? 'Video' : 'Voice'} Call` });
+      }
+    }
+  };
+
+  const handleAcceptIncomingCall = async (callSignal) => {
+    setIncomingCall(null);
+    setActiveCall({
+      ...callSignal,
+      status: 'connected'
+    });
+    try {
+      await firebaseBridge.respondToCall(callSignal.id || callSignal.callId, 'ACCEPTED');
+      await webRTCCallService.acceptCall(callSignal);
+    } catch (err) {
+      console.warn('[CALL] Accept call error:', err);
+    }
+  };
+
+  const handleDeclineIncomingCall = async (callSignal) => {
+    setIncomingCall(null);
+    try {
+      await firebaseBridge.respondToCall(callSignal.id || callSignal.callId, 'DECLINED');
+      await webRTCCallService.endCall('declined');
+    } catch (err) {
+      console.warn('[CALL] Decline call error:', err);
+    }
+  };
+
+  const handleEndActiveCall = async () => {
+    const callToCancel = activeCall;
+    setActiveCall(null);
+    try {
+      if (callToCancel) {
+        await firebaseBridge.cancelCall(callToCancel.id || callToCancel.callId);
+      }
+      await webRTCCallService.endCall('hung_up');
+    } catch (err) {
+      console.warn('[CALL] End call error:', err);
+    }
+  };
+
   // Attendance actions
   const handleRecordAttendance = (record) => {
     return recordAttendancePunch(record.action || 'CLOCK_IN', {
@@ -1419,6 +1514,7 @@ export function App() {
                   teamMembers={teamMembers}
                   initialActiveChannelId={activeChatChannel}
                   onSelectChannel={setActiveChatChannel}
+                  onStartCall={handleInitiateCall}
                 />
               )}
 
@@ -1499,6 +1595,17 @@ export function App() {
             onLeaveApplied={handleApplyLeaveSuccess}
           />
         )}
+
+        {/* Real-Time WebRTC Call Overlay / Incoming Ringing Modal */}
+        <CallOverlayModal
+          activeCall={activeCall}
+          incomingCall={incomingCall}
+          currentUser={userProfile.name}
+          currentUserEmail={userProfile.email}
+          onAcceptIncoming={handleAcceptIncomingCall}
+          onDeclineIncoming={handleDeclineIncomingCall}
+          onEndCall={handleEndActiveCall}
+        />
       </Suspense>
     </div>
   );
