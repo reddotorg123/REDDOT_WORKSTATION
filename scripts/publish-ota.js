@@ -10,7 +10,7 @@ const https = require('https');
 const { execFile } = require('child_process');
 
 const SUPABASE_PROJECT = process.env.SUPABASE_PROJECT_ID || 'eliyyiythrbcmwdrcvzk';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || Buffer.from('c2Jfc2VjcmV0X1VxQzloalo0dHZoZG5KZ3dhbFZheEFfemxYM0NsRUE=', 'base64').toString('utf8');
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || Buffer.from('c2Jfc2VjcmV0X1VxQzlvaFo0dHZoZG5KZ3dhbFZheEFfemxYM0NsRUE=', 'base64').toString('utf8');
 const BUCKET_NAME = 'reddot-releases';
 
 function uploadToSupabase(fileName, fileBuffer, contentType) {
