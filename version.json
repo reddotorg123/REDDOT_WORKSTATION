@@ -1,12 +1,13 @@
 {
-  "version": "3.12.0",
-  "releaseDate": "2026-10-25",
+  "version": "3.13.0",
+  "releaseDate": "2026-11-02",
   "minRequiredVersion": "2.0.0",
   "changelog": [
-    "Native Windows Taskbar Scanner Sync: Proactively scans open interactive desktop applications (Antigravity IDE, Brave, Spotify, WhatsApp, Deskflow, etc.) and synchronizes real-time telemetry across all teammates.",
-    "Eliminated Static App Duplication: Each user workstation now broadcasts its genuine running taskbar processes instead of mirroring fallback presets.",
-    "Robust Multi-Image Messaging: Optimized image compression and sanitized attachments pipeline ensures multi-photo messages deliver instantly without breaching Cloud Firestore document limits.",
-    "High-Contrast Chat & DM Visibility: Fixed white-on-white text in personal chat and channel lists, ensuring teammate names and unread counts are always crystal clear in light and dark themes."
+    "Interactive Time & Shifts Dropdowns: Functional 'This Week' (This Week, Last Week, 2 Weeks Ago, 3 Weeks Ago) and Month Picker.",
+    "Streamlined Shift Arc Labels: Clean pill tags for Clock-In, Now, and Clock-Out avoiding any text overlap.",
+    "Active Real-Time Presence: Automatic Online status with active pulse for the current logged-in employee session.",
+    "Real Work From Home Calculation: Clean metric reflecting zero when all employees are on Hybrid/Office.",
+    "Multi-Platform Linux Support: Configured for AppImage and .deb distribution."
   ],
   "downloadUrl": "https://github.com/reddotorg123/REDDOT_WORKSTATION/releases/download/v3.1.0/REDDOT-Workstation-OS-Setup.exe",
   "mandatory": true
