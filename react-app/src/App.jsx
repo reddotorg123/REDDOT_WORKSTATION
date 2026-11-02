@@ -1448,6 +1448,8 @@ export function App() {
                   onUpdateUserProfile={setUserProfile}
                   onSelectPhoto={handleSelectProfilePhoto}
                   metrics={metrics}
+                  filesCount={files?.length || 0}
+                  teamMembersCount={teamMembers?.length || 4}
                 />
               )}
             </Suspense>

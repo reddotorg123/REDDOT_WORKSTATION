@@ -28,8 +28,8 @@ export const Topbar = React.memo(function Topbar({
             <img src="./assets/icon.png" alt="R" style={{ width: 22, height: 22, borderRadius: 5, objectFit: 'cover' }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span className="brand-title">REDDOT WORKSTATION</span>
-            <span className="brand-version">v3.0</span>
+            <span className="brand-title">REDDOT WS</span>
+            <span className="brand-version">v3.13.0</span>
           </div>
         </div>
       </div>

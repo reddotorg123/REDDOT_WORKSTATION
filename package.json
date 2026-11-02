@@ -33,7 +33,7 @@
       "version.json",
       "wallpaper-ui/**/*"
     ],
-    "artifactName": "${productName}-${version}-${target}.${ext}",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
     "win": {
       "signAndEditExecutable": false,
       "target": [

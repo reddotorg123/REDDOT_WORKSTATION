@@ -20,15 +20,25 @@ export function SettingsView({
   userProfile, 
   _onUpdateUserProfile,
   onSelectPhoto,
-  _metrics
+  _metrics,
+  filesCount = 0,
+  teamMembersCount = 4
 }) {
   const [activeTab, setActiveTab] = useState('general');
-  const [workspaceName, setWorkspaceName] = useState('REDDOT WORKSTATION');
+  const [workspaceName, setWorkspaceName] = useState('REDDOT WS');
   const [workspaceDesc, setWorkspaceDesc] = useState('All-in-one workspace for REDDOT project.');
   const [timeZone, setTimeZone] = useState('(UTC+05:30) Asia/Kolkata');
   const [language, setLanguage] = useState('English');
   const [autoSave, setAutoSave] = useState(true);
   const [startOnLogin, setStartOnLogin] = useState(false);
+  const [installedVersion, setInstalledVersion] = useState('3.13.0');
+
+  // Load verified runtime version info from Electron
+  useEffect(() => {
+    electronBridge.otaGetInfo().then(info => {
+      if (info?.version) setInstalledVersion(info.version);
+    }).catch(() => {});
+  }, []);
 
   // Sync auto-start with native Electron login item settings
   useEffect(() => {
@@ -418,11 +428,11 @@ export function SettingsView({
           {activeTab === 'about' && (
             <div>
               <div className="panel-header">
-                <span className="panel-title">About REDDOT Workstation</span>
+                <span className="panel-title">About REDDOT WS</span>
               </div>
               <div style={{ padding: '16px 20px', fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                 <p style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>REDDOT WS Architecture & Executive Workspace</p>
-                <p style={{ marginTop: 6 }}>Version: <strong>v3.12.0</strong> (Production Release Build)</p>
+                <p style={{ marginTop: 6 }}>Version: <strong>v{installedVersion}</strong> (Production Release Build)</p>
                 <p>Runtime: Electron 34 / React 19 / V8 Core</p>
                 <p>Native IPC Bridge: <span style={{ color: 'var(--accent-green)', fontWeight: 600 }}>● Connected & Authorized</span></p>
                 <p style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>Persistent Local Vault: %APPDATA%\reddot-workstation-os\reddot_storage</p>
@@ -531,7 +541,7 @@ export function SettingsView({
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}>
               <span style={{ color: 'var(--text-muted)' }}>Version</span>
-              <span style={{ fontWeight: 600 }}>v3.0.0</span>
+              <span style={{ fontWeight: 600 }}>v{installedVersion}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}>
               <span style={{ color: 'var(--text-muted)' }}>Status</span>
@@ -539,15 +549,15 @@ export function SettingsView({
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}>
               <span style={{ color: 'var(--text-muted)' }}>Last Sync</span>
-              <span style={{ fontWeight: 600 }}>1 min ago</span>
+              <span style={{ fontWeight: 600 }}>Active</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}>
               <span style={{ color: 'var(--text-muted)' }}>Storage Usage</span>
-              <span style={{ fontWeight: 600 }}>15.2 GB / 15.2 GB</span>
+              <span style={{ fontWeight: 600 }}>0.8 GB / 15.0 GB (5%)</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}>
               <span style={{ color: 'var(--text-muted)' }}>Team Members</span>
-              <span style={{ fontWeight: 600 }}>4</span>
+              <span style={{ fontWeight: 600 }}>{teamMembersCount}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}>
               <span style={{ color: 'var(--text-muted)' }}>Active Sprint</span>

@@ -29,7 +29,7 @@ app.userAgentFallback = CHROME_USER_AGENT;
 
 // Windows Application User Model ID (Required for Windows 10/11 Action Center & Toast Notifications)
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.reddot.workstation.ws');
+  app.setAppUserModelId('com.reddot.workstation');
 }
 
 let mainWindow = null;
@@ -513,8 +513,13 @@ function createWallpaperWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize || primaryDisplay.bounds;
 
+  // Resolve application icon explicitly for window frame, alt-tab, and taskbar
+  const iconPath = path.join(__dirname, 'wallpaper-ui', 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+  const appIcon = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : undefined;
+
   mainWindow = new BrowserWindow({
-    title: 'REDDOT Workstation OS',
+    title: 'REDDOT WS',
+    icon: appIcon,
     width: Math.min(width, 1536),
     height: Math.min(height, 864),
     x: 0,
