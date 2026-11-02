@@ -1,18 +1,13 @@
 {
-  "version": "3.3.1",
-  "releaseDate": "2026-09-18",
+  "version": "3.12.0",
+  "releaseDate": "2026-10-25",
   "minRequiredVersion": "2.0.0",
   "changelog": [
-    "Hotfix v3.3.1: Completely restored seamless authentication and login functionality across all workstations.",
-    "Removed experimental app monitor background service to guarantee maximum performance, rock-solid stability, and zero login issues.",
-    "WhatsApp Status Ticks Overhaul: Past messages and answered conversation messages accurately display WhatsApp Double Green Ticks (✓✓). Delivered cloud messages display Double Grey Ticks (✓✓).",
-    "Message Info & Read Receipts: Full delivery receipts and read participants with exact timestamps.",
-    "Enterprise Role Standardization: Streamlined all company structures to 4 strict roles: Founder, CEO, Manager, and Employee.",
-    "Strict Attendance Access: Attendance telemetry, member filtering, and ledger exports restricted strictly to CEO and Founder.",
-    "Author-Only Message Deletion: Strict author validation ensures users can only delete their own chat messages across cloud and local storage.",
-    "Real-Time Online Presence Fixes: Seamless live presence synchronization across Direct Messages, Team Members, and Chat header.",
-    "Secure Boot Screen & Auth Guard: Shielded workstation startup with authenticated boot screen, preventing unauthenticated sessions or fake ID message broadcasting."
+    "Native Windows Taskbar Scanner Sync: Proactively scans open interactive desktop applications (Antigravity IDE, Brave, Spotify, WhatsApp, Deskflow, etc.) and synchronizes real-time telemetry across all teammates.",
+    "Eliminated Static App Duplication: Each user workstation now broadcasts its genuine running taskbar processes instead of mirroring fallback presets.",
+    "Robust Multi-Image Messaging: Optimized image compression and sanitized attachments pipeline ensures multi-photo messages deliver instantly without breaching Cloud Firestore document limits.",
+    "High-Contrast Chat & DM Visibility: Fixed white-on-white text in personal chat and channel lists, ensuring teammate names and unread counts are always crystal clear in light and dark themes."
   ],
   "downloadUrl": "https://github.com/reddotorg123/REDDOT_WORKSTATION/releases/download/v3.1.0/REDDOT-Workstation-OS-Setup.exe",
-  "mandatory": false
+  "mandatory": true
 }
